@@ -34,6 +34,11 @@ from echosense.repositories.provider_connections import (
     ProviderConnection,
     ProviderConnectionRepository,
 )
+from echosense.temporal_mood import (
+    MoodEvidence,
+    TemporalMoodLearningService,
+    TemporalMoodProfile,
+)
 
 router = APIRouter(prefix="/auth/spotify", tags=["spotify-auth"])
 
@@ -69,6 +74,15 @@ class SpotifyFeedbackRequest(BaseModel):
 class SpotifyLibrarySaveRequest(BaseModel):
     outcome_id: str = Field(min_length=1)
     decision_id: str = Field(min_length=1)
+
+
+class TemporalMoodCorrectionRequest(BaseModel):
+    daypart: str = Field(min_length=1, max_length=32)
+    mood: str = Field(min_length=1, max_length=32)
+
+
+class TemporalMoodSettingRequest(BaseModel):
+    enabled: bool
 
 
 def get_connection_repository() -> ProviderConnectionRepository:
@@ -114,6 +128,7 @@ def _why_now(
     road_setting: str | None,
     activity: str | None,
     daypart: str | None,
+    temporal_mood: TemporalMoodProfile | None = None,
 ) -> dict[str, object]:
     preference = float(candidate.get("preference_weight", 0.0))
     context_fit = float(candidate.get("context_fit", 0.0))
@@ -135,6 +150,20 @@ def _why_now(
                 "score": round(float(candidate["provider_base_score"]) * 100),
             },
             {"name": "Live context fit", "score": round(context_fit * 100)},
+            *(
+                [
+                    {
+                        "name": (
+                            "Time pattern"
+                            if temporal_mood.pattern_type == "stable_pattern"
+                            else "Recent mood shift"
+                        ),
+                        "score": round(temporal_mood.confidence * 100),
+                    }
+                ]
+                if temporal_mood and temporal_mood.mood
+                else []
+            ),
             {
                 "name": "Learned preference",
                 "score": round(max(-1.0, min(1.0, preference)) * 100),
@@ -143,7 +172,9 @@ def _why_now(
         ],
         "observations": observations or ["Music DNA and recent listening"],
         "summary": (
-            f"Selected from your Music DNA with {round(context_fit * 100)}% live-context fit."
+            temporal_mood.explanation
+            if temporal_mood and temporal_mood.mood
+            else f"Selected from your Music DNA with {round(context_fit * 100)}% live-context fit."
         ),
     }
 
@@ -346,7 +377,13 @@ def spotify_data(
         repository.save(session.provider_user_id, imported)
         music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
         repository.save_profile(music_dna)
-        learning = PlaybackLearningService(get_connection_repository().storage)
+        storage = get_connection_repository().storage
+        learning = PlaybackLearningService(storage)
+        temporal_service = TemporalMoodLearningService(storage)
+        temporal_profile = temporal_service.profile(
+            user_id=session.provider_user_id,
+            daypart=daypart or "unknown",
+        )
         context_service = ListeningContextService()
         context_fits = context_service.score(imported, moment)
         ranking_context = context_service.ranking_context(moment)
@@ -359,6 +396,7 @@ def spotify_data(
             road_setting=road_setting,
             activity=activity,
             daypart=daypart,
+            mood=temporal_profile.mood,
         )
         candidate_tracks = list(
             {
@@ -394,7 +432,23 @@ def spotify_data(
         for slate_item in diverse_slate:
             slate_decision_id = f"dec_{uuid4().hex}"
             decision_ids[slate_item.track.provider_id] = slate_decision_id
-            get_connection_repository().storage.save_decision_trace(
+            context_evidence = expanded.evidence.get(slate_item.track.provider_id, ())
+            inferred_mood = temporal_service.infer_track(
+                slate_item.track,
+                context_evidence,
+            )
+            if temporal_profile.mood and any("learned" in label for label in context_evidence):
+                inferred_mood = inferred_mood or temporal_service.infer_track(
+                    slate_item.track,
+                    (f"learned {temporal_profile.mood} pattern",),
+                )
+                if inferred_mood is None:
+                    inferred_mood = MoodEvidence(
+                        temporal_profile.mood,
+                        temporal_profile.pattern_type,
+                        temporal_profile.confidence,
+                    )
+            storage.save_decision_trace(
                 decision_id=slate_decision_id,
                 user_id=session.provider_user_id,
                 context=ranking_context,
@@ -414,8 +468,26 @@ def spotify_data(
                         "activity": activity,
                         "daypart": daypart,
                     },
-                    "context_evidence": list(
-                        expanded.evidence.get(slate_item.track.provider_id, ())
+                    "context_evidence": list(context_evidence),
+                    "temporal_mood": (
+                        {
+                            "mood": inferred_mood.mood,
+                            "daypart": daypart or "unknown",
+                            "source": inferred_mood.source,
+                            "confidence": inferred_mood.confidence,
+                            "recording_key": (
+                                f"isrc:{slate_item.track.isrc}"
+                                if slate_item.track.isrc
+                                else f"spotify:{slate_item.track.provider_id}"
+                            ),
+                            "policy_version": TemporalMoodLearningService.POLICY_VERSION,
+                        }
+                        if inferred_mood
+                        else {
+                            "mood": None,
+                            "daypart": daypart or "unknown",
+                            "policy_version": TemporalMoodLearningService.POLICY_VERSION,
+                        }
                     ),
                 },
             )
@@ -491,10 +563,12 @@ def spotify_data(
                 road_setting=road_setting,
                 activity=activity,
                 daypart=daypart,
+                temporal_mood=temporal_profile,
             ),
         }
         for item in diverse_slate
     ]
+    result["temporal_mood"] = temporal_profile.as_dict()
     return result
 
 
@@ -547,6 +621,19 @@ def spotify_feedback(
             attribution_window_seconds=86400,
         )
     if result.applied:
+        trace = storage.get_decision_trace(request.decision_id)
+        temporal_applied = (
+            TemporalMoodLearningService(storage).record(
+                outcome_id=request.outcome_id,
+                user_id=session.provider_user_id,
+                signal=request.signal,
+                trace=trace,
+                completion_ratio=request.completion_ratio,
+                rating=request.rating,
+            )
+            if trace
+            else False
+        )
         storage.append_event(
             event_id=f"evt_{uuid4().hex}",
             event_type="playback.learning.applied",
@@ -554,8 +641,11 @@ def spotify_feedback(
             trace_id=f"trc_{uuid4().hex}",
             payload=asdict(result),
         )
+    else:
+        temporal_applied = False
     return {
         **asdict(result),
+        "temporal_mood_applied": temporal_applied,
         "evaluation": (
             {
                 "observed_reward": report.observed_reward,
@@ -566,6 +656,60 @@ def spotify_feedback(
             else None
         ),
     }
+
+
+@router.get("/temporal-mood")
+def spotify_temporal_mood(
+    daypart: str = Query(min_length=1, max_length=32),
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    return (
+        TemporalMoodLearningService(get_connection_repository().storage)
+        .profile(
+            user_id=session.provider_user_id,
+            daypart=daypart,
+        )
+        .as_dict()
+    )
+
+
+@router.post("/temporal-mood/correct")
+def correct_spotify_temporal_mood(
+    request: TemporalMoodCorrectionRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    removed = TemporalMoodLearningService(get_connection_repository().storage).correct(
+        user_id=session.provider_user_id,
+        daypart=request.daypart,
+        mood=request.mood,
+    )
+    return {"status": "corrected", "removed": removed}
+
+
+@router.put("/temporal-mood/settings")
+def set_spotify_temporal_mood(
+    request: TemporalMoodSettingRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    TemporalMoodLearningService(get_connection_repository().storage).set_enabled(
+        session.provider_user_id,
+        request.enabled,
+    )
+    return {"enabled": request.enabled}
+
+
+@router.delete("/temporal-mood")
+def reset_spotify_temporal_mood(
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    removed = TemporalMoodLearningService(get_connection_repository().storage).reset(
+        session.provider_user_id
+    )
+    return {"status": "reset", "removed": removed}
 
 
 def _library_error(exc: Exception) -> HTTPException:

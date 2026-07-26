@@ -32,6 +32,19 @@
         "live-context-factor-explained",
         "driving-speed-baseline-bounded",
         "coastal-mountain-setting-explained",
+        "temporal-pattern-evidence-threshold",
+        "daypart-pattern-isolated",
+        "recent-mood-shift-bounded",
+        "single-track-mood-inference-rejected",
+        "temporal-pattern-decay-applied",
+        "mood-negative-feedback-applied",
+        "temporal-mood-factor-explained",
+        "mood-evidence-provenance-visible",
+        "mood-provider-outage-isolated",
+        "temporal-pattern-correction-applied",
+        "temporal-mood-memory-reset",
+        "temporal-observation-idempotent",
+        "sensitive-mood-inference-prohibited",
         "library-saved",
         "library-unsaved",
         "playlists-browsed",
@@ -56,23 +69,10 @@
         "disconnected"
       ],
       "planned_states": [
-        "temporal-pattern-evidence-threshold",
-        "daypart-pattern-isolated",
-        "recent-mood-shift-bounded",
-        "single-track-mood-inference-rejected",
-        "temporal-pattern-decay-applied",
-        "mood-negative-feedback-applied",
         "mood-dna-compatibility-floor",
         "mood-ranking-influence-bounded",
         "mood-queue-diversity-preserved",
-        "temporal-mood-factor-explained",
-        "mood-evidence-provenance-visible",
-        "mood-provider-outage-isolated",
-        "temporal-pattern-correction-applied",
-        "temporal-mood-memory-reset",
-        "temporal-observation-idempotent",
-        "cross-provider-mood-evidence-deduplicated",
-        "sensitive-mood-inference-prohibited"
+        "cross-provider-mood-evidence-deduplicated"
       ]
     }
   ]

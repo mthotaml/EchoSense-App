@@ -28,6 +28,7 @@ class ContextCandidateService:
         road_setting: str | None,
         activity: str | None,
         daypart: str | None,
+        mood: str | None = None,
     ) -> ContextCandidateResult:
         queries = self.queries(
             weather=weather,
@@ -35,6 +36,7 @@ class ContextCandidateService:
             road_setting=road_setting,
             activity=activity,
             daypart=daypart,
+            mood=mood,
         )
         tracks: dict[str, Track] = {}
         scores: dict[str, float] = {}
@@ -46,7 +48,15 @@ class ContextCandidateService:
                     "/search",
                     params={"q": query, "type": "track", "limit": 5},
                 )
-            except (SpotifyRateLimited, httpx.HTTPError, KeyError, TypeError, ValueError):
+            except (
+                SpotifyRateLimited,
+                httpx.HTTPError,
+                ImportError,
+                KeyError,
+                RuntimeError,
+                TypeError,
+                ValueError,
+            ):
                 continue
             items = payload.get("tracks", {}).get("items", []) if isinstance(payload, dict) else []
             for raw in items:
@@ -70,8 +80,17 @@ class ContextCandidateService:
         road_setting: str | None,
         activity: str | None,
         daypart: str | None,
+        mood: str | None = None,
     ) -> list[tuple[str, str, float]]:
         result: list[tuple[str, str, float]] = []
+        if mood in {"romantic", "melancholy", "calm", "reflective", "energetic", "uplifting"}:
+            result.append(
+                (
+                    f"{mood} {daypart.replace('_', ' ') if daypart else ''} music".strip(),
+                    f"learned {mood} {daypart.replace('_', ' ') if daypart else ''} pattern".strip(),
+                    1.0,
+                )
+            )
         if road_setting == "coastal":
             result.append(
                 (
@@ -106,4 +125,4 @@ class ContextCandidateService:
             )
         if daypart:
             result.append((f"{daypart.replace('_', ' ')} music", f"{daypart} timing", 0.65))
-        return result[:5]
+        return result[:6]

@@ -140,6 +140,7 @@ PAGE = r"""<!doctype html>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. A persistent listening surface powered by your Music DNA.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
     <section id="live-context-panel" class="panel connection"><div><div class="eyebrow">Context fusion</div><h2>Why this music, right now?</h2><p id="context-status" class="connection-copy">Time is automatic. Enable live context for permission-based weather, coarse location, and movement.</p><div id="context-chips" class="context-chips"></div><p class="evidence">Raw coordinates are used transiently for current weather and are not stored by EchoSense.</p></div><button id="context-toggle" class="secondary" type="button">Enable live context</button></section>
+    <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play now</button><button id="queue-add" class="secondary" type="button" disabled>Add next</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip &amp; play next</button></div><div id="toast" aria-live="polite"></div></section>
       <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA queue</div><h2>Different tracks, ranked for this moment</h2><p class="copy">Context, learned preference, familiarity, and diversity shape this sequence.</p></div><button id="dna-queue-add" class="primary" type="button">Add DNA queue</button></div><div id="dna-queue-items" class="track-list"></div></section>
@@ -166,6 +167,7 @@ PAGE = r"""<!doctype html>
     let currentTrackSaved = false;
     let recommendationSlate = [];
     let liveContext = null;
+    let temporalMoodProfile = null;
     let contextWatchId = null;
     let lastContextKey = '';
     let playlistsNextOffset = null;
@@ -226,6 +228,7 @@ PAGE = r"""<!doctype html>
       const response=await api(`/auth/spotify/data?${params}`); const data=await response.json();
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
+      temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
       if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; $('#queue-add').disabled=false; reportedSignals.clear(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
@@ -337,6 +340,31 @@ PAGE = r"""<!doctype html>
       ].filter(Boolean);
       values.forEach(value=>{const chip=document.createElement('span');chip.className='context-chip';chip.textContent=value;chips.appendChild(chip);});
       setText('#context-status',liveContext.faster_than_usual?'Faster-than-usual driving detected. Energy is increased gradually.':'Live context is shaping candidate generation and ranking.');
+    }
+    function renderTemporalMood() {
+      const chips=$('#temporal-mood-chips'); chips.replaceChildren();
+      if(!temporalMoodProfile)return;
+      setText('#temporal-mood-status',temporalMoodProfile.explanation||'Still learning your listening rhythm.');
+      [temporalMoodProfile.mood,temporalMoodProfile.pattern_type?.replace('_',' '),temporalMoodProfile.evidence_count?`${temporalMoodProfile.evidence_count} qualifying signals`:null,temporalMoodProfile.confidence?`${Math.round(temporalMoodProfile.confidence*100)}% confidence`:null].filter(Boolean).forEach(value=>{const chip=document.createElement('span');chip.className='context-chip';chip.textContent=value;chips.appendChild(chip);});
+      $('#temporal-mood-correct').disabled=!temporalMoodProfile.mood;
+      $('#temporal-mood-toggle').textContent=temporalMoodProfile.enabled===false?'Enable learning':'Disable learning';
+    }
+    async function correctTemporalMood() {
+      if(!temporalMoodProfile?.mood)return;
+      await api('/auth/spotify/temporal-mood/correct',{method:'POST',body:JSON.stringify({daypart:temporalMoodProfile.daypart,mood:temporalMoodProfile.mood})});
+      setText('#toast','Pattern corrected. EchoSense will relearn from future qualified listening.');
+      await loadLiveSpotify();
+    }
+    async function toggleTemporalMood() {
+      const enabled=temporalMoodProfile?.enabled===false;
+      await api('/auth/spotify/temporal-mood/settings',{method:'PUT',body:JSON.stringify({enabled})});
+      setText('#toast',enabled?'Temporal mood learning enabled.':'Temporal mood learning disabled.');
+      await loadLiveSpotify();
+    }
+    async function resetTemporalMood() {
+      await api('/auth/spotify/temporal-mood',{method:'DELETE'});
+      setText('#toast','Temporal mood patterns reset. Your other Music DNA remains intact.');
+      await loadLiveSpotify();
     }
     function speedBaseline(speed) {
       const samples=JSON.parse(localStorage.getItem('echosenseDrivingSpeeds')||'[]').filter(value=>Number.isFinite(value)&&value>=8);
@@ -523,6 +551,9 @@ PAGE = r"""<!doctype html>
       $('#skip').addEventListener('click',()=>skipAndPlayNext().catch(e=>setText('#toast',e.message)));
       $('#queue-skip').addEventListener('click',()=>skipAndPlayNext().catch(e=>setText('#toast',e.message)));
       $('#context-toggle').addEventListener('click',toggleLiveContext);
+      $('#temporal-mood-correct').addEventListener('click',()=>correctTemporalMood().catch(e=>setText('#toast',e.message)));
+      $('#temporal-mood-toggle').addEventListener('click',()=>toggleTemporalMood().catch(e=>setText('#toast',e.message)));
+      $('#temporal-mood-reset').addEventListener('click',()=>resetTemporalMood().catch(e=>setText('#toast',e.message)));
       $('#moment').addEventListener('change',()=>spotifyConnected&&loadLiveSpotify($('#moment').value).catch(e=>setText('#toast',e.message)));
       $('#toggle').addEventListener('click',()=>togglePlayback().catch(e=>setText('#toast',e.message)));
       $('#previous').addEventListener('click',()=>api(`/v1/player/previous?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message))); $('#next').addEventListener('click',()=>api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));

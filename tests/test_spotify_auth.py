@@ -9,6 +9,7 @@ from echosense import spotify_auth
 from echosense.product_app import app
 from echosense.repositories.provider_connections import ProviderConnectionRepository
 from echosense.storage import Storage
+from echosense.temporal_mood import TemporalMoodLearningService
 
 client = TestClient(app)
 
@@ -282,3 +283,67 @@ def test_logout_revokes_server_connection_and_clears_cookie(
     assert connection_repository.get(session_id, "spotify") is None
     assert spotify_auth.SESSION_COOKIE in response.headers["set-cookie"]
     assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+def test_temporal_mood_controls_are_scoped_to_connected_listener(
+    connection_repository: ProviderConnectionRepository,
+) -> None:
+    session_id = "temporal-session"
+    connection_repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id="spotify-user",
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"id": "spotify-user", "display_name": "Mohan"},
+        )
+    )
+    learning = TemporalMoodLearningService(connection_repository.storage)
+    now = datetime.now(UTC)
+    for index in range(3):
+        learning.record(
+            outcome_id=f"temporal-{index}",
+            user_id="spotify-user",
+            signal="liked",
+            trace={
+                "item_id": f"track-{index}",
+                "factors": {
+                    "temporal_mood": {
+                        "mood": "romantic",
+                        "daypart": "evening",
+                        "source": "synthetic route evidence",
+                        "confidence": 0.8,
+                    }
+                },
+            },
+            observed_at=now - timedelta(days=index),
+        )
+
+    cookies = {spotify_auth.SESSION_COOKIE: session_id}
+    profile = client.get("/auth/spotify/temporal-mood?daypart=evening", cookies=cookies)
+    assert profile.status_code == 200
+    assert profile.json()["mood"] == "romantic"
+    assert profile.json()["pattern_type"] == "stable_pattern"
+
+    corrected = client.post(
+        "/auth/spotify/temporal-mood/correct",
+        cookies=cookies,
+        json={"daypart": "evening", "mood": "romantic"},
+    )
+    assert corrected.json() == {"status": "corrected", "removed": 3}
+
+    disabled = client.put(
+        "/auth/spotify/temporal-mood/settings",
+        cookies=cookies,
+        json={"enabled": False},
+    )
+    assert disabled.json() == {"enabled": False}
+    assert (
+        client.get("/auth/spotify/temporal-mood?daypart=evening", cookies=cookies).json()["enabled"]
+        is False
+    )
+
+    reset = client.delete("/auth/spotify/temporal-mood", cookies=cookies)
+    assert reset.json() == {"status": "reset", "removed": 0}

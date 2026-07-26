@@ -170,10 +170,35 @@ class Storage:
                 observed_at TEXT NOT NULL
             )
             """,
+            """
+            CREATE TABLE IF NOT EXISTS temporal_mood_observations (
+                outcome_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                recording_key TEXT NOT NULL,
+                daypart TEXT NOT NULL,
+                mood TEXT NOT NULL,
+                signal TEXT NOT NULL,
+                evidence_weight REAL NOT NULL,
+                evidence_source TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                observed_at TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS temporal_mood_settings (
+                user_id TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                updated_at TEXT NOT NULL
+            )
+            """,
             "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON event_outbox (published_at, claim_until, occurred_at)",
             """
             CREATE INDEX IF NOT EXISTS idx_provider_connections_account
             ON provider_connections (provider, provider_user_id, revoked_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_temporal_mood_lookup
+            ON temporal_mood_observations (user_id, daypart, observed_at)
             """,
         ]
         with self.connect() as connection:

@@ -62,3 +62,23 @@ def test_mountain_query_has_situational_explanation() -> None:
         "mountain drive matched to your Music DNA",
         1.0,
     )
+
+
+def test_optional_mood_candidate_outage_is_isolated() -> None:
+    class UnavailableClient:
+        def request(self, *args, **kwargs):
+            raise RuntimeError("optional provider feature unavailable")
+
+    result = ContextCandidateService().expand(
+        UnavailableClient(),
+        weather=None,
+        region=None,
+        road_setting=None,
+        activity=None,
+        daypart="evening",
+        mood="romantic",
+    )
+
+    assert result.tracks == ()
+    assert result.scores == {}
+    assert result.evidence == {}
