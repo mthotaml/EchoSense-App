@@ -259,6 +259,16 @@ def add_to_queue(
         if dict(existing)["item_id"] != request.item_id:
             raise HTTPException(status_code=409, detail={"code": "queue_command_conflict"})
         return {"status": "already_queued", "item_id": request.item_id, "applied": False}
+    queue_payload = _spotify_request(session_id, "GET", "/me/player/queue").json()
+    queued_items = [queue_payload.get("currently_playing")]
+    if isinstance(queue_payload.get("queue"), list):
+        queued_items.extend(queue_payload["queue"])
+    if any(isinstance(item, dict) and item.get("id") == request.item_id for item in queued_items):
+        return {
+            "status": "already_queued",
+            "item_id": request.item_id,
+            "applied": False,
+        }
     params: dict[str, object] = {"uri": f"spotify:track:{request.item_id}"}
     if request.device_id:
         params["device_id"] = request.device_id

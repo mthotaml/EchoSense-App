@@ -46,6 +46,13 @@ class SpotifyClient:
                 headers={"Authorization": f"Bearer {self.connection.access_token}"},
                 timeout=self.timeout_seconds,
             )
+        elif response.status_code in {502, 503, 504}:
+            response = httpx.get(
+                f"{self.base_url}{path}",
+                params=params,
+                headers={"Authorization": f"Bearer {self.connection.access_token}"},
+                timeout=self.timeout_seconds,
+            )
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After", "1")
             raise SpotifyRateLimited(int(retry_after) if retry_after.isdigit() else 1)
@@ -73,6 +80,14 @@ class SpotifyClient:
         )
         if response.status_code == 401:
             self.refresh_connection(self.connection, force=True)
+            response = httpx.request(
+                method,
+                f"{self.base_url}{path}",
+                params=params,
+                headers={"Authorization": f"Bearer {self.connection.access_token}"},
+                timeout=self.timeout_seconds,
+            )
+        elif response.status_code in {502, 503, 504}:
             response = httpx.request(
                 method,
                 f"{self.base_url}{path}",

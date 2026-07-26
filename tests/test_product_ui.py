@@ -76,6 +76,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Saved to Spotify. EchoSense learned from this choice." in response.text
     assert 'id="playlists-panel"' in response.text
     assert "loadPlaylists" in response.text
+    assert "loadPlaylistsSafely" in response.text
+    assert "Spotify playlists are temporarily unavailable" in response.text
+    assert "Promise.allSettled" in response.text
     assert "loadPlaylistTracks" in response.text
     assert "playPlaylistTrack" in response.text
     assert 'id="moment"' in response.text
@@ -92,6 +95,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="queue-panel"' in response.text
     assert "queueRecommendation" in response.text
     assert "loadQueue" in response.text
+    assert "Spotify returned an incomplete listening profile" in response.text
+    assert "detail.detail?.code" in response.text
+    assert "$('#queue-add').disabled=true" in response.text
     assert 'id="shuffle"' in response.text
     assert 'id="repeat"' in response.text
     assert "/v1/player/shuffle" in response.text

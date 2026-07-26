@@ -191,7 +191,7 @@ def test_queue_is_ordered_and_add_command_is_idempotent(
 
     monkeypatch.setattr(player_routes.httpx, "request", fake_request)
     queue = client.get("/v1/player/queue", cookies={spotify_auth.SESSION_COOKIE: session_id})
-    payload = {"item_id": "next-1", "command_id": "queue-command-1"}
+    payload = {"item_id": "next-3", "command_id": "queue-command-1"}
     first = client.post(
         "/v1/player/queue",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
@@ -207,6 +207,39 @@ def test_queue_is_ordered_and_add_command_is_idempotent(
     assert first.json()["applied"] is True
     assert duplicate.json()["applied"] is False
     assert len([call for call in calls if call[0] == "POST"]) == 1
+
+
+def test_queue_rejects_item_already_present_under_a_new_command(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return httpx.Response(
+            200,
+            request=httpx.Request(method, url),
+            json={
+                "currently_playing": {"id": "now", "name": "Now", "artists": []},
+                "queue": [{"id": "duplicate", "name": "Already next", "artists": []}],
+            },
+        )
+
+    monkeypatch.setattr(player_routes.httpx, "request", fake_request)
+    response = client.post(
+        "/v1/player/queue",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={"item_id": "duplicate", "command_id": "new-command"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "already_queued",
+        "item_id": "duplicate",
+        "applied": False,
+    }
+    assert [call[0] for call in calls] == ["GET"]
 
 
 def test_shuffle_and_repeat_commands_are_device_scoped(
