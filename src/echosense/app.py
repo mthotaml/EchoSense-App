@@ -606,6 +606,10 @@ def create_app(profile: AppProfile = "api") -> FastAPI:
     application = FastAPI(title="EchoSense", version="0.24.0")
     application.include_router(_core_router)
 
+    @application.get("/healthz", include_in_schema=False)
+    def health() -> dict[str, str]:
+        return {"status": "ok", "profile": profile, "version": application.version}
+
     if profile == "api":
         return application
 

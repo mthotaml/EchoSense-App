@@ -5,7 +5,9 @@
       "configuration",
       "ruff",
       "contract-tests",
-      "spotify-reference-journey"
+      "spotify-reference-journey",
+      "application-profile-smoke",
+      "release-evidence"
     ]
   },
   "journeys": [
