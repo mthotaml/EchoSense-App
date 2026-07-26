@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Cookie, HTTPException, Response
@@ -47,29 +48,56 @@ def _spotify_request(
 ) -> httpx.Response:
     session = _connected_session(session_id)
     _refresh_session(session)
-    try:
-        response = httpx.request(
-            method,
-            f"{SPOTIFY_API_URL}{path}",
-            params=params,
-            json=json,
-            headers={"Authorization": f"Bearer {session.access_token}"},
-            timeout=15.0,
-        )
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail={"code": "spotify_player_unavailable", "message": str(exc)},
-        ) from exc
+
+    def send() -> httpx.Response:
+        try:
+            return httpx.request(
+                method,
+                f"{SPOTIFY_API_URL}{path}",
+                params=params,
+                json=json,
+                headers={"Authorization": f"Bearer {session.access_token}"},
+                timeout=15.0,
+            )
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "code": "spotify_player_unavailable",
+                    "message": str(exc),
+                    "correlation_id": uuid4().hex,
+                },
+            ) from exc
+
+    response = send()
+    if response.status_code == 401 and session.refresh_token:
+        _refresh_session(session, force=True)
+        response = send()
 
     if response.status_code >= 400:
+        correlation_id = uuid4().hex
+        retry_after = response.headers.get("Retry-After")
         try:
             spotify_error = response.json()
         except ValueError:
             spotify_error = {"message": response.text}
+        if response.status_code == 429:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "code": "spotify_rate_limited",
+                    "retry_after": retry_after,
+                    "correlation_id": correlation_id,
+                },
+                headers={"Retry-After": retry_after or "1"},
+            )
         raise HTTPException(
             status_code=response.status_code,
-            detail={"code": "spotify_player_error", "spotify": spotify_error},
+            detail={
+                "code": "spotify_player_error",
+                "spotify": spotify_error,
+                "correlation_id": correlation_id,
+            },
         )
     return response
 

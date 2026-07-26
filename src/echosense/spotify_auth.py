@@ -82,8 +82,8 @@ def _cookie_secure(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
-def _refresh_session(session: SpotifySession) -> None:
-    if session.expires_at > datetime.now(UTC) + timedelta(seconds=30):
+def _refresh_session(session: SpotifySession, *, force: bool = False) -> None:
+    if not force and session.expires_at > datetime.now(UTC) + timedelta(seconds=30):
         return
     if not session.refresh_token:
         raise HTTPException(status_code=401, detail={"code": "spotify_reconnect_required"})

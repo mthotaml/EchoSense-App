@@ -64,3 +64,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "/v1/player/pause" in response.text
     assert "/v1/player/play" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text
+    assert "/ui/player-lifecycle.js" in response.text
+
+    lifecycle = client.get("/ui/player-lifecycle.js")
+    assert lifecycle.status_code == 200
+    assert "class PlayerLifecycle" in lifecycle.text

@@ -93,3 +93,68 @@ def test_play_recommendation_sends_spotify_uri(
     assert response.status_code == 204
     assert captured["params"] == {"device_id": "browser-device"}
     assert captured["json"] == {"uris": ["spotify:track:abc"]}
+
+
+def test_token_expiry_during_command_refreshes_and_retries(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "client-id")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "client-secret")
+    responses = iter(
+        [
+            httpx.Response(401, request=httpx.Request("PUT", "https://api.spotify.com")),
+            httpx.Response(204, request=httpx.Request("PUT", "https://api.spotify.com")),
+        ]
+    )
+    used_tokens: list[str] = []
+
+    def fake_request(method, url, **kwargs):
+        used_tokens.append(kwargs["headers"]["Authorization"])
+        return next(responses)
+
+    def fake_refresh(*args, **kwargs):
+        return httpx.Response(
+            200,
+            request=httpx.Request("POST", spotify_auth.SPOTIFY_TOKEN_URL),
+            json={"access_token": "refreshed-token", "expires_in": 3600},
+        )
+
+    monkeypatch.setattr(player_routes.httpx, "request", fake_request)
+    monkeypatch.setattr(spotify_auth.httpx, "post", fake_refresh)
+
+    response = client.put(
+        "/v1/player/pause",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert response.status_code == 204
+    assert used_tokens == ["Bearer access-token", "Bearer refreshed-token"]
+
+
+def test_rate_limit_preserves_retry_after_and_stable_error(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+
+    def fake_request(method, url, **kwargs):
+        return httpx.Response(
+            429,
+            request=httpx.Request(method, url),
+            headers={"Retry-After": "7"},
+            json={"error": {"status": 429}},
+        )
+
+    monkeypatch.setattr(player_routes.httpx, "request", fake_request)
+
+    response = client.get(
+        "/v1/player/state",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "7"
+    detail = response.json()["detail"]
+    assert detail["code"] == "spotify_rate_limited"
+    assert detail["retry_after"] == "7"
+    assert detail["correlation_id"]

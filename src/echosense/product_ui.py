@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from echosense.music_dna_service import music_dna_service
 
 router = APIRouter(tags=["product-ui"])
+UI_DIR = Path(__file__).with_name("web")
 
 
 class DemoFeedbackRequest(BaseModel):
@@ -25,6 +27,11 @@ def landing_page() -> str:
 @router.get("/demo", response_class=HTMLResponse)
 def demo_page() -> str:
     return PAGE
+
+
+@router.get("/ui/player-lifecycle.js", include_in_schema=False)
+def player_lifecycle_script() -> FileResponse:
+    return FileResponse(UI_DIR / "player-lifecycle.js", media_type="text/javascript")
 
 
 @router.get("/v1/demo/taste-profile")
@@ -46,7 +53,7 @@ def demo_timeline() -> dict[str, object]:
 def demo_recommendations() -> dict[str, object]:
     return {
         "items": music_dna_service.get_recommendations(),
-        "generated_at": datetime.now(timezone.utc),
+        "generated_at": datetime.now(UTC),
     }
 
 
@@ -58,7 +65,7 @@ def demo_feedback(request: DemoFeedbackRequest) -> dict[str, str]:
     )
 
 
-PAGE = r'''<!doctype html>
+PAGE = r"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -132,16 +139,22 @@ PAGE = r'''<!doctype html>
   </section>
 
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
+  <script src="/ui/player-lifecycle.js"></script>
   <script>
     let currentRecommendationId = null;
     let currentTrackUri = null;
     let spotifyConnected = false;
-    let player = null;
     let deviceId = null;
     let playerState = null;
     let progressTimer = null;
     let restoreRequest = 0;
-    let sdkReady = false;
+    const lifecycle = new EchoSensePlayerLifecycle.PlayerLifecycle({
+      createPlayer: SpotifyApi => new SpotifyApi.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}}),
+      onReady: async ({device_id}) => {deviceId=device_id;setText('#player-status','EchoSense Browser ready');$('#activate').disabled=false;await restorePlaybackState();},
+      onNotReady: () => setText('#player-status','EchoSense Browser offline'),
+      onPlayback: renderPlayer,
+      onError: (_, error) => {setText('#toast',error.message);setText('#player-status','Player needs attention');}
+    });
 
     const $ = (selector) => document.querySelector(selector);
     const setText = (selector, value) => { $(selector).textContent = value || ''; };
@@ -232,29 +245,22 @@ PAGE = r'''<!doctype html>
 
     async function activateBrowser(play=false) {
       if (!deviceId) throw new Error('The EchoSense player is still starting.');
-      await api('/v1/player/transfer',{method:'PUT',body:JSON.stringify({device_id:deviceId,play})}); setText('#player-status','EchoSense Browser active');
+      await api('/v1/player/transfer',{method:'PUT',body:JSON.stringify({device_id:deviceId,play})}); lifecycle.markDeviceActive(); setText('#player-status','EchoSense Browser active');
     }
 
     function initializeSpotifyPlayer() {
-      if (!sdkReady || !spotifyConnected || player) return;
-      player = new Spotify.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}});
-      player.addListener('ready',async ({device_id})=>{deviceId=device_id;setText('#player-status','EchoSense Browser ready');$('#activate').disabled=false;await restorePlaybackState();});
-      player.addListener('not_ready',()=>setText('#player-status','EchoSense Browser offline'));
-      player.addListener('player_state_changed',renderPlayer);
-      ['initialization_error','authentication_error','account_error','playback_error'].forEach(name=>player.addListener(name,({message})=>{setText('#toast',message);setText('#player-status','Player needs attention');}));
-      player.connect();
+      return lifecycle.setConnection(spotifyConnected);
     }
 
     window.onSpotifyWebPlaybackSDKReady = () => {
-      sdkReady = true;
-      initializeSpotifyPlayer();
+      lifecycle.setSdk(window.Spotify);
     };
 
     async function playRecommendation() { if(!spotifyConnected){location.href='/auth/spotify/login';return;} if(!deviceId) throw new Error('Player is not ready yet.'); await activateBrowser(false); await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:deviceId,spotify_uri:currentTrackUri})}); setText('#toast','Playing inside EchoSense.'); }
     async function togglePlayback() {
       if(!spotifyConnected) { location.href='/auth/spotify/login'; return; }
       if(!deviceId) throw new Error('Player is not ready yet.');
-      const latest=await player?.getCurrentState();
+      const latest=await lifecycle.player?.getCurrentState();
       if(latest) renderPlayer(latest); else await restorePlaybackState();
       if(playerState?.paused===false) {
         await api(`/v1/player/pause?device_id=${encodeURIComponent(deviceId)}`,{method:'PUT'});
@@ -284,4 +290,4 @@ PAGE = r'''<!doctype html>
     load().catch(e=>setText('#toast',e.message||'EchoSense could not load.'));
   </script>
 </body>
-</html>'''
+</html>"""
