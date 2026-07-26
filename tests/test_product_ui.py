@@ -92,6 +92,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="queue-panel"' in response.text
     assert "queueRecommendation" in response.text
     assert "loadQueue" in response.text
+    assert "Spotify returned an incomplete listening profile" in response.text
+    assert "detail.detail?.code" in response.text
+    assert "$('#queue-add').disabled=true" in response.text
     assert 'id="shuffle"' in response.text
     assert 'id="repeat"' in response.text
     assert "/v1/player/shuffle" in response.text

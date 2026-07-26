@@ -183,7 +183,7 @@ PAGE = r"""<!doctype html>
 
     async function api(path, options={}) {
       const response = await fetch(path, {headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options});
-      if (!response.ok && response.status !== 204) { let detail={}; try { detail=await response.json(); } catch (_) {} throw new Error(detail.detail?.spotify?.error?.message || detail.detail?.message || `Request failed (${response.status})`); }
+      if (!response.ok && response.status !== 204) { let detail={}; try { detail=await response.json(); } catch (_) {} throw new Error(detail.detail?.spotify?.error?.message || detail.detail?.message || detail.detail?.code || `Request failed (${response.status})`); }
       return response;
     }
 
@@ -208,7 +208,9 @@ PAGE = r"""<!doctype html>
     }
 
     async function loadLiveSpotify(moment=$('#moment').value) {
-      const data = await (await fetch(`/auth/spotify/data?moment=${encodeURIComponent(moment)}`)).json(); const profile=data.profile; const pick=data.recommendation;
+      const response=await api(`/auth/spotify/data?moment=${encodeURIComponent(moment)}`); const data=await response.json();
+      if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
+      const profile=data.profile; const pick=data.recommendation;
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
       if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; $('#queue-add').disabled=false; reportedSignals.clear(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
@@ -300,7 +302,7 @@ PAGE = r"""<!doctype html>
     async function queueRecommendation() {
       if(!currentTrackId||!currentQueueCommandId)return;
       const result=await (await api('/v1/player/queue',{method:'POST',body:JSON.stringify({item_id:currentTrackId,command_id:currentQueueCommandId,device_id:deviceId})})).json();
-      setText('#toast',result.applied?'Added to your Spotify queue.':'Already in your queue.'); await loadQueue();
+      $('#queue-add').disabled=true; setText('#toast',result.applied?'Added to your Spotify queue.':'Already in your queue.'); await loadQueue();
     }
     async function toggleShuffle() {
       const enabled=$('#shuffle').getAttribute('aria-pressed')!=='true';

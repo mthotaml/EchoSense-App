@@ -275,8 +275,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#save')).toHaveText('Save');
   await page.locator('#queue-add').click();
   await expect(page.locator('#queue-items')).toContainText('Next Motion');
-  await page.locator('#queue-add').click();
-  expect(queueCommands[1].command_id).toBe(queueCommands[0].command_id);
+  await expect(page.locator('#queue-add')).toBeDisabled();
+  expect(queueCommands).toHaveLength(1);
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
@@ -337,4 +337,26 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.locator('#account-action').click();
   await expect(page.locator('#account-status')).toHaveText('Spotify not connected');
   expect(connected).toBe(false);
+});
+
+test('Guardian renders Spotify data failures without leaking JavaScript errors', async ({page}) => {
+  await page.route('https://sdk.scdn.co/spotify-player.js', route =>
+    route.fulfill({contentType: 'application/javascript', body: ''}),
+  );
+  await page.route('**/auth/spotify/session', route =>
+    route.fulfill({
+      json: {connected: true, profile: {display_name: 'Guardian Listener'}},
+    }),
+  );
+  await page.route('**/auth/spotify/data?moment=*', route =>
+    route.fulfill({
+      status: 502,
+      json: {detail: {code: 'spotify_api_failed', message: 'Provider unavailable'}},
+    }),
+  );
+
+  await page.goto('/');
+
+  await expect(page.locator('#toast')).toHaveText('Provider unavailable');
+  await expect(page.locator('#toast')).not.toContainText('display_name');
 });

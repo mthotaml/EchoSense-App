@@ -18,6 +18,7 @@
         "connected",
         "player-ready",
         "context-selected",
+        "spotify-data-failure-rendered",
         "recommendation-ranked",
         "library-saved",
         "library-unsaved",
@@ -36,6 +37,7 @@
         "explicit-device-transfer",
         "queue-order-preserved",
         "queue-command-idempotent",
+        "queue-existing-item-guarded",
         "shuffle-state-reconciled",
         "repeat-mode-reconciled",
         "disconnected"
