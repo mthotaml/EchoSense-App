@@ -82,7 +82,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "loadPlaylistTracks" in response.text
     assert "playPlaylistTrack" in response.text
     assert 'id="moment"' in response.text
-    assert "data?moment=" in response.text
+    assert "/auth/spotify/data?" in response.text
     assert "Context evidence:" in response.text
     assert "disconnectSpotify" in response.text
     assert "/auth/spotify/logout" in response.text
@@ -110,6 +110,12 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Skip &amp; play next" in response.text
     assert "skipAndPlayNext" in response.text
     assert 'id="queue-skip"' in response.text
+    assert 'id="live-context-panel"' in response.text
+    assert "enableLiveContext" in response.text
+    assert "navigator.geolocation.watchPosition" in response.text
+    assert "/v1/context/resolve" in response.text
+    assert "Raw coordinates are used transiently" in response.text
+    assert "why_now?.factors" in response.text
     assert "/ui/player-lifecycle.js" in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")
