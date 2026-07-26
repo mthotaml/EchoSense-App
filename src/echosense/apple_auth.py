@@ -45,7 +45,11 @@ class AppleDeveloperTokenProvider:
                 return self._token
             expires_at = current + self.ttl
             self._token = jwt.encode(
-                {"iss": self.team_id, "iat": int(current.timestamp()), "exp": int(expires_at.timestamp())},
+                {
+                    "iss": self.team_id,
+                    "iat": int(current.timestamp()),
+                    "exp": int(expires_at.timestamp()),
+                },
                 self.private_key,
                 algorithm="ES256",
                 headers={"kid": self.key_id},

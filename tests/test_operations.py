@@ -48,9 +48,7 @@ def test_controlled_replay_supports_dry_run_and_loop_rejection() -> None:
     schema_path = Path(__file__).parents[1] / "schemas" / "event-envelope.v1.json"
     replay = ReplayService(producer, LocalSchemaRegistry(schema_path=schema_path))
     record = valid_dead_letter()
-    result = replay.replay(
-        [record], selection=ReplayFilter(event_id="evt_replay_01"), dry_run=True
-    )
+    result = replay.replay([record], selection=ReplayFilter(event_id="evt_replay_01"), dry_run=True)
     assert result == {"selected": 1, "replayed": 1, "rejected": 0}
     assert producer.messages == []
 

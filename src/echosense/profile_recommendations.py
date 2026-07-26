@@ -44,11 +44,13 @@ def profile_aware_recommendation(
     top_artist = profile.top_artists[0].name if profile.top_artists else None
     try:
         candidates = get_music_provider().candidates_for_context(context, user_id, limit=5)
-        candidate, preference_weight, ranking_score, candidate_slate, policy_factors = rank_candidates(
-            user_id=user_id,
-            context=context,
-            decision_id=decision_id,
-            candidates=candidates,
+        candidate, preference_weight, ranking_score, candidate_slate, policy_factors = (
+            rank_candidates(
+                user_id=user_id,
+                context=context,
+                decision_id=decision_id,
+                candidates=candidates,
+            )
         )
     except (httpx.HTTPError, LookupError, ValueError, RuntimeError) as exc:
         raise HTTPException(
@@ -56,7 +58,9 @@ def profile_aware_recommendation(
             detail={"code": "provider_unavailable", "message": str(exc)},
         ) from exc
 
-    profile_phrase = f" your current affinity for {top_artist}" if top_artist else " your current taste profile"
+    profile_phrase = (
+        f" your current affinity for {top_artist}" if top_artist else " your current taste profile"
+    )
     discovery_phrase = (
         "with more room for discovery"
         if profile.discovery_ratio >= 0.5

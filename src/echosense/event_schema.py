@@ -55,7 +55,11 @@ def registry_from_environment() -> SchemaRegistry:
     backend = os.getenv("ECHOSENSE_SCHEMA_REGISTRY_BACKEND", "local").lower()
     if backend == "local":
         configured = os.getenv("ECHOSENSE_EVENT_SCHEMA_PATH")
-        schema_path = Path(configured) if configured else Path(__file__).parents[2] / "schemas" / "event-envelope.v1.json"
+        schema_path = (
+            Path(configured)
+            if configured
+            else Path(__file__).parents[2] / "schemas" / "event-envelope.v1.json"
+        )
         return LocalSchemaRegistry(schema_path=schema_path)
     if backend in {"confluent", "redpanda"}:
         return ConfluentSchemaRegistry(

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "release_gate": {
+    "required_checks": [
+      "configuration",
+      "ruff",
+      "contract-tests",
+      "spotify-reference-journey",
+      "application-profile-smoke",
+      "release-evidence"
+    ]
+  },
+  "journeys": [
+    {
+      "id": "spotify-reference",
+      "spec": "tests/e2e/spotify-reference.spec.js",
+      "states": [
+        "connected",
+        "player-ready",
+        "context-selected",
+        "recommendation-ranked",
+        "library-saved",
+        "library-unsaved",
+        "playlists-browsed",
+        "unavailable-track-guarded",
+        "playlist-track-played",
+        "decision-owned-playback",
+        "played-outcome-idempotent",
+        "playback-started",
+        "feedback-learned",
+        "refresh-restored",
+        "snapshot-confirmation-required",
+        "device-handoff-reconciled",
+        "devices-discovered",
+        "restricted-device-guarded",
+        "explicit-device-transfer",
+        "queue-order-preserved",
+        "queue-command-idempotent",
+        "shuffle-state-reconciled",
+        "repeat-mode-reconciled",
+        "disconnected"
+      ]
+    }
+  ]
+}

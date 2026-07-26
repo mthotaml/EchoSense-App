@@ -9,6 +9,7 @@ from echosense.evaluation_service import EvaluationService
 from echosense.exposure_store import ExposureStore
 from echosense.memory import InMemoryPreferenceMemory
 from echosense.memory_lifecycle_service import MemoryLifecycleService
+from echosense.playback_learning import PlaybackLearningService
 from echosense.providers import FixtureMusicProvider
 from echosense.storage import Storage
 
@@ -33,6 +34,24 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
     user_id = "user-delete-01"
     store.upsert_consent(user_id, "contextual_recommendation", "2026-07-20")
     store.upsert_apple_music_user_token(user_id, "encrypted-secret")
+    with store.connect() as connection:
+        store._execute(
+            connection,
+            """
+            INSERT INTO music_data_imports
+                (user_id, provider, imported_at, normalized_json)
+            VALUES (%s, 'spotify', '2026-07-25T00:00:00+00:00', '{}')
+            """,
+            (user_id,),
+        )
+        store._execute(
+            connection,
+            """
+            INSERT INTO music_dna_profiles (user_id, generated_at, profile_json)
+            VALUES (%s, '2026-07-25T00:00:00+00:00', '{}')
+            """,
+            (user_id,),
+        )
     store.save_decision_trace(
         decision_id="dec-delete-01",
         user_id=user_id,
@@ -63,6 +82,13 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
                 },
             ],
         },
+    )
+    PlaybackLearningService(store).record(
+        outcome_id="playback-delete-01",
+        user_id=user_id,
+        decision_id="dec-delete-01",
+        signal="completed",
+        completion_ratio=1.0,
     )
     store.append_event(
         event_id="evt-delete-01",
@@ -137,6 +163,10 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "cognitive_memories": 1,
         "memory_lifecycle_runs": 1,
         "recommendation_exposures": 1,
+        "music_data_imports": 1,
+        "music_dna_profiles": 1,
+        "music_item_preferences": 1,
+        "playback_learning_outcomes": 1,
         "decision_traces": 1,
         "provider_tokens": 1,
         "outbox_events": 2,
@@ -150,12 +180,15 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
     assert store.get_apple_music_user_token(user_id) is None
     assert CognitiveMemoryStore(store).get("mem-delete-01") is None
     assert MemoryLifecycleService(store).get("lifecycle-delete-01") is None
-    assert memory.get_preference(
-        user_id=user_id,
-        provider="apple_music",
-        item_id="fixture-rain-001",
-        context="rainy_commute",
-    ) is None
+    assert (
+        memory.get_preference(
+            user_id=user_id,
+            provider="apple_music",
+            item_id="fixture-rain-001",
+            context="rainy_commute",
+        )
+        is None
+    )
 
     with store.connect() as connection:
         outcomes = store._execute(

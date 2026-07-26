@@ -150,7 +150,9 @@ class DeletionCoordinator:
                     subject_hash=request["subject_hash"],
                 )
             if request["user_id"] is None:
-                raise RuntimeError("Incomplete deletion request no longer contains a resumable subject")
+                raise RuntimeError(
+                    "Incomplete deletion request no longer contains a resumable subject"
+                )
             self.storage._execute(
                 connection,
                 """
@@ -258,6 +260,10 @@ class DeletionCoordinator:
                 ("cognitive_memories", "cognitive_memories"),
                 ("memory_lifecycle_runs", "memory_lifecycle_runs"),
                 ("recommendation_exposures", "recommendation_exposures"),
+                ("music_data_imports", "music_data_imports"),
+                ("music_dna_profiles", "music_dna_profiles"),
+                ("music_item_preferences", "music_item_preferences"),
+                ("playback_learning_outcomes", "playback_learning_outcomes"),
                 ("decision_traces", "decision_traces"),
                 ("provider_tokens", "apple_music_user_tokens"),
                 ("outbox_events", "event_outbox"),

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections import Counter
+from datetime import UTC, datetime, timezone
 from typing import Literal
 from uuid import uuid4
+
+from echosense.music_dna import MusicDNAProfile
+from echosense.providers.models import Artist, MusicDataImport, Track
 
 Reaction = Literal["love", "not_for_me", "save", "play"]
 
@@ -17,6 +21,99 @@ class MusicDNAService:
 
     def __init__(self) -> None:
         self._feedback_events: list[dict[str, str]] = []
+
+    def build_provider_profile(
+        self,
+        imported: MusicDataImport,
+        *,
+        display_name: str,
+        music_dna: MusicDNAProfile | None = None,
+        recommendation: Track | None = None,
+        decision_id: str | None = None,
+        moment: str = "general",
+        decision_evidence: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        artists = [artist for artist, _ in imported.top_artists]
+        top_tracks = [item.track for item in imported.top_tracks]
+        recent_tracks = [item.track for item in imported.recent_tracks]
+        genre_counts = Counter(genre for artist in artists for genre in artist.genres)
+        genres = [
+            {"name": name.title(), "score": count} for name, count in genre_counts.most_common(5)
+        ]
+        recommendation = recommendation or (
+            top_tracks[0] if top_tracks else (recent_tracks[0] if recent_tracks else None)
+        )
+        leading_artists = [artist.name for artist in artists[:3]]
+        reason = (
+            f"This fits the pattern formed by {', '.join(leading_artists)}."
+            if leading_artists
+            else f"This reflects your recent {imported.provider.title()} listening."
+        )
+        if moment != "general":
+            reason = f"For {moment}, {reason[0].lower()}{reason[1:]}"
+        average_popularity = (
+            round(sum(track.popularity or 0 for track in top_tracks) / len(top_tracks))
+            if top_tracks
+            else 0
+        )
+        return {
+            "profile": {
+                "display_name": display_name,
+                "genres": genres,
+                "top_artists": [self._artist_view(artist) for artist in artists],
+                "top_tracks": [self._track_view(track) for track in top_tracks],
+                "recent_tracks": [self._track_view(track) for track in recent_tracks],
+                "average_popularity": average_popularity,
+                "confidence": music_dna.confidence if music_dna else 0.0,
+                "discovery_score": music_dna.discovery_score if music_dna else 0,
+                "comfort_score": music_dna.comfort_score if music_dna else 0,
+                "diversity_score": music_dna.diversity_score if music_dna else 0,
+                "evidence_count": music_dna.evidence_count if music_dna else 0,
+                "evidence_sources": list(music_dna.source_paths) if music_dna else [],
+            },
+            "recommendation": (
+                {
+                    **self._track_view(recommendation),
+                    "decision_id": decision_id,
+                    "reason": reason,
+                    "match_score": 96,
+                    "evidence": decision_evidence or {},
+                }
+                if recommendation
+                else None
+            ),
+            "insight": (
+                f"Your strongest current signal is {genres[0]['name']}."
+                if genres
+                else "EchoSense is still collecting enough listening history to identify your strongest signal."
+            ),
+            "timeline": leading_artists[:4],
+            "generated_at": datetime.now(UTC),
+        }
+
+    @staticmethod
+    def _artist_view(artist: Artist) -> dict[str, object]:
+        return {
+            "id": artist.provider_id,
+            "name": artist.name,
+            "genres": list(artist.genres),
+            "popularity": artist.popularity,
+            "image_url": artist.image_url,
+            f"{artist.provider}_url": artist.external_url,
+        }
+
+    @staticmethod
+    def _track_view(track: Track) -> dict[str, object]:
+        return {
+            "id": track.provider_id,
+            "title": track.title,
+            "artist": track.primary_artist,
+            "artists": list(track.artists),
+            "album": track.album,
+            "popularity": track.popularity,
+            "image_url": track.image_url,
+            f"{track.provider}_url": track.external_url,
+        }
 
     def get_profile(self) -> dict[str, object]:
         return {

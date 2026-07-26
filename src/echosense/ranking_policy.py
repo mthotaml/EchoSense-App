@@ -100,7 +100,9 @@ def rank_with_policy(
     return result
 
 
-def diversify(ranked: Iterable[RankedCandidate], *, limit: int, max_per_group: int = 1) -> list[RankedCandidate]:
+def diversify(
+    ranked: Iterable[RankedCandidate], *, limit: int, max_per_group: int = 1
+) -> list[RankedCandidate]:
     if limit < 1 or max_per_group < 1:
         raise ValueError("limit and max_per_group must be positive")
     result: list[RankedCandidate] = []

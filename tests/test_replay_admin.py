@@ -27,7 +27,9 @@ class FakeRegistry:
         return 42
 
 
-def envelope(event_id: str = "evt-1", event_type: str = "recommendation.ranked") -> dict[str, object]:
+def envelope(
+    event_id: str = "evt-1", event_type: str = "recommendation.ranked"
+) -> dict[str, object]:
     return {
         "event_id": event_id,
         "event_type": event_type,
@@ -80,7 +82,9 @@ def test_dry_run_is_audited_without_producing(client: tuple[TestClient, FakeProd
     assert audit.json()["events"][0]["result"] == "dry_run"
 
 
-def test_published_and_rejected_records_are_audited(client: tuple[TestClient, FakeProducer]) -> None:
+def test_published_and_rejected_records_are_audited(
+    client: tuple[TestClient, FakeProducer],
+) -> None:
     http, producer = client
     response = http.post(
         "/admin/replays",

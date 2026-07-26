@@ -63,4 +63,41 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "restorePlaybackState" in response.text
     assert "/v1/player/pause" in response.text
     assert "/v1/player/play" in response.text
+    assert "/v1/player/recommendations/" in response.text
+    assert "currentPlayOutcomeId" in response.text
+    assert "The outcome is linked to this decision." in response.text
+    assert "/auth/spotify/feedback" in response.text
+    assert "pick.decision_id" in response.text
+    assert "feedback('completed'" in response.text
+    assert "feedback('skipped')" in response.text
+    assert 'id="save"' in response.text
+    assert "toggleSaved" in response.text
+    assert "/auth/spotify/library/tracks/" in response.text
+    assert "Saved to Spotify. EchoSense learned from this choice." in response.text
+    assert 'id="playlists-panel"' in response.text
+    assert "loadPlaylists" in response.text
+    assert "loadPlaylistTracks" in response.text
+    assert "playPlaylistTrack" in response.text
+    assert 'id="moment"' in response.text
+    assert "data?moment=" in response.text
+    assert "Context evidence:" in response.text
+    assert "disconnectSpotify" in response.text
+    assert "/auth/spotify/logout" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text
+    assert "Last session restored · choose a device to resume" in response.text
+    assert "continuity?.requires_confirmation" in response.text
+    assert 'id="device-picker"' in response.text
+    assert "loadDevices" in response.text
+    assert "transferSelectedDevice" in response.text
+    assert 'id="queue-panel"' in response.text
+    assert "queueRecommendation" in response.text
+    assert "loadQueue" in response.text
+    assert 'id="shuffle"' in response.text
+    assert 'id="repeat"' in response.text
+    assert "/v1/player/shuffle" in response.text
+    assert "/v1/player/repeat" in response.text
+    assert "/ui/player-lifecycle.js" in response.text
+
+    lifecycle = client.get("/ui/player-lifecycle.js")
+    assert lifecycle.status_code == 200
+    assert "class PlayerLifecycle" in lifecycle.text

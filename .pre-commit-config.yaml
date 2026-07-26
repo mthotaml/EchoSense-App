@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Ruff lint
+        entry: ruff check
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: Ruff format
+        entry: ruff format --check
+        language: system
+        types: [python]
+      - id: browser-lifecycle
+        name: Browser lifecycle permutations
+        entry: node tests/player_lifecycle.test.js
+        language: system
+        pass_filenames: false
+      - id: unit-tests
+        name: EchoSense unit tests
+        entry: pytest -q -m not\ infrastructure\ and\ not\ postgres\ and\ not\ neo4j
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

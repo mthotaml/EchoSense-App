@@ -58,7 +58,9 @@ def context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[TestClient
     monkeypatch.setenv("ECHOSENSE_ADMIN_API_KEY", "test-admin-key")
     monkeypatch.setattr(operations_api, "storage", store)
     monkeypatch.setattr(operations_api, "replay_audit_store", audit)
-    monkeypatch.setattr(operations_api, "replay_service", ReplayService(Producer(), Registry(), audit_store=audit))
+    monkeypatch.setattr(
+        operations_api, "replay_service", ReplayService(Producer(), Registry(), audit_store=audit)
+    )
     monkeypatch.setattr(operations_api, "dlq_consumer", source)
     return TestClient(operations_api.app), source
 

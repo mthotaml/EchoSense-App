@@ -116,7 +116,9 @@ class AppleMusicSyncStore:
                     ),
                 )
 
-    def complete(self, sync_id: str, *, library_songs: int, recent_plays: int, playlists: int = 0) -> None:
+    def complete(
+        self, sync_id: str, *, library_songs: int, recent_plays: int, playlists: int = 0
+    ) -> None:
         total = library_songs + recent_plays + playlists
         with self.storage.connect() as connection:
             self.storage._execute(
@@ -127,7 +129,14 @@ class AppleMusicSyncStore:
                     completed_at = %s, error = NULL
                 WHERE sync_id = %s
                 """,
-                (library_songs, recent_plays, playlists, total, datetime.now(timezone.utc).isoformat(), sync_id),
+                (
+                    library_songs,
+                    recent_plays,
+                    playlists,
+                    total,
+                    datetime.now(timezone.utc).isoformat(),
+                    sync_id,
+                ),
             )
 
     def fail(self, sync_id: str, error: str) -> None:
@@ -160,7 +169,9 @@ class AppleMusicSyncService:
         self.provider = provider
         self.store = store
 
-    def run(self, user_id: str, *, library_limit: int = 100, recent_limit: int = 30) -> dict[str, Any]:
+    def run(
+        self, user_id: str, *, library_limit: int = 100, recent_limit: int = 30
+    ) -> dict[str, Any]:
         sync_id = self.store.start(user_id)
         try:
             library = self.provider.sync_library(user_id, limit=library_limit)
@@ -190,7 +201,9 @@ def start_sync(user_id: str) -> AppleMusicSyncResponse:
     try:
         row = AppleMusicSyncService(get_music_provider(), store).run(user_id)
     except (PermissionError, RuntimeError, ValueError, OSError) as exc:
-        raise HTTPException(status_code=503, detail={"code": "apple_music_sync_failed", "message": str(exc)}) from exc
+        raise HTTPException(
+            status_code=503, detail={"code": "apple_music_sync_failed", "message": str(exc)}
+        ) from exc
     get_storage().append_event(
         event_id=f"evt_{uuid4().hex}",
         event_type="provider.sync.completed",

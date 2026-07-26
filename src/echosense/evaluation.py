@@ -77,7 +77,9 @@ def normalize_reward(
     return round(max(-1.0, min(1.0, reward)), 6)
 
 
-def snapshot_candidates(candidates: Iterable[dict[str, Any]], selected_item_id: str) -> list[CandidateSnapshot]:
+def snapshot_candidates(
+    candidates: Iterable[dict[str, Any]], selected_item_id: str
+) -> list[CandidateSnapshot]:
     snapshots: list[CandidateSnapshot] = []
     for index, candidate in enumerate(candidates, start=1):
         snapshots.append(
@@ -112,7 +114,9 @@ def evaluate_counterfactual(
     alternatives = [candidate for candidate in slate if not candidate.selected]
     best: CounterfactualCandidate | None = None
     if alternatives:
-        strongest = max(alternatives, key=lambda candidate: (candidate.ranking_score, -candidate.rank))
+        strongest = max(
+            alternatives, key=lambda candidate: (candidate.ranking_score, -candidate.rank)
+        )
         score_gap = strongest.ranking_score - selected.ranking_score
         estimated_reward = max(-1.0, min(1.0, outcome.reward + score_gap))
         best = CounterfactualCandidate(
@@ -127,7 +131,11 @@ def evaluate_counterfactual(
     confidence = "low"
     if len(slate) >= 3 and outcome.completion_ratio is not None:
         confidence = "medium"
-    if len(slate) >= 5 and outcome.completion_ratio is not None and outcome.playback_seconds is not None:
+    if (
+        len(slate) >= 5
+        and outcome.completion_ratio is not None
+        and outcome.playback_seconds is not None
+    ):
         confidence = "high"
 
     return CounterfactualReport(

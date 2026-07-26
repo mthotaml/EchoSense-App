@@ -133,9 +133,7 @@ def get_memory(user_id: str, memory_id: str) -> MemoryResponse:
     "/v1/users/{user_id}/memories:search",
     response_model=list[RetrievedMemoryResponse],
 )
-def search_memories(
-    user_id: str, request: MemorySearchRequest
-) -> list[RetrievedMemoryResponse]:
+def search_memories(user_id: str, request: MemorySearchRequest) -> list[RetrievedMemoryResponse]:
     require_memory_consent(user_id)
     results = get_memory_store().retrieve(
         user_id=user_id,

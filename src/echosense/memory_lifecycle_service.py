@@ -160,9 +160,7 @@ class MemoryLifecycleService:
             consolidations.append(ConsolidationCandidate(**normalized))
         plan = LifecyclePlan(
             consolidations=tuple(consolidations),
-            forgetting=tuple(
-                ForgettingCandidate(**item) for item in plan_payload["forgetting"]
-            ),
+            forgetting=tuple(ForgettingCandidate(**item) for item in plan_payload["forgetting"]),
             protected_memory_ids=tuple(plan_payload["protected_memory_ids"]),
         )
         return LifecycleResult(

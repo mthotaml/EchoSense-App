@@ -6,7 +6,7 @@ from typing import Literal
 from uuid import uuid4
 
 import httpx
-from fastapi import FastAPI, HTTPException, status
+from fastapi import APIRouter, FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
 from echosense.apple_auth import AppleUserTokenVault
@@ -19,7 +19,10 @@ from echosense.providers import MusicProvider, RecommendationCandidate, provider
 from echosense.ranking_policy import PolicyCandidate, RankingPolicy, rank_with_policy
 from echosense.storage import Storage
 
-app = FastAPI(title="EchoSense", version="0.15.0")
+# Core routes are collected independently from any deployable FastAPI
+# application. Deployment entry points compose this router through
+# ``create_app`` instead of mutating a shared global application.
+_core_router = APIRouter()
 storage: Storage | None = None
 music_provider: MusicProvider | None = None
 preference_memory: PreferenceMemory | None = None
@@ -217,9 +220,7 @@ def rank_candidates(
     if not candidates:
         raise LookupError("Provider returned no recommendation candidates")
     half_life_days = float(os.getenv("ECHOSENSE_PREFERENCE_HALF_LIFE_DAYS", "30"))
-    influence = min(
-        0.5, max(0.0, float(os.getenv("ECHOSENSE_PREFERENCE_INFLUENCE", "0.25")))
-    )
+    influence = min(0.5, max(0.0, float(os.getenv("ECHOSENSE_PREFERENCE_INFLUENCE", "0.25"))))
     weights = get_preference_memory().rank_weights(
         user_id=user_id,
         context=context,
@@ -250,7 +251,8 @@ def rank_candidates(
     selected = next(
         candidate
         for candidate in candidates
-        if candidate.provider == selected_ranked.provider and candidate.item_id == selected_ranked.item_id
+        if candidate.provider == selected_ranked.provider
+        and candidate.item_id == selected_ranked.item_id
     )
     slate = [
         {
@@ -297,12 +299,12 @@ def report_response(report: CounterfactualReport) -> CounterfactualReportRespons
     return CounterfactualReportResponse.model_validate(report, from_attributes=True)
 
 
-@app.get("/health")
+@_core_router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.put("/v1/consents", status_code=status.HTTP_204_NO_CONTENT)
+@_core_router.put("/v1/consents", status_code=status.HTTP_204_NO_CONTENT)
 def grant_consent(grant: ConsentGrant) -> None:
     store = get_storage()
     store.upsert_consent(grant.user_id, grant.purpose_id, grant.policy_version)
@@ -315,7 +317,9 @@ def grant_consent(grant: ConsentGrant) -> None:
     )
 
 
-@app.delete("/v1/users/{user_id}/consents/{purpose_id}", status_code=status.HTTP_204_NO_CONTENT)
+@_core_router.delete(
+    "/v1/users/{user_id}/consents/{purpose_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 def revoke_consent(user_id: str, purpose_id: str) -> None:
     store = get_storage()
     if not store.revoke_consent(user_id, purpose_id):
@@ -329,7 +333,7 @@ def revoke_consent(user_id: str, purpose_id: str) -> None:
     )
 
 
-@app.post("/v1/users/{user_id}/deletions", response_model=DeletionResponse)
+@_core_router.post("/v1/users/{user_id}/deletions", response_model=DeletionResponse)
 def delete_consent_derived_data(user_id: str, request: DeletionRequest) -> DeletionResponse:
     try:
         result = get_deletion_coordinator().delete_user(user_id, request.purpose_id)
@@ -341,7 +345,7 @@ def delete_consent_derived_data(user_id: str, request: DeletionRequest) -> Delet
     return DeletionResponse.model_validate(result, from_attributes=True)
 
 
-@app.get("/v1/deletions/{deletion_id}", response_model=DeletionStatusResponse)
+@_core_router.get("/v1/deletions/{deletion_id}", response_model=DeletionStatusResponse)
 def get_deletion_status(deletion_id: str) -> DeletionStatusResponse:
     deletion = get_deletion_coordinator().get_request(deletion_id)
     if deletion is None:
@@ -349,7 +353,10 @@ def get_deletion_status(deletion_id: str) -> DeletionStatusResponse:
     return DeletionStatusResponse.model_validate(deletion)
 
 
-@app.put("/v1/users/{user_id}/providers/apple-music/token", status_code=status.HTTP_204_NO_CONTENT)
+@_core_router.put(
+    "/v1/users/{user_id}/providers/apple-music/token",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 def store_apple_music_user_token(user_id: str, request: AppleMusicUserTokenRequest) -> None:
     try:
         vault = AppleUserTokenVault.from_environment(get_storage())
@@ -368,7 +375,10 @@ def store_apple_music_user_token(user_id: str, request: AppleMusicUserTokenReque
     )
 
 
-@app.delete("/v1/users/{user_id}/providers/apple-music/token", status_code=status.HTTP_204_NO_CONTENT)
+@_core_router.delete(
+    "/v1/users/{user_id}/providers/apple-music/token",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 def revoke_apple_music_user_token(user_id: str) -> None:
     try:
         vault = AppleUserTokenVault.from_environment(get_storage())
@@ -388,7 +398,7 @@ def revoke_apple_music_user_token(user_id: str) -> None:
     )
 
 
-@app.post("/v1/recommendations", response_model=RecommendationResponse)
+@_core_router.post("/v1/recommendations", response_model=RecommendationResponse)
 def recommend(request: RecommendationRequest) -> RecommendationResponse:
     store = get_storage()
     missing = sorted(
@@ -406,14 +416,14 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
     context, confidence, factors = infer_context(request.signals)
     decision_id = f"dec_{uuid4().hex}"
     try:
-        candidates = get_music_provider().candidates_for_context(
-            context, request.user_id, limit=5
-        )
-        candidate, preference_weight, ranking_score, candidate_slate, policy_factors = rank_candidates(
-            user_id=request.user_id,
-            context=context,
-            decision_id=decision_id,
-            candidates=candidates,
+        candidates = get_music_provider().candidates_for_context(context, request.user_id, limit=5)
+        candidate, preference_weight, ranking_score, candidate_slate, policy_factors = (
+            rank_candidates(
+                user_id=request.user_id,
+                context=context,
+                decision_id=decision_id,
+                candidates=candidates,
+            )
         )
     except (httpx.HTTPError, LookupError, ValueError, RuntimeError) as exc:
         raise HTTPException(
@@ -462,9 +472,7 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
             "factors": decision_factors,
         },
     )
-    preference_phrase = (
-        " and your learned preference" if abs(preference_weight) >= 0.001 else ""
-    )
+    preference_phrase = " and your learned preference" if abs(preference_weight) >= 0.001 else ""
     policy_phrase = " with controlled exploration" if policy_factors["explored"] else ""
     return RecommendationResponse(
         decision_id=decision_id,
@@ -480,7 +488,7 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
     )
 
 
-@app.post("/v1/outcomes", response_model=PreferenceResponse)
+@_core_router.post("/v1/outcomes", response_model=PreferenceResponse)
 def submit_outcome(request: OutcomeRequest) -> PreferenceResponse:
     store = get_storage()
     require_consent(request.user_id)
@@ -522,7 +530,7 @@ def submit_outcome(request: OutcomeRequest) -> PreferenceResponse:
     return PreferenceResponse.model_validate(preference, from_attributes=True)
 
 
-@app.post("/v1/evaluations/outcomes", response_model=CounterfactualReportResponse)
+@_core_router.post("/v1/evaluations/outcomes", response_model=CounterfactualReportResponse)
 def evaluate_outcome(request: EvaluationOutcomeRequest) -> CounterfactualReportResponse:
     require_consent(request.user_id)
     trace = get_storage().get_decision_trace(request.decision_id)
@@ -566,7 +574,7 @@ def evaluate_outcome(request: EvaluationOutcomeRequest) -> CounterfactualReportR
     return report_response(report)
 
 
-@app.get(
+@_core_router.get(
     "/v1/evaluations/outcomes/{outcome_id}",
     response_model=CounterfactualReportResponse,
 )
@@ -581,9 +589,66 @@ def get_evaluation_report(outcome_id: str, user_id: str) -> CounterfactualReport
     return report_response(get_evaluation_service()._report_from_dict(payload))
 
 
-@app.get("/v1/decision-traces/{decision_id}", response_model=DecisionTraceResponse)
+@_core_router.get("/v1/decision-traces/{decision_id}", response_model=DecisionTraceResponse)
 def get_decision_trace(decision_id: str) -> DecisionTraceResponse:
     trace = get_storage().get_decision_trace(decision_id)
     if trace is None:
         raise HTTPException(status_code=404, detail="Decision trace not found")
     return DecisionTraceResponse.model_validate(trace)
+
+
+AppProfile = Literal["api", "legacy", "product"]
+
+
+def create_app(profile: AppProfile = "api") -> FastAPI:
+    """Create an isolated EchoSense application for a deployment profile."""
+
+    application = FastAPI(title="EchoSense", version="0.24.0")
+    application.include_router(_core_router)
+
+    @application.get("/healthz", include_in_schema=False)
+    def health() -> dict[str, str]:
+        return {"status": "ok", "profile": profile, "version": application.version}
+
+    if profile == "api":
+        return application
+
+    if profile == "legacy":
+        from pathlib import Path
+
+        from fastapi.responses import FileResponse
+        from fastapi.staticfiles import StaticFiles
+
+        from echosense.apple_music_sync import router as apple_music_sync_router
+        from echosense.apple_music_web import router as apple_music_web_router
+        from echosense.profile_recommendations import router as profile_recommendations_router
+        from echosense.taste_profile import router as taste_profile_router
+
+        ui_dir = Path(__file__).with_name("web")
+        application.include_router(apple_music_web_router)
+        application.include_router(apple_music_sync_router)
+        application.include_router(taste_profile_router)
+        application.include_router(profile_recommendations_router)
+        application.mount("/ui", StaticFiles(directory=ui_dir), name="ui")
+
+        @application.get("/", include_in_schema=False)
+        def cognitive_dashboard() -> FileResponse:
+            return FileResponse(ui_dir / "index.html")
+
+        return application
+
+    if profile == "product":
+        from echosense.player_routes import router as player_router
+        from echosense.product_ui import router as product_ui_router
+        from echosense.spotify_auth import router as spotify_auth_router
+
+        application.include_router(spotify_auth_router)
+        application.include_router(player_router)
+        application.include_router(product_ui_router)
+        return application
+
+    raise ValueError(f"Unknown EchoSense application profile: {profile}")
+
+
+# Backwards-compatible API-only entry point.
+app = create_app()

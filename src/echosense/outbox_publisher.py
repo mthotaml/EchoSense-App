@@ -10,12 +10,20 @@ from typing import Any, Protocol
 from jsonschema import ValidationError
 
 from echosense.event_schema import SchemaRegistry, registry_from_environment
-from echosense.operations import DEAD_LETTERED, PUBLISHED, PUBLISH_LATENCY, RETRIES, VALIDATION_FAILURES
+from echosense.operations import (
+    DEAD_LETTERED,
+    PUBLISH_LATENCY,
+    PUBLISHED,
+    RETRIES,
+    VALIDATION_FAILURES,
+)
 from echosense.storage import Storage
 
 
 class Producer(Protocol):
-    def produce(self, topic: str, key: str, value: bytes, headers: list[tuple[str, bytes]]) -> None: ...
+    def produce(
+        self, topic: str, key: str, value: bytes, headers: list[tuple[str, bytes]]
+    ) -> None: ...
 
     def flush(self, timeout: float | None = None) -> int: ...
 
@@ -97,7 +105,9 @@ class OutboxPublisher:
             PUBLISH_LATENCY.observe(time.monotonic() - started)
 
     def _dead_letter(self, event: dict[str, Any], envelope: dict[str, Any], exc: Exception) -> bool:
-        failure_type = "schema_validation" if isinstance(exc, ValidationError) else "publish_exhausted"
+        failure_type = (
+            "schema_validation" if isinstance(exc, ValidationError) else "publish_exhausted"
+        )
         dead_letter = {
             "dead_lettered_at": datetime.now(timezone.utc).isoformat(),
             "failure_type": failure_type,
@@ -145,7 +155,10 @@ class OutboxPublisher:
             except Exception as exc:
                 if isinstance(exc, ValidationError):
                     VALIDATION_FAILURES.inc()
-                should_dead_letter = isinstance(exc, ValidationError) or int(event["publish_attempts"]) >= self.max_attempts
+                should_dead_letter = (
+                    isinstance(exc, ValidationError)
+                    or int(event["publish_attempts"]) >= self.max_attempts
+                )
                 if should_dead_letter:
                     try:
                         if self._dead_letter(event, envelope, exc):

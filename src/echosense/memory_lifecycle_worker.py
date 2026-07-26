@@ -36,9 +36,7 @@ def run_once(
     protected_memory_ids: tuple[str, ...] = (),
     storage: Storage | None = None,
 ) -> dict[str, object]:
-    generated_run_id = (
-        f"lifecycle_{utc_now().strftime('%Y%m%dT%H%M%SZ')}_{uuid4().hex[:12]}"
-    )
+    generated_run_id = f"lifecycle_{utc_now().strftime('%Y%m%dT%H%M%SZ')}_{uuid4().hex[:12]}"
     resolved_run_id = run_id or generated_run_id
     service = MemoryLifecycleService(storage or Storage())
     result = service.execute(

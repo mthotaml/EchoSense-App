@@ -116,7 +116,9 @@ def test_working_memory_expires_and_is_not_retrieved(memory: CognitiveMemoryStor
         expires_at=now + timedelta(minutes=5),
     )
     assert memory.retrieve(user_id="u1", query="choose playlist", now=now)
-    assert memory.retrieve(user_id="u1", query="choose playlist", now=now + timedelta(minutes=6)) == []
+    assert (
+        memory.retrieve(user_id="u1", query="choose playlist", now=now + timedelta(minutes=6)) == []
+    )
     assert memory.expire_working_memories(now + timedelta(minutes=6)) == 1
     assert memory.get("working-1").status == "expired"  # type: ignore[union-attr]
 

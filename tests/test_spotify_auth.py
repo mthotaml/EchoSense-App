@@ -1,12 +1,26 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from echosense import spotify_auth
 from echosense.product_app import app
+from echosense.repositories.provider_connections import ProviderConnectionRepository
+from echosense.storage import Storage
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def connection_repository(tmp_path, monkeypatch) -> ProviderConnectionRepository:
+    repository = ProviderConnectionRepository(
+        Storage(f"sqlite:///{tmp_path / 'connections.db'}"),
+        Fernet.generate_key(),
+    )
+    monkeypatch.setattr(spotify_auth, "_connection_repository", repository)
+    return repository
 
 
 def test_spotify_session_is_disconnected_by_default() -> None:
@@ -34,9 +48,9 @@ def test_spotify_login_builds_authorization_redirect(monkeypatch) -> None:
     assert query["client_id"] == ["test-client-id"]
     assert query["response_type"] == ["code"]
     assert query["code_challenge_method"] == ["S256"]
-    assert query["redirect_uri"] == [
-        "http://127.0.0.1:8000/auth/spotify/callback"
-    ]
+    assert query["redirect_uri"] == ["http://127.0.0.1:8000/auth/spotify/callback"]
+    assert "playlist-read-private" in query["scope"][0]
+    assert "playlist-read-collaborative" in query["scope"][0]
     assert "echosense_spotify_oauth_state" in response.cookies
     assert "echosense_spotify_pkce_verifier" in response.cookies
 
@@ -50,6 +64,20 @@ def test_spotify_login_requires_client_id(monkeypatch) -> None:
     assert response.json()["detail"]["code"] == "spotify_not_configured"
 
 
+def test_session_requires_encrypted_token_storage_when_cookie_is_present(monkeypatch) -> None:
+    monkeypatch.setattr(spotify_auth, "_connection_repository", None)
+    monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEYS", raising=False)
+
+    response = client.get(
+        "/auth/spotify/session",
+        cookies={spotify_auth.SESSION_COOKIE: "unknown-session"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "spotify_token_storage_not_configured"
+
+
 def test_spotify_callback_rejects_invalid_state() -> None:
     response = client.get(
         "/auth/spotify/callback?code=test-code&state=unexpected",
@@ -61,56 +89,56 @@ def test_spotify_callback_rejects_invalid_state() -> None:
     assert response.json()["detail"]["code"] == "invalid_oauth_state"
 
 
-def test_spotify_data_builds_live_music_profile(monkeypatch) -> None:
+def test_spotify_data_builds_live_music_profile(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
     session_id = "test-session"
-    spotify_auth._sessions[session_id] = spotify_auth.SpotifySession(
-        access_token="access-token",
-        refresh_token="refresh-token",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        profile={"display_name": "Mohan"},
+    connection_repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id="spotify-user",
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"display_name": "Mohan"},
+        )
     )
 
-    def fake_get(session, path, params=None):
+    def fake_items(self, path, params, *, limit):
         if path == "/me/top/artists":
-            return {
-                "items": [
-                    {
-                        "id": "artist-1",
-                        "name": "Artist One",
-                        "genres": ["indie rock", "ambient"],
-                        "popularity": 70,
-                        "images": [],
-                        "external_urls": {"spotify": "https://open.spotify.com/artist/1"},
-                    },
-                    {
-                        "id": "artist-2",
-                        "name": "Artist Two",
-                        "genres": ["ambient"],
-                        "popularity": 50,
-                        "images": [],
-                        "external_urls": {"spotify": "https://open.spotify.com/artist/2"},
-                    },
-                ]
-            }
+            yield from [
+                {
+                    "id": "artist-1",
+                    "name": "Artist One",
+                    "genres": ["indie rock", "ambient"],
+                    "popularity": 70,
+                    "images": [],
+                    "external_urls": {"spotify": "https://open.spotify.com/artist/1"},
+                },
+                {
+                    "id": "artist-2",
+                    "name": "Artist Two",
+                    "genres": ["ambient"],
+                    "popularity": 50,
+                    "images": [],
+                    "external_urls": {"spotify": "https://open.spotify.com/artist/2"},
+                },
+            ]
         if path == "/me/top/tracks":
-            return {
-                "items": [
-                    {
-                        "id": "track-1",
-                        "name": "A Real Track",
-                        "artists": [{"name": "Artist One"}],
-                        "album": {"name": "Album", "images": []},
-                        "popularity": 64,
-                        "external_urls": {"spotify": "https://open.spotify.com/track/1"},
-                    }
-                ]
+            yield {
+                "id": "track-1",
+                "name": "A Real Track",
+                "artists": [{"name": "Artist One"}],
+                "album": {"name": "Album", "images": []},
+                "popularity": 64,
+                "external_urls": {"spotify": "https://open.spotify.com/track/1"},
             }
-        return {"items": []}
 
-    monkeypatch.setattr(spotify_auth, "_spotify_get", fake_get)
+    monkeypatch.setattr(spotify_auth.SpotifyClient, "items", fake_items)
 
     response = client.get(
-        "/auth/spotify/data",
+        "/auth/spotify/data?moment=working",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
     )
 
@@ -118,6 +146,139 @@ def test_spotify_data_builds_live_music_profile(monkeypatch) -> None:
     payload = response.json()
     assert payload["profile"]["display_name"] == "Mohan"
     assert payload["profile"]["genres"][0]["name"] == "Ambient"
+    assert payload["profile"]["confidence"] > 0
+    assert payload["profile"]["evidence_count"] == 3
+    assert payload["profile"]["evidence_sources"] == [
+        "/me/top/artists",
+        "/me/top/tracks",
+    ]
     assert payload["recommendation"]["title"] == "A Real Track"
+    assert payload["recommendation"]["decision_id"].startswith("dec_")
+    assert payload["recommendation"]["evidence"]["noticed"] == "You selected working."
+    assert payload["recommendation"]["evidence"]["matched_genres"] == ["ambient"]
+    assert "For working" in payload["recommendation"]["reason"]
     assert payload["recommendation"]["spotify_url"].endswith("/track/1")
-    spotify_auth._sessions.pop(session_id, None)
+    trace = connection_repository.storage.get_decision_trace(
+        payload["recommendation"]["decision_id"]
+    )
+    assert trace is not None
+    assert trace["context"] == "working"
+    assert trace["factors"]["listening_moment"] == "working"
+    snapshot = connection_repository.storage._execute
+    with connection_repository.storage.connect() as database:
+        row = snapshot(
+            database,
+            "SELECT normalized_json FROM music_data_imports WHERE user_id = %s",
+            ("spotify-user",),
+        ).fetchone()
+    assert row is not None
+    assert "access-token" not in dict(row)["normalized_json"]
+    with connection_repository.storage.connect() as database:
+        profile = snapshot(
+            database,
+            "SELECT profile_json FROM music_dna_profiles WHERE user_id = %s",
+            ("spotify-user",),
+        ).fetchone()
+    assert profile is not None
+    assert "access-token" not in dict(profile)["profile_json"]
+
+    library_calls = []
+
+    def fake_contains(self, track_id):
+        library_calls.append(("contains", track_id))
+        return False
+
+    def fake_save(self, track_id):
+        library_calls.append(("save", track_id))
+
+    def fake_remove(self, track_id):
+        library_calls.append(("remove", track_id))
+
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "contains_track", fake_contains)
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "save_track", fake_save)
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "remove_track", fake_remove)
+
+    library_status = client.get(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    saved = client.put(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-save-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+        },
+    )
+    removed = client.delete(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert library_status.json()["saved"] is False
+    assert saved.status_code == 200
+    assert saved.json()["saved"] is True
+    assert saved.json()["learning"]["signal"] == "saved"
+    assert saved.json()["learning"]["applied"] is True
+    assert removed.json()["saved"] is False
+    assert library_calls == [
+        ("contains", "track-1"),
+        ("save", "track-1"),
+        ("remove", "track-1"),
+    ]
+
+    feedback = client.post(
+        "/auth/spotify/feedback",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-feedback-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+            "signal": "skipped",
+            "completion_ratio": 0.1,
+            "playback_seconds": 12,
+        },
+    )
+    duplicate = client.post(
+        "/auth/spotify/feedback",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-feedback-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+            "signal": "skipped",
+            "completion_ratio": 0.1,
+            "playback_seconds": 12,
+        },
+    )
+    assert feedback.status_code == 200
+    assert feedback.json()["delta"] == -0.072
+    assert feedback.json()["applied"] is True
+    assert feedback.json()["evaluation"]["observed_reward"] < 0
+    assert duplicate.json()["applied"] is False
+
+
+def test_logout_revokes_server_connection_and_clears_cookie(
+    connection_repository: ProviderConnectionRepository,
+) -> None:
+    session_id = "logout-session"
+    connection_repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id="spotify-user",
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"id": "spotify-user", "display_name": "Mohan"},
+        )
+    )
+
+    response = client.post(
+        "/auth/spotify/logout",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "disconnected"}
+    assert connection_repository.get(session_id, "spotify") is None
+    assert spotify_auth.SESSION_COOKIE in response.headers["set-cookie"]
+    assert "Max-Age=0" in response.headers["set-cookie"]

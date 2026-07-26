@@ -10,12 +10,18 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, ge
 
 PUBLISHED = Counter("echosense_events_published_total", "Canonical events published")
 RETRIES = Counter("echosense_event_retries_total", "Event publish retries")
-VALIDATION_FAILURES = Counter("echosense_event_validation_failures_total", "Schema validation failures")
-DEAD_LETTERED = Counter("echosense_events_dead_lettered_total", "Events sent to the DLQ", ["failure_type"])
+VALIDATION_FAILURES = Counter(
+    "echosense_event_validation_failures_total", "Schema validation failures"
+)
+DEAD_LETTERED = Counter(
+    "echosense_events_dead_lettered_total", "Events sent to the DLQ", ["failure_type"]
+)
 REPLAYED = Counter("echosense_events_replayed_total", "DLQ events replayed", ["result"])
 PUBLISH_LATENCY = Histogram("echosense_event_publish_seconds", "Event publication latency")
 OUTBOX_DEPTH = Gauge("echosense_outbox_depth", "Unpublished outbox rows")
-OUTBOX_OLDEST_AGE = Gauge("echosense_outbox_oldest_event_age_seconds", "Age of oldest unpublished event")
+OUTBOX_OLDEST_AGE = Gauge(
+    "echosense_outbox_oldest_event_age_seconds", "Age of oldest unpublished event"
+)
 
 
 @dataclass(frozen=True)
@@ -40,7 +46,9 @@ def _database_probe(storage) -> None:
     oldest = values["oldest"]
     age = 0.0
     if oldest:
-        age = max(0.0, (datetime.now(timezone.utc) - datetime.fromisoformat(oldest)).total_seconds())
+        age = max(
+            0.0, (datetime.now(timezone.utc) - datetime.fromisoformat(oldest)).total_seconds()
+        )
     OUTBOX_OLDEST_AGE.set(age)
 
 

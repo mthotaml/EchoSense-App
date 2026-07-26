@@ -3,14 +3,15 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterator, Protocol
+from typing import Any, Protocol
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class CursorLike(Protocol):
@@ -111,7 +112,69 @@ class Storage:
                 revoked_at TEXT
             )
             """,
+            """
+            CREATE TABLE IF NOT EXISTS provider_connections (
+                session_id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                provider_user_id TEXT NOT NULL,
+                encrypted_access_token TEXT NOT NULL,
+                encrypted_refresh_token TEXT,
+                expires_at TEXT NOT NULL,
+                profile_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                revoked_at TEXT
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS music_data_imports (
+                user_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                imported_at TEXT NOT NULL,
+                normalized_json TEXT NOT NULL,
+                PRIMARY KEY (user_id, provider)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS music_dna_profiles (
+                user_id TEXT PRIMARY KEY,
+                generated_at TEXT NOT NULL,
+                profile_json TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS music_item_preferences (
+                user_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                context TEXT NOT NULL,
+                weight REAL NOT NULL,
+                evidence_count INTEGER NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, provider, item_id, context)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS playback_learning_outcomes (
+                outcome_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                decision_id TEXT NOT NULL,
+                signal TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                context TEXT NOT NULL,
+                delta REAL NOT NULL,
+                completion_ratio REAL,
+                playback_seconds REAL,
+                rating INTEGER,
+                observed_at TEXT NOT NULL
+            )
+            """,
             "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON event_outbox (published_at, claim_until, occurred_at)",
+            """
+            CREATE INDEX IF NOT EXISTS idx_provider_connections_account
+            ON provider_connections (provider, provider_user_id, revoked_at)
+            """,
         ]
         with self.connect() as connection:
             for statement in statements:
@@ -197,6 +260,82 @@ class Storage:
             )
             return cursor.rowcount > 0
 
+    def upsert_provider_connection(
+        self,
+        *,
+        session_id: str,
+        provider: str,
+        provider_user_id: str,
+        encrypted_access_token: str,
+        encrypted_refresh_token: str | None,
+        expires_at: datetime,
+        profile: dict[str, Any],
+    ) -> None:
+        now = utc_now().isoformat()
+        with self.connect() as connection:
+            self._execute(
+                connection,
+                """
+                INSERT INTO provider_connections (
+                    session_id, provider, provider_user_id,
+                    encrypted_access_token, encrypted_refresh_token,
+                    expires_at, profile_json, created_at, updated_at, revoked_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    provider = excluded.provider,
+                    provider_user_id = excluded.provider_user_id,
+                    encrypted_access_token = excluded.encrypted_access_token,
+                    encrypted_refresh_token = excluded.encrypted_refresh_token,
+                    expires_at = excluded.expires_at,
+                    profile_json = excluded.profile_json,
+                    updated_at = excluded.updated_at,
+                    revoked_at = NULL
+                """,
+                (
+                    session_id,
+                    provider,
+                    provider_user_id,
+                    encrypted_access_token,
+                    encrypted_refresh_token,
+                    expires_at.isoformat(),
+                    json.dumps(profile),
+                    now,
+                    now,
+                ),
+            )
+
+    def get_provider_connection(self, session_id: str, provider: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = self._execute(
+                connection,
+                """
+                SELECT session_id, provider, provider_user_id,
+                       encrypted_access_token, encrypted_refresh_token,
+                       expires_at, profile_json
+                FROM provider_connections
+                WHERE session_id = %s AND provider = %s AND revoked_at IS NULL
+                """,
+                (session_id, provider),
+            ).fetchone()
+        if row is None:
+            return None
+        payload = dict(row)
+        payload["profile"] = json.loads(payload.pop("profile_json"))
+        return payload
+
+    def revoke_provider_connection(self, session_id: str, provider: str) -> bool:
+        with self.connect() as connection:
+            cursor = self._execute(
+                connection,
+                """
+                UPDATE provider_connections SET revoked_at = %s, updated_at = %s
+                WHERE session_id = %s AND provider = %s AND revoked_at IS NULL
+                """,
+                (utc_now().isoformat(), utc_now().isoformat(), session_id, provider),
+            )
+            return cursor.rowcount > 0
+
     def append_event(
         self,
         event_id: str,
@@ -214,7 +353,14 @@ class Storage:
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT(event_id) DO NOTHING
                 """,
-                (event_id, event_type, user_id, utc_now().isoformat(), trace_id, json.dumps(payload)),
+                (
+                    event_id,
+                    event_type,
+                    user_id,
+                    utc_now().isoformat(),
+                    trace_id,
+                    json.dumps(payload),
+                ),
             )
 
     def claim_outbox(
