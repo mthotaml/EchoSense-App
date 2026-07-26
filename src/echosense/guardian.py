@@ -13,6 +13,12 @@ def validate_guardian_configuration() -> None:
     configuration = json.loads((ROOT / "guardian/guardian.json").read_text())
     Draft202012Validator(schema).validate(configuration)
     for journey in configuration["journeys"]:
+        overlap = set(journey["states"]) & set(journey.get("planned_states", ()))
+        if overlap:
+            raise ValueError(
+                "Guardian states cannot be both certified and planned: "
+                + ", ".join(sorted(overlap))
+            )
         spec = ROOT / journey["spec"]
         if not spec.is_file():
             raise FileNotFoundError(f"Guardian journey spec does not exist: {spec}")
