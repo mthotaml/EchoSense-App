@@ -135,7 +135,8 @@ PAGE = r"""<!doctype html>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play in EchoSense</button><button id="queue-add" class="secondary" type="button" disabled>Add next</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Not for me</button></div><div id="toast" aria-live="polite"></div></section>
-      <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Playback queue</div><h2>Now and next</h2></div><button id="queue-refresh" class="secondary" type="button">Refresh</button></div><div id="queue-items" class="track-list"></div></section>
+      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA queue</div><h2>Different tracks, ranked for this moment</h2><p class="copy">Context, learned preference, familiarity, and diversity shape this sequence.</p></div><button id="dna-queue-add" class="primary" type="button">Add DNA queue</button></div><div id="dna-queue-items" class="track-list"></div></section>
+      <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Spotify playback queue</div><h2>Now and next</h2></div><button id="queue-refresh" class="secondary" type="button">Refresh</button></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
       <section class="panel"><div class="eyebrow">Your journey</div><h2>Your taste, told as a story</h2><div id="timeline" class="journey"></div></section>
@@ -156,6 +157,7 @@ PAGE = r"""<!doctype html>
     let currentPlayOutcomeId = null;
     let currentQueueCommandId = null;
     let currentTrackSaved = false;
+    let recommendationSlate = [];
     let playlistsNextOffset = null;
     let selectedPlaylistId = null;
     let tracksNextOffset = null;
@@ -210,12 +212,12 @@ PAGE = r"""<!doctype html>
     async function loadLiveSpotify(moment=$('#moment').value) {
       const response=await api(`/auth/spotify/data?moment=${encodeURIComponent(moment)}`); const data=await response.json();
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
-      const profile=data.profile; const pick=data.recommendation;
+      const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
       if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; $('#queue-add').disabled=false; reportedSignals.clear(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
-      renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']);
+      renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderDnaQueue();
     }
 
     async function loadDemo() {
@@ -303,6 +305,19 @@ PAGE = r"""<!doctype html>
       if(!currentTrackId||!currentQueueCommandId)return;
       const result=await (await api('/v1/player/queue',{method:'POST',body:JSON.stringify({item_id:currentTrackId,command_id:currentQueueCommandId,device_id:deviceId})})).json();
       $('#queue-add').disabled=true; setText('#toast',result.applied?'Added to your Spotify queue.':'Already in your queue.'); await loadQueue();
+    }
+    function renderDnaQueue() {
+      const container=$('#dna-queue-items'); container.replaceChildren();
+      recommendationSlate.forEach(item=>{const row=document.createElement('div');row.className='playlist-track';const title=document.createElement('strong');title.textContent=`${item.rank||''} · ${item.title}`;const evidence=document.createElement('span');evidence.textContent=`${item.artist} · ${item.reason||'Ranked from your Music DNA.'}`;row.append(title,evidence);container.appendChild(row);});
+      $('#dna-queue-panel').hidden=recommendationSlate.length<2;
+    }
+    async function addDnaQueue() {
+      $('#dna-queue-add').disabled=true; let added=0;
+      for(const item of recommendationSlate) {
+        const result=await (await api('/v1/player/queue',{method:'POST',body:JSON.stringify({item_id:item.id,command_id:`dna_${currentRecommendationId}_${item.id}`,device_id:deviceId})})).json();
+        if(result.applied)added+=1;
+      }
+      setText('#toast',`${added} distinct Music DNA picks added. Tracks already queued were skipped.`); await loadQueue();
     }
     async function toggleShuffle() {
       const enabled=$('#shuffle').getAttribute('aria-pressed')!=='true';
@@ -430,6 +445,7 @@ PAGE = r"""<!doctype html>
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-add').addEventListener('click',()=>queueRecommendation().catch(e=>setText('#toast',e.message)));
+      $('#dna-queue-add').addEventListener('click',()=>addDnaQueue().catch(e=>{ $('#dna-queue-add').disabled=false; setText('#toast',e.message); }));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
       $('#more-playlists').addEventListener('click',()=>loadPlaylistsSafely(playlistsNextOffset||0));
       $('#more-tracks').addEventListener('click',()=>loadPlaylistTracks(selectedPlaylistId,$('#playlist-title').textContent,tracksNextOffset).catch(e=>setText('#toast',e.message)));

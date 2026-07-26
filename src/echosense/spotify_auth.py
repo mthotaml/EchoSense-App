@@ -15,6 +15,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from echosense.diverse_slate import DiverseSlateService
 from echosense.evaluation_service import EvaluationService
 from echosense.listening_context import ListeningContextService, ListeningMoment
 from echosense.music_dna import MusicDNAGenerator
@@ -299,12 +300,23 @@ def spotify_data(
         context_service = ListeningContextService()
         context_fits = context_service.score(imported, moment)
         ranking_context = context_service.ranking_context(moment)
+        candidate_tracks = list(
+            {
+                item.track.provider_id: item.track
+                for item in (*imported.top_tracks, *imported.recent_tracks)
+            }.values()
+        )
         recommendation, candidate_slate = learning.rank(
             user_id=session.provider_user_id,
             provider="spotify",
             context=ranking_context,
-            tracks=[item.track for item in imported.top_tracks],
+            tracks=candidate_tracks,
             context_scores={item_id: fit.score for item_id, fit in context_fits.items()},
+        )
+        diverse_slate = DiverseSlateService().build(
+            candidate_tracks,
+            candidate_slate,
+            limit=5,
         )
         decision_id = f"dec_{uuid4().hex}"
         if recommendation is not None:
@@ -336,7 +348,7 @@ def spotify_data(
             status_code=502,
             detail={"code": "spotify_api_failed", "message": str(exc)},
         ) from exc
-    return music_dna_service.build_provider_profile(
+    result = music_dna_service.build_provider_profile(
         imported,
         display_name=str(session.profile.get("display_name") or "Spotify listener"),
         music_dna=music_dna,
@@ -349,8 +361,16 @@ def spotify_data(
                 "remembered": (
                     f"Your Music DNA currently has {music_dna.evidence_count} listening signals."
                 ),
-                "matched_genres": list(context_fits[recommendation.provider_id].matched_genres),
-                "context_fit": context_fits[recommendation.provider_id].score,
+                "matched_genres": list(
+                    context_fits[recommendation.provider_id].matched_genres
+                    if recommendation.provider_id in context_fits
+                    else ()
+                ),
+                "context_fit": (
+                    context_fits[recommendation.provider_id].score
+                    if recommendation.provider_id in context_fits
+                    else 0.0
+                ),
                 "learned_preference": next(
                     (
                         item["preference_weight"]
@@ -364,6 +384,16 @@ def spotify_data(
             else None
         ),
     )
+    result["recommendations"] = [
+        {
+            **music_dna_service._track_view(item.track),
+            "rank": item.rank,
+            "score": item.score,
+            "reason": item.reason,
+        }
+        for item in diverse_slate
+    ]
+    return result
 
 
 @router.post("/feedback")
