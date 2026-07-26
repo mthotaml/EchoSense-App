@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
+from echosense.music_dna import MusicDNAProfile
 from echosense.providers.models import Artist, MusicDataImport, Track
 
 Reaction = Literal["love", "not_for_me", "save", "play"]
@@ -22,7 +23,11 @@ class MusicDNAService:
         self._feedback_events: list[dict[str, str]] = []
 
     def build_provider_profile(
-        self, imported: MusicDataImport, *, display_name: str
+        self,
+        imported: MusicDataImport,
+        *,
+        display_name: str,
+        music_dna: MusicDNAProfile | None = None,
     ) -> dict[str, object]:
         artists = [artist for artist, _ in imported.top_artists]
         top_tracks = [item.track for item in imported.top_tracks]
@@ -53,6 +58,12 @@ class MusicDNAService:
                 "top_tracks": [self._track_view(track) for track in top_tracks],
                 "recent_tracks": [self._track_view(track) for track in recent_tracks],
                 "average_popularity": average_popularity,
+                "confidence": music_dna.confidence if music_dna else 0.0,
+                "discovery_score": music_dna.discovery_score if music_dna else 0,
+                "comfort_score": music_dna.comfort_score if music_dna else 0,
+                "diversity_score": music_dna.diversity_score if music_dna else 0,
+                "evidence_count": music_dna.evidence_count if music_dna else 0,
+                "evidence_sources": list(music_dna.source_paths) if music_dna else [],
             },
             "recommendation": (
                 {

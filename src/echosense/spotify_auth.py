@@ -11,6 +11,7 @@ import httpx
 from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from echosense.music_dna import MusicDNAGenerator
 from echosense.music_dna_service import music_dna_service
 from echosense.providers.spotify import SpotifyClient, SpotifyProvider, SpotifyRateLimited
 from echosense.repositories.music_dna import MusicDNARepository
@@ -257,9 +258,10 @@ def spotify_data(
     session = _connected_session(session_id)
     try:
         imported = SpotifyProvider(SpotifyClient(session, _refresh_session)).import_music_data()
-        MusicDNARepository(get_connection_repository().storage).save(
-            session.provider_user_id, imported
-        )
+        repository = MusicDNARepository(get_connection_repository().storage)
+        repository.save(session.provider_user_id, imported)
+        music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
+        repository.save_profile(music_dna)
     except SpotifyRateLimited as exc:
         raise HTTPException(
             status_code=429,
@@ -277,6 +279,7 @@ def spotify_data(
     return music_dna_service.build_provider_profile(
         imported,
         display_name=str(session.profile.get("display_name") or "Spotify listener"),
+        music_dna=music_dna,
     )
 
 

@@ -33,6 +33,24 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
     user_id = "user-delete-01"
     store.upsert_consent(user_id, "contextual_recommendation", "2026-07-20")
     store.upsert_apple_music_user_token(user_id, "encrypted-secret")
+    with store.connect() as connection:
+        store._execute(
+            connection,
+            """
+            INSERT INTO music_data_imports
+                (user_id, provider, imported_at, normalized_json)
+            VALUES (%s, 'spotify', '2026-07-25T00:00:00+00:00', '{}')
+            """,
+            (user_id,),
+        )
+        store._execute(
+            connection,
+            """
+            INSERT INTO music_dna_profiles (user_id, generated_at, profile_json)
+            VALUES (%s, '2026-07-25T00:00:00+00:00', '{}')
+            """,
+            (user_id,),
+        )
     store.save_decision_trace(
         decision_id="dec-delete-01",
         user_id=user_id,
@@ -137,7 +155,8 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "cognitive_memories": 1,
         "memory_lifecycle_runs": 1,
         "recommendation_exposures": 1,
-        "music_data_imports": 0,
+        "music_data_imports": 1,
+        "music_dna_profiles": 1,
         "decision_traces": 1,
         "provider_tokens": 1,
         "outbox_events": 2,

@@ -144,6 +144,12 @@ def test_spotify_data_builds_live_music_profile(
     payload = response.json()
     assert payload["profile"]["display_name"] == "Mohan"
     assert payload["profile"]["genres"][0]["name"] == "Ambient"
+    assert payload["profile"]["confidence"] > 0
+    assert payload["profile"]["evidence_count"] == 3
+    assert payload["profile"]["evidence_sources"] == [
+        "/me/top/artists",
+        "/me/top/tracks",
+    ]
     assert payload["recommendation"]["title"] == "A Real Track"
     assert payload["recommendation"]["spotify_url"].endswith("/track/1")
     snapshot = connection_repository.storage._execute
@@ -155,6 +161,14 @@ def test_spotify_data_builds_live_music_profile(
         ).fetchone()
     assert row is not None
     assert "access-token" not in dict(row)["normalized_json"]
+    with connection_repository.storage.connect() as database:
+        profile = snapshot(
+            database,
+            "SELECT profile_json FROM music_dna_profiles WHERE user_id = %s",
+            ("spotify-user",),
+        ).fetchone()
+    assert profile is not None
+    assert "access-token" not in dict(profile)["profile_json"]
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(

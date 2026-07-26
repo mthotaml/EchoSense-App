@@ -135,6 +135,13 @@ class Storage:
                 PRIMARY KEY (user_id, provider)
             )
             """,
+            """
+            CREATE TABLE IF NOT EXISTS music_dna_profiles (
+                user_id TEXT PRIMARY KEY,
+                generated_at TEXT NOT NULL,
+                profile_json TEXT NOT NULL
+            )
+            """,
             "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON event_outbox (published_at, claim_until, occurred_at)",
             """
             CREATE INDEX IF NOT EXISTS idx_provider_connections_account

@@ -261,6 +261,7 @@ class DeletionCoordinator:
                 ("memory_lifecycle_runs", "memory_lifecycle_runs"),
                 ("recommendation_exposures", "recommendation_exposures"),
                 ("music_data_imports", "music_data_imports"),
+                ("music_dna_profiles", "music_dna_profiles"),
                 ("decision_traces", "decision_traces"),
                 ("provider_tokens", "apple_music_user_tokens"),
                 ("outbox_events", "event_outbox"),
