@@ -20,7 +20,12 @@ from echosense.listening_context import ListeningContextService, ListeningMoment
 from echosense.music_dna import MusicDNAGenerator
 from echosense.music_dna_service import music_dna_service
 from echosense.playback_learning import PlaybackLearningService
-from echosense.providers.spotify import SpotifyClient, SpotifyProvider, SpotifyRateLimited
+from echosense.providers.spotify import (
+    SpotifyClient,
+    SpotifyLibrary,
+    SpotifyProvider,
+    SpotifyRateLimited,
+)
 from echosense.repositories.music_dna import MusicDNARepository
 from echosense.repositories.provider_connections import (
     ProviderConnection,
@@ -34,7 +39,10 @@ SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 SPOTIFY_API_URL = "https://api.spotify.com/v1"
 SPOTIFY_PROFILE_URL = f"{SPOTIFY_API_URL}/me"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8001/auth/spotify/callback"
-DEFAULT_SCOPES = "user-top-read user-read-recently-played user-read-email user-read-private"
+DEFAULT_SCOPES = (
+    "user-top-read user-read-recently-played user-read-email user-read-private "
+    "user-library-read user-library-modify"
+)
 SESSION_COOKIE = "echosense_spotify_session"
 STATE_COOKIE = "echosense_spotify_oauth_state"
 VERIFIER_COOKIE = "echosense_spotify_pkce_verifier"
@@ -51,6 +59,11 @@ class SpotifyFeedbackRequest(BaseModel):
     completion_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     playback_seconds: float | None = Field(default=None, ge=0.0)
     rating: int | None = Field(default=None, ge=1, le=5)
+
+
+class SpotifyLibrarySaveRequest(BaseModel):
+    outcome_id: str = Field(min_length=1)
+    decision_id: str = Field(min_length=1)
 
 
 def get_connection_repository() -> ProviderConnectionRepository:
@@ -418,6 +431,75 @@ def spotify_feedback(
             else None
         ),
     }
+
+
+def _library_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, SpotifyRateLimited):
+        return HTTPException(
+            status_code=429,
+            detail={
+                "code": "spotify_rate_limited",
+                "retry_after_seconds": exc.retry_after,
+            },
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+    return HTTPException(
+        status_code=502,
+        detail={"code": "spotify_library_failed", "message": str(exc)},
+    )
+
+
+@router.get("/library/tracks/{track_id}")
+def spotify_library_status(
+    track_id: str,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    try:
+        saved = SpotifyLibrary(SpotifyClient(session, _refresh_session)).contains_track(track_id)
+    except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
+        raise _library_error(exc) from exc
+    return {"provider": "spotify", "track_id": track_id, "saved": saved}
+
+
+@router.put("/library/tracks/{track_id}")
+def spotify_save_track(
+    track_id: str,
+    request: SpotifyLibrarySaveRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    try:
+        SpotifyLibrary(SpotifyClient(session, _refresh_session)).save_track(track_id)
+    except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
+        raise _library_error(exc) from exc
+    learning = spotify_feedback(
+        SpotifyFeedbackRequest(
+            outcome_id=request.outcome_id,
+            decision_id=request.decision_id,
+            signal="saved",
+        ),
+        session_id,
+    )
+    return {
+        "provider": "spotify",
+        "track_id": track_id,
+        "saved": True,
+        "learning": learning,
+    }
+
+
+@router.delete("/library/tracks/{track_id}")
+def spotify_remove_track(
+    track_id: str,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    try:
+        SpotifyLibrary(SpotifyClient(session, _refresh_session)).remove_track(track_id)
+    except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
+        raise _library_error(exc) from exc
+    return {"provider": "spotify", "track_id": track_id, "saved": False}
 
 
 @router.post("/logout")

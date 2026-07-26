@@ -17,6 +17,8 @@
         "player-ready",
         "context-selected",
         "recommendation-ranked",
+        "library-saved",
+        "library-unsaved",
         "playback-started",
         "feedback-learned",
         "refresh-restored",

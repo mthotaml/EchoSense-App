@@ -55,6 +55,37 @@ class SpotifyClient:
             raise ValueError("Spotify returned a non-object response")
         return payload
 
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, object] | None = None,
+    ) -> Any:
+        """Send a Spotify request that may return an object, array, or empty body."""
+        self.refresh_connection(self.connection)
+        response = httpx.request(
+            method,
+            f"{self.base_url}{path}",
+            params=params,
+            headers={"Authorization": f"Bearer {self.connection.access_token}"},
+            timeout=self.timeout_seconds,
+        )
+        if response.status_code == 401:
+            self.refresh_connection(self.connection, force=True)
+            response = httpx.request(
+                method,
+                f"{self.base_url}{path}",
+                params=params,
+                headers={"Authorization": f"Bearer {self.connection.access_token}"},
+                timeout=self.timeout_seconds,
+            )
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After", "1")
+            raise SpotifyRateLimited(int(retry_after) if retry_after.isdigit() else 1)
+        response.raise_for_status()
+        return response.json() if response.content else None
+
     def items(
         self, path: str, params: dict[str, object], *, limit: int
     ) -> Iterator[dict[str, Any]]:

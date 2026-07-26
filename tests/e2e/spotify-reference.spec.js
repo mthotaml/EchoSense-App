@@ -3,6 +3,8 @@ const { test, expect } = require('@playwright/test');
 test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let connected = true;
   let playbackStarted = false;
+  const savedTracks = new Set();
+  const libraryMutations = [];
   const feedback = [];
 
   await page.route('https://sdk.scdn.co/spotify-player.js', route =>
@@ -94,6 +96,33 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       json: {applied: true, weight: 0.1, evidence_count: feedback.length},
     });
   });
+  await page.route('**/auth/spotify/library/tracks/*', async route => {
+    const trackId = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop());
+    const method = route.request().method();
+    if (method === 'PUT') {
+      const request = await route.request().postDataJSON();
+      savedTracks.add(trackId);
+      libraryMutations.push({method, trackId, request});
+      return route.fulfill({
+        json: {
+          provider: 'spotify',
+          track_id: trackId,
+          saved: true,
+          learning: {signal: 'saved', applied: true},
+        },
+      });
+    }
+    if (method === 'DELETE') {
+      savedTracks.delete(trackId);
+      libraryMutations.push({method, trackId});
+      return route.fulfill({
+        json: {provider: 'spotify', track_id: trackId, saved: false},
+      });
+    }
+    return route.fulfill({
+      json: {provider: 'spotify', track_id: trackId, saved: savedTracks.has(trackId)},
+    });
+  });
   await page.route('**/auth/spotify/logout', route => {
     connected = false;
     return route.fulfill({json: {status: 'disconnected'}});
@@ -106,6 +135,21 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.locator('#moment').selectOption('working');
   await expect(page.locator('#pick-heading')).toHaveText('Focused Motion');
   await expect(page.locator('#evidence')).toContainText('Context evidence: ambient');
+  await expect(page.locator('#save')).toHaveText('Save');
+
+  await page.locator('#save').click();
+  await expect(page.locator('#save')).toHaveText('Saved');
+  await expect(page.locator('#save')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#toast')).toContainText('EchoSense learned');
+  expect(libraryMutations[0]).toMatchObject({
+    method: 'PUT',
+    trackId: 'working-track',
+    request: {decision_id: 'decision-working'},
+  });
+
+  await page.locator('#save').click();
+  await expect(page.locator('#save')).toHaveText('Save');
+  expect(libraryMutations[1]).toEqual({method: 'DELETE', trackId: 'working-track'});
 
   await page.locator('#play').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('played');

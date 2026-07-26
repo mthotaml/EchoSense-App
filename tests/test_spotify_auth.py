@@ -180,6 +180,51 @@ def test_spotify_data_builds_live_music_profile(
     assert profile is not None
     assert "access-token" not in dict(profile)["profile_json"]
 
+    library_calls = []
+
+    def fake_contains(self, track_id):
+        library_calls.append(("contains", track_id))
+        return False
+
+    def fake_save(self, track_id):
+        library_calls.append(("save", track_id))
+
+    def fake_remove(self, track_id):
+        library_calls.append(("remove", track_id))
+
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "contains_track", fake_contains)
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "save_track", fake_save)
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "remove_track", fake_remove)
+
+    library_status = client.get(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    saved = client.put(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-save-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+        },
+    )
+    removed = client.delete(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert library_status.json()["saved"] is False
+    assert saved.status_code == 200
+    assert saved.json()["saved"] is True
+    assert saved.json()["learning"]["signal"] == "saved"
+    assert saved.json()["learning"]["applied"] is True
+    assert removed.json()["saved"] is False
+    assert library_calls == [
+        ("contains", "track-1"),
+        ("save", "track-1"),
+        ("remove", "track-1"),
+    ]
+
     feedback = client.post(
         "/auth/spotify/feedback",
         cookies={spotify_auth.SESSION_COOKIE: session_id},

@@ -67,6 +67,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "pick.decision_id" in response.text
     assert "feedback('completed'" in response.text
     assert "feedback('skipped')" in response.text
+    assert 'id="save"' in response.text
+    assert "toggleSaved" in response.text
+    assert "/auth/spotify/library/tracks/" in response.text
+    assert "Saved to Spotify. EchoSense learned from this choice." in response.text
     assert 'id="moment"' in response.text
     assert "data?moment=" in response.text
     assert "Context evidence:" in response.text
