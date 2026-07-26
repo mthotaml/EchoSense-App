@@ -111,6 +111,7 @@ def _why_now(
     *,
     weather: str | None,
     region: str | None,
+    road_setting: str | None,
     activity: str | None,
     daypart: str | None,
 ) -> dict[str, object]:
@@ -120,6 +121,7 @@ def _why_now(
     for value, label in (
         (weather, "weather"),
         (region, "coarse location"),
+        (road_setting, "road setting"),
         (activity, "movement"),
         (daypart, "local time"),
     ):
@@ -331,6 +333,7 @@ def spotify_data(
     moment: ListeningMoment = Query(default="general"),
     weather: str | None = Query(default=None, max_length=32),
     region: str | None = Query(default=None, max_length=64),
+    road_setting: str | None = Query(default=None, max_length=32),
     activity: str | None = Query(default=None, max_length=32),
     daypart: str | None = Query(default=None, max_length=32),
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
@@ -353,6 +356,7 @@ def spotify_data(
             spotify_client,
             weather=weather,
             region=region,
+            road_setting=road_setting,
             activity=activity,
             daypart=daypart,
         )
@@ -372,7 +376,7 @@ def spotify_data(
                 combined_context_scores.get(item_id, 0.0),
                 score,
             )
-        live_context = any((weather, region, activity, daypart))
+        live_context = any((weather, region, road_setting, activity, daypart))
         recommendation, candidate_slate = learning.rank(
             user_id=session.provider_user_id,
             provider="spotify",
@@ -406,6 +410,7 @@ def spotify_data(
                     "live_context": {
                         "weather": weather,
                         "region": region,
+                        "road_setting": road_setting,
                         "activity": activity,
                         "daypart": daypart,
                     },
@@ -483,6 +488,7 @@ def spotify_data(
                 expanded.evidence.get(item.track.provider_id, ()),
                 weather=weather,
                 region=region,
+                road_setting=road_setting,
                 activity=activity,
                 daypart=daypart,
             ),

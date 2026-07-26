@@ -114,6 +114,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "enableLiveContext" in response.text
     assert "navigator.geolocation.watchPosition" in response.text
     assert "/v1/context/resolve" in response.text
+    assert "road_setting" in response.text
+    assert "road_setting?.replace" in response.text
     assert "Raw coordinates are used transiently" in response.text
     assert "why_now?.factors" in response.text
     assert "/ui/player-lifecycle.js" in response.text

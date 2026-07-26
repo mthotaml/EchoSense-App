@@ -30,16 +30,35 @@ def test_context_expands_candidates_with_explainable_queries() -> None:
         client,
         weather="sunny",
         region="Southern California",
+        road_setting="coastal",
         activity="driving",
         daypart="afternoon",
     )
 
     assert client.queries == [
+        "beach coastal drive",
         "sunny day",
         "California Los Angeles",
         "driving",
         "afternoon music",
     ]
-    assert len(result.tracks) == 4
+    assert len(result.tracks) == 5
     assert result.scores["track-1"] == 1.0
-    assert result.evidence["track-2"] == ("local connection to Southern California",)
+    assert result.evidence["track-1"] == ("coastal drive matched to your Music DNA",)
+    assert result.evidence["track-3"] == ("local connection to Southern California",)
+
+
+def test_mountain_query_has_situational_explanation() -> None:
+    queries = ContextCandidateService.queries(
+        weather=None,
+        region="your area",
+        road_setting="mountain",
+        activity="driving",
+        daypart="morning",
+    )
+
+    assert queries[0] == (
+        "mountain scenic drive",
+        "mountain drive matched to your Music DNA",
+        1.0,
+    )

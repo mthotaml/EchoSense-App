@@ -25,12 +25,14 @@ class ContextCandidateService:
         *,
         weather: str | None,
         region: str | None,
+        road_setting: str | None,
         activity: str | None,
         daypart: str | None,
     ) -> ContextCandidateResult:
         queries = self.queries(
             weather=weather,
             region=region,
+            road_setting=road_setting,
             activity=activity,
             daypart=daypart,
         )
@@ -65,10 +67,27 @@ class ContextCandidateService:
         *,
         weather: str | None,
         region: str | None,
+        road_setting: str | None,
         activity: str | None,
         daypart: str | None,
     ) -> list[tuple[str, str, float]]:
         result: list[tuple[str, str, float]] = []
+        if road_setting == "coastal":
+            result.append(
+                (
+                    "beach coastal drive",
+                    "coastal drive matched to your Music DNA",
+                    1.0,
+                )
+            )
+        elif road_setting == "mountain":
+            result.append(
+                (
+                    "mountain scenic drive",
+                    "mountain drive matched to your Music DNA",
+                    1.0,
+                )
+            )
         if weather in {"sunny", "rainy", "cloudy", "partly_cloudy"}:
             term = {"partly_cloudy": "cloudy"}.get(weather, weather)
             result.append((f"{term} day", f"{weather.replace('_', ' ')} weather", 1.0))
@@ -87,4 +106,4 @@ class ContextCandidateService:
             )
         if daypart:
             result.append((f"{daypart.replace('_', ' ')} music", f"{daypart} timing", 0.65))
-        return result[:4]
+        return result[:5]

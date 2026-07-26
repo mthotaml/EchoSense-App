@@ -222,7 +222,7 @@ PAGE = r"""<!doctype html>
     async function loadLiveSpotify(moment=$('#moment').value) {
       const hour=new Date().getHours(); const automaticDaypart=hour<6?'late_night':hour<12?'morning':hour<17?'afternoon':hour<21?'evening':'night';
       const params=new URLSearchParams({moment,daypart:liveContext?.daypart||automaticDaypart});
-      if(liveContext){['weather','region','activity'].forEach(key=>liveContext[key]&&params.set(key,liveContext[key]));}
+      if(liveContext){['weather','region','road_setting','activity'].forEach(key=>liveContext[key]&&params.set(key,liveContext[key]));}
       const response=await api(`/auth/spotify/data?${params}`); const data=await response.json();
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
@@ -331,6 +331,7 @@ PAGE = r"""<!doctype html>
         liveContext.daypart?.replace('_',' '),
         liveContext.weather==='unknown'?'Weather unavailable':`${liveContext.weather?.replace('_',' ')}${liveContext.temperature_f!==null?` · ${liveContext.temperature_f}°F`:''}`,
         liveContext.region,
+        liveContext.road_setting!=='general'?`${liveContext.road_setting?.replace('_',' ')} drive`:null,
         liveContext.activity?.replace('_',' '),
         liveContext.speed_mph!==null?`${liveContext.speed_mph} mph`:null,
       ].filter(Boolean);
@@ -346,7 +347,7 @@ PAGE = r"""<!doctype html>
     async function resolveLiveContext(position) {
       const speed=Number.isFinite(position.coords.speed)?Math.max(0,position.coords.speed):null;
       const snapshot=await (await api('/v1/context/resolve',{method:'POST',body:JSON.stringify({latitude:position.coords.latitude,longitude:position.coords.longitude,local_hour:new Date().getHours(),speed_mps:speed,baseline_speed_mps:speedBaseline(speed)})})).json();
-      const key=JSON.stringify([snapshot.daypart,snapshot.weather,snapshot.region,snapshot.activity,snapshot.faster_than_usual]);
+      const key=JSON.stringify([snapshot.daypart,snapshot.weather,snapshot.region,snapshot.road_setting,snapshot.activity,snapshot.faster_than_usual]);
       liveContext=snapshot; renderLiveContext();
       if(key!==lastContextKey){lastContextKey=key;if(spotifyConnected)await loadLiveSpotify();}
     }

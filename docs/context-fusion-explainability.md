@@ -11,6 +11,7 @@ The product can now use:
 - the browser's local daypart automatically;
 - current weather from Open-Meteo after location permission;
 - a coarse region such as Southern California;
+- a confident coastal, mountain, or general road setting;
 - motion speed reported by a mobile browser;
 - a bounded, browser-local driving-speed baseline; and
 - learned positive and negative playback feedback.
@@ -38,6 +39,11 @@ Southern California uses a `California Los Angeles` catalog query while preservi
 `Southern California` as the user-facing evidence label. Driving uses a driving query;
 faster-than-usual driving uses an upbeat-driving query.
 
+The initial road-setting classifier uses Open-Meteo elevation for mountain detection and a
+bounded Southern California coastal corridor for coastal detection. A coastal drive adds
+beach/coastal candidates; a mountain drive adds scenic mountain candidates. Both retain
+Music DNA affinity, feedback learning, and diversity in the final score.
+
 ## Explanation contract
 
 Each visible Music DNA candidate carries a `why_now` object containing:
@@ -46,7 +52,7 @@ Each visible Music DNA candidate carries a `why_now` object containing:
 - scored factors for Music DNA affinity, live context fit, learned preference, and
   diversity; and
 - observable evidence such as sunny weather, afternoon timing, Southern California, or
-  driving.
+  a coastal or mountain drive.
 
 The interface renders these factors alongside each track so users can distinguish stable
 taste evidence from a transient reason to play the song now.
@@ -69,3 +75,5 @@ as a raw provider error.
   or explanation contracts.
 - The driving baseline is intentionally small and local. EchoSense does not build a raw
   location history in this slice.
+- Coastal detection is initially bounded to a conservative Southern California corridor.
+  Other regions safely return `general` until the provider-neutral geospatial layer expands.

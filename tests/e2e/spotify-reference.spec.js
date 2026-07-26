@@ -99,7 +99,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
                 {name: 'Music DNA affinity', score: 95},
                 {name: 'Live context fit', score: 88},
               ],
-              observations: ['sunny weather', 'Southern California'],
+              observations: ['sunny weather', 'Southern California', 'coastal drive matched to your Music DNA'],
             },
           },
           {
@@ -144,6 +144,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         weather: 'sunny',
         temperature_f: 78,
         region: 'Southern California',
+        road_setting: 'coastal',
+        elevation_m: 24,
         activity: 'driving',
         speed_mph: 40,
         faster_than_usual: false,
@@ -314,7 +316,11 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.locator('#context-toggle').click();
   await expect(page.locator('#context-chips')).toContainText('Southern California');
   await expect(page.locator('#context-chips')).toContainText('sunny · 78°F');
+  await expect(page.locator('#context-chips')).toContainText('coastal drive');
   await expect.poll(() => contextDataRequests.some(url => url.includes('weather=sunny'))).toBe(
+    true,
+  );
+  await expect.poll(() => contextDataRequests.some(url => url.includes('road_setting=coastal'))).toBe(
     true,
   );
   await expect(page.locator('#dna-queue-items .factor-chip')).toContainText([
