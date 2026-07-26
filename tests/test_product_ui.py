@@ -71,6 +71,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "toggleSaved" in response.text
     assert "/auth/spotify/library/tracks/" in response.text
     assert "Saved to Spotify. EchoSense learned from this choice." in response.text
+    assert 'id="playlists-panel"' in response.text
+    assert "loadPlaylists" in response.text
+    assert "loadPlaylistTracks" in response.text
+    assert "playPlaylistTrack" in response.text
     assert 'id="moment"' in response.text
     assert "data?moment=" in response.text
     assert "Context evidence:" in response.text

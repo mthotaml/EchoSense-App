@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let connected = true;
   let playbackStarted = false;
+  const playRequests = [];
   const savedTracks = new Set();
   const libraryMutations = [];
   const feedback = [];
@@ -88,6 +89,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.route('**/v1/player/transfer', route => route.fulfill({status: 204}));
   await page.route('**/v1/player/play', route => {
     playbackStarted = true;
+    playRequests.push(route.request().postDataJSON());
     return route.fulfill({status: 204});
   });
   await page.route('**/auth/spotify/feedback', async route => {
@@ -123,6 +125,63 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       json: {provider: 'spotify', track_id: trackId, saved: savedTracks.has(trackId)},
     });
   });
+  await page.route('**/auth/spotify/playlists?*', route =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            provider: 'spotify',
+            id: 'focus-playlist',
+            name: 'Guardian Focus',
+            owner_name: 'Guardian Listener',
+            track_count: 2,
+            can_browse: true,
+          },
+          {
+            provider: 'spotify',
+            id: 'public-playlist',
+            name: 'Public Mix',
+            owner_name: 'Curator',
+            track_count: 10,
+            can_browse: false,
+          },
+        ],
+        total: 2,
+        offset: 0,
+        limit: 8,
+        next_offset: null,
+      },
+    }),
+  );
+  await page.route('**/auth/spotify/playlists/*/tracks?*', route =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            position: 0,
+            playable: true,
+            unavailable_reason: null,
+            track: {
+              id: 'playlist-track',
+              title: 'Playlist Focus',
+              artists: ['Echo Artist'],
+              uri: 'spotify:track:playlist-track',
+            },
+          },
+          {
+            position: 1,
+            playable: false,
+            unavailable_reason: 'Unavailable on Spotify',
+            track: null,
+          },
+        ],
+        total: 2,
+        offset: 0,
+        limit: 20,
+        next_offset: null,
+      },
+    }),
+  );
   await page.route('**/auth/spotify/logout', route => {
     connected = false;
     return route.fulfill({json: {status: 'disconnected'}});
@@ -131,6 +190,16 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
   await expect(page.locator('#player-status')).toContainText('ready');
+  await expect(page.locator('.playlist-card')).toHaveCount(2);
+  await expect(page.locator('.playlist-card').nth(1)).toBeDisabled();
+
+  await page.getByRole('button', {name: /Guardian Focus/}).click();
+  await expect(page.locator('.playlist-track')).toHaveCount(2);
+  await expect(page.locator('.playlist-track').nth(1)).toBeDisabled();
+  await page.getByRole('button', {name: /Playlist Focus/}).click();
+  await expect.poll(() => playRequests.map(item => item.spotify_uri)).toContain(
+    'spotify:track:playlist-track',
+  );
 
   await page.locator('#moment').selectOption('working');
   await expect(page.locator('#pick-heading')).toHaveText('Focused Motion');

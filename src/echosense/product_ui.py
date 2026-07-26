@@ -93,6 +93,13 @@ PAGE = r"""<!doctype html>
     .reason { max-width:650px; margin:26px 0 30px; color:#c9d0db; font-size:1.08rem; line-height:1.65; }
     .evidence { color:var(--muted); font-size:.9rem; margin:-16px 0 24px; }
     .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .playlist-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:20px; }
+    .playlist-card { min-height:112px; text-align:left; background:var(--soft); color:var(--text); }
+    .playlist-card strong,.playlist-card span { display:block; }
+    .playlist-card span,.playlist-track span { color:var(--muted); font-size:.84rem; margin-top:6px; }
+    .track-list { display:grid; gap:8px; margin-top:18px; }
+    .playlist-track { width:100%; display:flex; justify-content:space-between; gap:18px; text-align:left; background:var(--soft); color:var(--text); }
+    .playlist-track[disabled] { text-decoration:none; }
     button,select,.button-link { border:1px solid #343d4f; border-radius:12px; padding:12px 16px; font:inherit; font-weight:680; cursor:pointer; text-decoration:none; display:inline-block; }
     .primary { background:#f5f7fb; color:#090b10; border-color:#f5f7fb; }
     .secondary { background:#171d27; color:var(--text); }
@@ -128,6 +135,7 @@ PAGE = r"""<!doctype html>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play in EchoSense</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Not for me</button></div><div id="toast" aria-live="polite"></div></section>
+      <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
       <section class="panel"><div class="eyebrow">Your journey</div><h2>Your taste, told as a story</h2><div id="timeline" class="journey"></div></section>
     </div>
@@ -146,6 +154,9 @@ PAGE = r"""<!doctype html>
     let currentTrackUri = null;
     let currentTrackId = null;
     let currentTrackSaved = false;
+    let playlistsNextOffset = null;
+    let selectedPlaylistId = null;
+    let tracksNextOffset = null;
     let spotifyConnected = false;
     let deviceId = null;
     let playerState = null;
@@ -296,6 +307,43 @@ PAGE = r"""<!doctype html>
       if(currentTrackId===trackId) renderSavedState(status.saved);
       setText('#toast',status.saved?'Saved to Spotify. EchoSense learned from this choice.':'Removed from Spotify.');
     }
+    function playlistCard(item) {
+      const button=document.createElement('button'); button.className='playlist-card'; button.type='button'; button.disabled=!item.can_browse;
+      const name=document.createElement('strong'); name.textContent=item.name;
+      const meta=document.createElement('span'); meta.textContent=item.can_browse?`${item.track_count} tracks · ${item.owner_name}`:'Spotify limits browsing for this playlist';
+      button.append(name,meta);
+      if(item.can_browse) button.addEventListener('click',()=>loadPlaylistTracks(item.id,item.name,0).catch(e=>setText('#toast',e.message)));
+      return button;
+    }
+    async function loadPlaylists(offset=0) {
+      const page=await (await api(`/auth/spotify/playlists?limit=8&offset=${offset}`)).json();
+      if(offset===0) $('#playlists').replaceChildren();
+      page.items.forEach(item=>$('#playlists').appendChild(playlistCard(item)));
+      playlistsNextOffset=page.next_offset;
+      $('#more-playlists').hidden=playlistsNextOffset===null;
+    }
+    function playlistTrackRow(item) {
+      const button=document.createElement('button'); button.className='playlist-track'; button.type='button'; button.disabled=!item.playable;
+      const label=document.createElement('strong'); label.textContent=item.track?.title||'Unavailable track';
+      const meta=document.createElement('span'); meta.textContent=item.track?.artists?.join(', ')||item.unavailable_reason||'Unavailable';
+      button.append(label,meta);
+      if(item.playable) button.addEventListener('click',()=>playPlaylistTrack(item.track).catch(e=>setText('#toast',e.message)));
+      return button;
+    }
+    async function loadPlaylistTracks(playlistId,name,offset=0) {
+      const page=await (await api(`/auth/spotify/playlists/${encodeURIComponent(playlistId)}/tracks?limit=20&offset=${offset}`)).json();
+      selectedPlaylistId=playlistId; tracksNextOffset=page.next_offset; $('#playlist-detail').hidden=false; setText('#playlist-title',name);
+      if(offset===0) $('#playlist-tracks').replaceChildren();
+      page.items.forEach(item=>$('#playlist-tracks').appendChild(playlistTrackRow(item)));
+      $('#more-tracks').hidden=tracksNextOffset===null;
+    }
+    async function playPlaylistTrack(track) {
+      if(!deviceId) throw new Error('Player is not ready yet.');
+      await activateBrowser(false);
+      await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:deviceId,spotify_uri:track.uri})});
+      setText('#toast',`Playing ${track.title} from your playlist.`);
+      await restorePlaybackState();
+    }
     async function togglePlayback() {
       if(!spotifyConnected) { location.href='/auth/spotify/login'; return; }
       if(!deviceId) throw new Error('Player is not ready yet.');
@@ -327,9 +375,11 @@ PAGE = r"""<!doctype html>
 
     async function load() {
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); } else await loadDemo();
+      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await loadPlaylists(); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
+      $('#more-playlists').addEventListener('click',()=>loadPlaylists(playlistsNextOffset).catch(e=>setText('#toast',e.message)));
+      $('#more-tracks').addEventListener('click',()=>loadPlaylistTracks(selectedPlaylistId,$('#playlist-title').textContent,tracksNextOffset).catch(e=>setText('#toast',e.message)));
       $('#skip').addEventListener('click',()=>feedback('skipped').catch(e=>setText('#toast',e.message)));
       $('#moment').addEventListener('change',()=>spotifyConnected&&loadLiveSpotify($('#moment').value).catch(e=>setText('#toast',e.message)));
       $('#toggle').addEventListener('click',()=>togglePlayback().catch(e=>setText('#toast',e.message)));

@@ -40,6 +40,26 @@ class Track:
 
 
 @dataclass(frozen=True)
+class Playlist:
+    provider: str
+    provider_id: str
+    name: str
+    description: str
+    owner_name: str
+    track_count: int
+    can_browse: bool
+    image_url: str | None = None
+
+
+@dataclass(frozen=True)
+class PlaylistTrack:
+    track: Track | None
+    position: int
+    playable: bool
+    unavailable_reason: str | None = None
+
+
+@dataclass(frozen=True)
 class TrackObservation:
     track: Track
     provenance: ProviderProvenance

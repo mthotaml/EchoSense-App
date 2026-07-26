@@ -23,6 +23,7 @@ from echosense.playback_learning import PlaybackLearningService
 from echosense.providers.spotify import (
     SpotifyClient,
     SpotifyLibrary,
+    SpotifyPlaylists,
     SpotifyProvider,
     SpotifyRateLimited,
 )
@@ -41,7 +42,9 @@ SPOTIFY_PROFILE_URL = f"{SPOTIFY_API_URL}/me"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8001/auth/spotify/callback"
 DEFAULT_SCOPES = (
     "user-top-read user-read-recently-played user-read-email user-read-private "
-    "user-library-read user-library-modify"
+    "user-library-read user-library-modify playlist-read-private "
+    "playlist-read-collaborative streaming user-read-playback-state "
+    "user-modify-playback-state"
 )
 SESSION_COOKIE = "echosense_spotify_session"
 STATE_COOKIE = "echosense_spotify_oauth_state"
@@ -500,6 +503,89 @@ def spotify_remove_track(
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
         raise _library_error(exc) from exc
     return {"provider": "spotify", "track_id": track_id, "saved": False}
+
+
+@router.get("/playlists")
+def spotify_playlists(
+    limit: int = Query(default=8, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    try:
+        page = SpotifyPlaylists(
+            SpotifyClient(session, _refresh_session),
+            session.provider_user_id,
+        ).list(limit=limit, offset=offset)
+    except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
+        raise _library_error(exc) from exc
+    return {
+        "items": [
+            {
+                "provider": item.provider,
+                "id": item.provider_id,
+                "name": item.name,
+                "description": item.description,
+                "owner_name": item.owner_name,
+                "track_count": item.track_count,
+                "can_browse": item.can_browse,
+                "image_url": item.image_url,
+            }
+            for item in page.items
+        ],
+        "total": page.total,
+        "offset": page.offset,
+        "limit": page.limit,
+        "next_offset": page.next_offset,
+    }
+
+
+@router.get("/playlists/{playlist_id}/tracks")
+def spotify_playlist_tracks(
+    playlist_id: str,
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    try:
+        page = SpotifyPlaylists(
+            SpotifyClient(session, _refresh_session),
+            session.provider_user_id,
+        ).tracks(playlist_id, limit=limit, offset=offset)
+    except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
+        raise _library_error(exc) from exc
+    items = []
+    for item in page.items:
+        track = item.track
+        items.append(
+            {
+                "position": item.position,
+                "playable": item.playable,
+                "unavailable_reason": item.unavailable_reason,
+                "track": (
+                    {
+                        "provider": track.provider,
+                        "id": track.provider_id,
+                        "title": track.title,
+                        "artists": list(track.artists),
+                        "album": track.album,
+                        "image_url": track.image_url,
+                        "external_url": track.external_url,
+                        "uri": f"spotify:track:{track.provider_id}",
+                    }
+                    if track
+                    else None
+                ),
+            }
+        )
+    return {
+        "items": items,
+        "total": page.total,
+        "offset": page.offset,
+        "limit": page.limit,
+        "next_offset": page.next_offset,
+    }
 
 
 @router.post("/logout")

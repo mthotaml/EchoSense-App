@@ -4,12 +4,10 @@ import os
 
 from dotenv import load_dotenv
 
+from echosense.spotify_auth import DEFAULT_SCOPES
+
 load_dotenv()
-os.environ.setdefault(
-    "SPOTIFY_SCOPES",
-    "user-top-read user-read-recently-played user-read-email user-read-private "
-    "streaming user-read-playback-state user-modify-playback-state",
-)
+os.environ.setdefault("SPOTIFY_SCOPES", DEFAULT_SCOPES)
 
 from echosense.app import create_app
 

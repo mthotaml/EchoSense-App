@@ -49,6 +49,8 @@ def test_spotify_login_builds_authorization_redirect(monkeypatch) -> None:
     assert query["response_type"] == ["code"]
     assert query["code_challenge_method"] == ["S256"]
     assert query["redirect_uri"] == ["http://127.0.0.1:8000/auth/spotify/callback"]
+    assert "playlist-read-private" in query["scope"][0]
+    assert "playlist-read-collaborative" in query["scope"][0]
     assert "echosense_spotify_oauth_state" in response.cookies
     assert "echosense_spotify_pkce_verifier" in response.cookies
 
