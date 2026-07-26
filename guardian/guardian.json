@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "release_gate": {
+    "required_checks": [
+      "configuration",
+      "ruff",
+      "contract-tests",
+      "spotify-reference-journey"
+    ]
+  },
+  "journeys": [
+    {
+      "id": "spotify-reference",
+      "spec": "tests/e2e/spotify-reference.spec.js",
+      "states": [
+        "connected",
+        "player-ready",
+        "context-selected",
+        "recommendation-ranked",
+        "playback-started",
+        "feedback-learned",
+        "refresh-restored",
+        "disconnected"
+      ]
+    }
+  ]
+}

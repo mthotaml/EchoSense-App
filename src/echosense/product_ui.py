@@ -180,10 +180,18 @@ PAGE = r"""<!doctype html>
       const session = await response.json(); spotifyConnected = session.connected;
       if (!session.connected) return null;
       const name = session.profile.display_name || 'Spotify listener';
-      setText('#account-status', `Connected as ${name}`); setText('#account-action','Connected'); $('#account-action').removeAttribute('href');
+      setText('#account-status', `Connected as ${name}`); setText('#account-action','Disconnect'); $('#account-action').href='#';
       setText('#connection-title', `Spotify connected as ${name}`); setText('#connection-copy','Your Spotify history and browser player are powering EchoSense.');
       setText('#connect-button','Reconnect for player permissions'); $('#connect-button').href='/auth/spotify/login';
       return session;
+    }
+
+    async function disconnectSpotify(event) {
+      if(!spotifyConnected)return;
+      event.preventDefault();
+      await api('/auth/spotify/logout',{method:'POST'});
+      spotifyConnected=false;
+      location.reload();
     }
 
     async function loadLiveSpotify(moment=$('#moment').value) {
@@ -295,6 +303,7 @@ PAGE = r"""<!doctype html>
     }
 
     async function load() {
+      $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
       const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#skip').addEventListener('click',()=>feedback('skipped').catch(e=>setText('#toast',e.message)));

@@ -7,6 +7,7 @@ Protect `main` and require these checks before merge:
 - `Quality`
 - `Unit tests`
 - `Browser lifecycle`
+- `Guardian`
 - `Dependency audit`
 - `Secret scan`
 
@@ -40,6 +41,10 @@ python -m pip install -e ".[dev]"
 pre-commit run --all-files
 pytest -m "not infrastructure and not postgres and not neo4j"
 node tests/player_lifecycle.test.js
+python scripts/validate_guardian.py
+npm ci
+npx playwright install chromium
+npm run test:e2e
 ```
 
 Run infrastructure verification separately:

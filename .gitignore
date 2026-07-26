@@ -22,6 +22,9 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
+node_modules/
+test-results/
+artifacts/guardian/
 
 # macOS
 .DS_Store
