@@ -161,9 +161,7 @@ def test_evaluation_report_isolated_by_user_and_blocked_after_revocation(
     )
     assert cross_user.status_code == 404
 
-    revoke = client.delete(
-        "/v1/users/user_fixture_01/consents/contextual_recommendation"
-    )
+    revoke = client.delete("/v1/users/user_fixture_01/consents/contextual_recommendation")
     assert revoke.status_code == 204
     revoked = client.get(
         "/v1/evaluations/outcomes/outcome_private_01",
@@ -174,9 +172,7 @@ def test_evaluation_report_isolated_by_user_and_blocked_after_revocation(
 
 def test_revocation_blocks_future_processing(client: TestClient) -> None:
     grant_consent(client)
-    revoke = client.delete(
-        "/v1/users/user_fixture_01/consents/contextual_recommendation"
-    )
+    revoke = client.delete("/v1/users/user_fixture_01/consents/contextual_recommendation")
     assert revoke.status_code == 204
 
     response = client.post("/v1/recommendations", json=recommendation_payload())

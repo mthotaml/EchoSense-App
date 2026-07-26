@@ -12,7 +12,9 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def decayed_weight(weight: float, decay_anchor: datetime, now: datetime, half_life_days: float) -> float:
+def decayed_weight(
+    weight: float, decay_anchor: datetime, now: datetime, half_life_days: float
+) -> float:
     if half_life_days <= 0:
         raise ValueError("half_life_days must be positive")
     elapsed_days = max(0.0, (now - decay_anchor).total_seconds() / 86400.0)
@@ -176,7 +178,9 @@ class InMemoryPreferenceMemory:
     def delete_user(self, user_id: str) -> dict[str, int]:
         with self._lock:
             preference_keys = [key for key in self._values if key[0] == user_id]
-            outcome_ids = [outcome_id for outcome_id, owner in self._outcomes.items() if owner == user_id]
+            outcome_ids = [
+                outcome_id for outcome_id, owner in self._outcomes.items() if owner == user_id
+            ]
             for key in preference_keys:
                 del self._values[key]
             for outcome_id in outcome_ids:

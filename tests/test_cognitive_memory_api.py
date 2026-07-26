@@ -89,9 +89,13 @@ def test_recording_emits_outbox_event(client: TestClient) -> None:
     assert response.status_code == 201
 
     with api.get_storage().connect() as connection:
-        row = api.get_storage()._execute(
-            connection,
-            "SELECT event_type, user_id FROM event_outbox WHERE event_type = %s",
-            ("memory.recorded",),
-        ).fetchone()
+        row = (
+            api.get_storage()
+            ._execute(
+                connection,
+                "SELECT event_type, user_id FROM event_outbox WHERE event_type = %s",
+                ("memory.recorded",),
+            )
+            .fetchone()
+        )
     assert dict(row) == {"event_type": "memory.recorded", "user_id": "u1"}

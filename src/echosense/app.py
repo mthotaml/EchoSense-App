@@ -220,9 +220,7 @@ def rank_candidates(
     if not candidates:
         raise LookupError("Provider returned no recommendation candidates")
     half_life_days = float(os.getenv("ECHOSENSE_PREFERENCE_HALF_LIFE_DAYS", "30"))
-    influence = min(
-        0.5, max(0.0, float(os.getenv("ECHOSENSE_PREFERENCE_INFLUENCE", "0.25")))
-    )
+    influence = min(0.5, max(0.0, float(os.getenv("ECHOSENSE_PREFERENCE_INFLUENCE", "0.25"))))
     weights = get_preference_memory().rank_weights(
         user_id=user_id,
         context=context,
@@ -253,7 +251,8 @@ def rank_candidates(
     selected = next(
         candidate
         for candidate in candidates
-        if candidate.provider == selected_ranked.provider and candidate.item_id == selected_ranked.item_id
+        if candidate.provider == selected_ranked.provider
+        and candidate.item_id == selected_ranked.item_id
     )
     slate = [
         {
@@ -417,14 +416,14 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
     context, confidence, factors = infer_context(request.signals)
     decision_id = f"dec_{uuid4().hex}"
     try:
-        candidates = get_music_provider().candidates_for_context(
-            context, request.user_id, limit=5
-        )
-        candidate, preference_weight, ranking_score, candidate_slate, policy_factors = rank_candidates(
-            user_id=request.user_id,
-            context=context,
-            decision_id=decision_id,
-            candidates=candidates,
+        candidates = get_music_provider().candidates_for_context(context, request.user_id, limit=5)
+        candidate, preference_weight, ranking_score, candidate_slate, policy_factors = (
+            rank_candidates(
+                user_id=request.user_id,
+                context=context,
+                decision_id=decision_id,
+                candidates=candidates,
+            )
         )
     except (httpx.HTTPError, LookupError, ValueError, RuntimeError) as exc:
         raise HTTPException(
@@ -473,9 +472,7 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
             "factors": decision_factors,
         },
     )
-    preference_phrase = (
-        " and your learned preference" if abs(preference_weight) >= 0.001 else ""
-    )
+    preference_phrase = " and your learned preference" if abs(preference_weight) >= 0.001 else ""
     policy_phrase = " with controlled exploration" if policy_factors["explored"] else ""
     return RecommendationResponse(
         decision_id=decision_id,

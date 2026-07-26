@@ -17,9 +17,7 @@ PURPOSE_ID = "contextual_recommendation"
 
 def _check(response, expected: int = 200):
     if response.status_code != expected:
-        raise RuntimeError(
-            f"Unexpected response {response.status_code}: {response.text}"
-        )
+        raise RuntimeError(f"Unexpected response {response.status_code}: {response.text}")
     return response
 
 
@@ -68,12 +66,8 @@ def run_demo() -> dict[str, object]:
             ],
         }
 
-        first = _check(
-            client.post("/v1/recommendations", json=recommendation_request)
-        ).json()
-        first_trace = _check(
-            client.get(f"/v1/decision-traces/{first['decision_id']}")
-        ).json()
+        first = _check(client.post("/v1/recommendations", json=recommendation_request)).json()
+        first_trace = _check(client.get(f"/v1/decision-traces/{first['decision_id']}")).json()
 
         learned = _check(
             client.post(
@@ -87,12 +81,8 @@ def run_demo() -> dict[str, object]:
             )
         ).json()
 
-        second = _check(
-            client.post("/v1/recommendations", json=recommendation_request)
-        ).json()
-        second_trace = _check(
-            client.get(f"/v1/decision-traces/{second['decision_id']}")
-        ).json()
+        second = _check(client.post("/v1/recommendations", json=recommendation_request)).json()
+        second_trace = _check(client.get(f"/v1/decision-traces/{second['decision_id']}")).json()
 
         deletion = _check(
             client.post(
@@ -101,9 +91,7 @@ def run_demo() -> dict[str, object]:
             )
         ).json()
 
-        blocked_after_deletion = client.post(
-            "/v1/recommendations", json=recommendation_request
-        )
+        blocked_after_deletion = client.post("/v1/recommendations", json=recommendation_request)
         if blocked_after_deletion.status_code != 403:
             raise RuntimeError("Deletion verification failed: processing was not blocked")
 
@@ -128,8 +116,7 @@ def main() -> None:
 
     first_selected = first_trace["factors"]["candidate_slate"][0]
     second_candidates = {
-        item["item_id"]: item
-        for item in second_trace["factors"]["candidate_slate"]
+        item["item_id"]: item for item in second_trace["factors"]["candidate_slate"]
     }
     repeated = second_candidates[first["item_id"]]
 
@@ -157,10 +144,7 @@ def main() -> None:
         "  prior selected-item novelty: "
         f"{first_selected['novelty_score']:.3f} → {repeated['novelty_score']:.3f}"
     )
-    print(
-        "  learned preference used: "
-        f"{repeated['preference_weight']:.3f}"
-    )
+    print(f"  learned preference used: {repeated['preference_weight']:.3f}")
     print("\nDeletion")
     print(f"  status: {deletion['status']}")
     print(f"  removed records: {sum(deletion['counts'].values())}")

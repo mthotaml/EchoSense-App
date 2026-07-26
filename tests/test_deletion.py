@@ -150,12 +150,15 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
     assert store.get_apple_music_user_token(user_id) is None
     assert CognitiveMemoryStore(store).get("mem-delete-01") is None
     assert MemoryLifecycleService(store).get("lifecycle-delete-01") is None
-    assert memory.get_preference(
-        user_id=user_id,
-        provider="apple_music",
-        item_id="fixture-rain-001",
-        context="rainy_commute",
-    ) is None
+    assert (
+        memory.get_preference(
+            user_id=user_id,
+            provider="apple_music",
+            item_id="fixture-rain-001",
+            context="rainy_commute",
+        )
+        is None
+    )
 
     with store.connect() as connection:
         outcomes = store._execute(

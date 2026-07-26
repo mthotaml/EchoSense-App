@@ -28,8 +28,12 @@ def test_novelty_can_lift_unexposed_candidate_within_bound() -> None:
 
 def test_exploration_is_deterministic_and_bounded() -> None:
     policy = RankingPolicy(novelty_weight=0.0, exploration_rate=0.2, exploration_pool=2)
-    first = rank_with_policy(candidates(), preference_influence=0.25, policy=policy, seed_material="fixed")
-    second = rank_with_policy(candidates(), preference_influence=0.25, policy=policy, seed_material="fixed")
+    first = rank_with_policy(
+        candidates(), preference_influence=0.25, policy=policy, seed_material="fixed"
+    )
+    second = rank_with_policy(
+        candidates(), preference_influence=0.25, policy=policy, seed_material="fixed"
+    )
     assert first == second
     assert first[0].item_id in {"a1", "a2"}
 

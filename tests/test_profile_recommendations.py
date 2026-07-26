@@ -11,9 +11,7 @@ def test_profile_aware_recommendation_requires_synced_profile(tmp_path, monkeypa
     storage = Storage(f"sqlite:///{tmp_path / 'recommendations.db'}")
     monkeypatch.setattr(profile_recommendations, "get_storage", lambda: storage)
 
-    response = TestClient(app).get(
-        "/v1/users/new-user/recommendations/profile-aware"
-    )
+    response = TestClient(app).get("/v1/users/new-user/recommendations/profile-aware")
 
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "taste_profile_required"
@@ -31,7 +29,13 @@ def test_profile_aware_recommendation_uses_taste_evidence(tmp_path, monkeypatch)
     monkeypatch.setattr(
         profile_recommendations,
         "rank_candidates",
-        lambda **_: (candidate, 0.0, candidate.base_score, [{"item_id": candidate.item_id}], {"explored": False}),
+        lambda **_: (
+            candidate,
+            0.0,
+            candidate.base_score,
+            [{"item_id": candidate.item_id}],
+            {"explored": False},
+        ),
     )
 
     response = TestClient(app).get(

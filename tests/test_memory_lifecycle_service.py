@@ -55,7 +55,9 @@ def test_apply_creates_one_semantic_memory_and_is_idempotent(tmp_path: Path) -> 
     assert consolidated is not None
     assert consolidated.memory_type == "semantic"
     assert consolidated.provenance_type == "consolidation"
-    assert all(memory_id in consolidated.provenance_ref for memory_id in ("mem_0", "mem_1", "mem_2"))
+    assert all(
+        memory_id in consolidated.provenance_ref for memory_id in ("mem_0", "mem_1", "mem_2")
+    )
 
 
 def test_apply_forgets_only_stale_weak_unprotected_memory(tmp_path: Path) -> None:

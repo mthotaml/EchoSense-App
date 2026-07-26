@@ -150,7 +150,9 @@ class DeletionCoordinator:
                     subject_hash=request["subject_hash"],
                 )
             if request["user_id"] is None:
-                raise RuntimeError("Incomplete deletion request no longer contains a resumable subject")
+                raise RuntimeError(
+                    "Incomplete deletion request no longer contains a resumable subject"
+                )
             self.storage._execute(
                 connection,
                 """

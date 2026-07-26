@@ -134,8 +134,7 @@ class MemoryLifecyclePlanner:
                 continue
             old = max(memory.observed_at, memory.created_at) <= cutoff
             weak_or_inactive = (
-                memory.status != "active"
-                or memory.confidence < self.policy.forgetting_confidence
+                memory.status != "active" or memory.confidence < self.policy.forgetting_confidence
             )
             if old and weak_or_inactive:
                 reason = "inactive_and_stale" if memory.status != "active" else "weak_and_stale"

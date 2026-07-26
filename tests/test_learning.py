@@ -180,9 +180,7 @@ def test_negative_preference_can_demote_provider_favorite(client: TestClient) ->
 
     assert recommendation.status_code == 200
     assert recommendation.json()["item_id"] == "fixture-rain-002"
-    trace = client.get(
-        f"/v1/decision-traces/{recommendation.json()['decision_id']}"
-    ).json()
+    trace = client.get(f"/v1/decision-traces/{recommendation.json()['decision_id']}").json()
     assert trace["factors"]["candidate_count"] == 3
     assert trace["factors"]["preference_weight"] == 0.0
     assert trace["factors"]["ranking_score"] == 0.75

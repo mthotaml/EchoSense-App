@@ -12,7 +12,7 @@ dependencies = [
   "psycopg[binary]>=3.2,<4",
   "confluent-kafka>=2.8,<3",
   "PyJWT[crypto]>=2.10,<3",
-  "cryptography>=44,<46",
+  "cryptography>=48.0.1,<49",
   "neo4j>=5.28,<6",
   "jsonschema>=4.23,<5",
   "prometheus-client>=0.21,<1",
@@ -20,7 +20,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.3,<9",
+  "pre-commit>=4,<5",
+  "pytest>=9.0.3,<10",
   "ruff>=0.9,<1",
 ]
 
@@ -43,3 +44,9 @@ markers = [
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/echosense/product_app.py" = ["E402"]

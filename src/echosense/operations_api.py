@@ -125,7 +125,9 @@ def create_replay(
         )
         if batch is not None and request.commit_offsets:
             if int(summary["rejected"]) > 0:
-                raise HTTPException(status_code=409, detail="Offsets not committed because records were rejected")
+                raise HTTPException(
+                    status_code=409, detail="Offsets not committed because records were rejected"
+                )
             dlq_consumer.commit(batch)
         return summary
     except HTTPException:

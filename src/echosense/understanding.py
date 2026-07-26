@@ -95,10 +95,7 @@ class UnderstandingEngine:
                 key=lambda item: item.key,
             )
         )
-        query = " ".join(
-            [context]
-            + [f"{item.key} {item.value}" for item in normalized]
-        )
+        query = " ".join([context] + [f"{item.key} {item.value}" for item in normalized])
         retrieved = self.memory_store.retrieve(
             user_id=user_id,
             query=query,

@@ -16,8 +16,7 @@ def test_mvp_demo_exercises_complete_cognitive_loop() -> None:
     assert learned["weight"] > 0
 
     second_candidates = {
-        item["item_id"]: item
-        for item in second_trace["factors"]["candidate_slate"]
+        item["item_id"]: item for item in second_trace["factors"]["candidate_slate"]
     }
     repeated = second_candidates[first["item_id"]]
     assert repeated["preference_weight"] == learned["weight"]

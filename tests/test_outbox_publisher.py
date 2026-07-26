@@ -25,9 +25,7 @@ class FakeProducer:
         self.messages: list[tuple[str, str, bytes, list[tuple[str, bytes]]]] = []
         self.fail_topics = fail_topics or set()
 
-    def produce(
-        self, topic: str, key: str, value: bytes, headers: list[tuple[str, bytes]]
-    ) -> None:
+    def produce(self, topic: str, key: str, value: bytes, headers: list[tuple[str, bytes]]) -> None:
         if topic in self.fail_topics:
             raise RuntimeError(f"unavailable topic: {topic}")
         self.messages.append((topic, key, value, headers))

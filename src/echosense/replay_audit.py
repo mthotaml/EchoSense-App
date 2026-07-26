@@ -75,7 +75,9 @@ class ReplayAuditStore:
             )
         return replay_id
 
-    def record_event(self, replay_id: str, event_id: str, result: str, error: str | None = None) -> None:
+    def record_event(
+        self, replay_id: str, event_id: str, result: str, error: str | None = None
+    ) -> None:
         with self.storage.connect() as connection:
             self.storage._execute(
                 connection,
@@ -88,10 +90,18 @@ class ReplayAuditStore:
                     error = excluded.error,
                     recorded_at = excluded.recorded_at
                 """,
-                (replay_id, event_id, result, error[:1000] if error else None, utc_now().isoformat()),
+                (
+                    replay_id,
+                    event_id,
+                    result,
+                    error[:1000] if error else None,
+                    utc_now().isoformat(),
+                ),
             )
 
-    def complete(self, replay_id: str, summary: dict[str, int], *, status: str = "completed") -> None:
+    def complete(
+        self, replay_id: str, summary: dict[str, int], *, status: str = "completed"
+    ) -> None:
         with self.storage.connect() as connection:
             self.storage._execute(
                 connection,
