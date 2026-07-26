@@ -91,8 +91,9 @@ PAGE = r"""<!doctype html>
     .artist { color:var(--muted); font-size:1.15rem; }
     .match { color:var(--accent); font-weight:700; white-space:nowrap; margin-top:18px; }
     .reason { max-width:650px; margin:26px 0 30px; color:#c9d0db; font-size:1.08rem; line-height:1.65; }
+    .evidence { color:var(--muted); font-size:.9rem; margin:-16px 0 24px; }
     .actions { display:flex; gap:10px; flex-wrap:wrap; }
-    button,.button-link { border:1px solid #343d4f; border-radius:12px; padding:12px 16px; font:inherit; font-weight:680; cursor:pointer; text-decoration:none; display:inline-block; }
+    button,select,.button-link { border:1px solid #343d4f; border-radius:12px; padding:12px 16px; font:inherit; font-weight:680; cursor:pointer; text-decoration:none; display:inline-block; }
     .primary { background:#f5f7fb; color:#090b10; border-color:#f5f7fb; }
     .secondary { background:#171d27; color:var(--text); }
     button:disabled { opacity:.45; cursor:not-allowed; }
@@ -126,7 +127,7 @@ PAGE = r"""<!doctype html>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. A persistent listening surface powered by your Music DNA.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
     <div class="stack">
-      <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><div class="actions"><button id="play" class="primary" type="button">Play in EchoSense</button><button id="skip" class="secondary" type="button">Not for me</button></div><div id="toast" aria-live="polite"></div></section>
+      <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play in EchoSense</button><button id="skip" class="secondary" type="button">Not for me</button></div><div id="toast" aria-live="polite"></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
       <section class="panel"><div class="eyebrow">Your journey</div><h2>Your taste, told as a story</h2><div id="timeline" class="journey"></div></section>
     </div>
@@ -185,10 +186,10 @@ PAGE = r"""<!doctype html>
       return session;
     }
 
-    async function loadLiveSpotify() {
-      const data = await (await fetch('/auth/spotify/data')).json(); const profile=data.profile; const pick=data.recommendation;
+    async function loadLiveSpotify(moment=$('#moment').value) {
+      const data = await (await fetch(`/auth/spotify/data?moment=${encodeURIComponent(moment)}`)).json(); const profile=data.profile; const pick=data.recommendation;
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentTrackUri=spotifyUri(pick.spotify_url,pick.id); }
+      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentTrackUri=spotifyUri(pick.spotify_url,pick.id); reportedSignals.clear(); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']);
@@ -197,6 +198,7 @@ PAGE = r"""<!doctype html>
     async function loadDemo() {
       const [p,i,r,t]=await Promise.all(['/v1/demo/taste-profile','/v1/demo/insights','/v1/demo/recommendations','/v1/demo/timeline'].map(x=>fetch(x).then(y=>y.json()))); const pick=r.items[0];
       setText('#greeting',`${greetingForHour(new Date().getHours())}, ${p.display_name}.`); setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · ${pick.context}`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); setText('#insight',i.items[0].detail); currentRecommendationId=pick.recommendation_id;
+      setText('#evidence','Demo evidence · Connect Spotify for your real listening context.');
       const dna=$('#dna'); dna.replaceChildren(); dna.appendChild(dnaLine('Mostly',p.genres[0].name)); dna.appendChild(dnaLine('Recently exploring',p.genres[2].name)); dna.appendChild(dnaLine('Listening rhythm','After 8 PM')); renderTimeline(t.items.map(x=>x.label));
     }
 
@@ -296,6 +298,7 @@ PAGE = r"""<!doctype html>
       const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#skip').addEventListener('click',()=>feedback('skipped').catch(e=>setText('#toast',e.message)));
+      $('#moment').addEventListener('change',()=>spotifyConnected&&loadLiveSpotify($('#moment').value).catch(e=>setText('#toast',e.message)));
       $('#toggle').addEventListener('click',()=>togglePlayback().catch(e=>setText('#toast',e.message)));
       $('#previous').addEventListener('click',()=>api(`/v1/player/previous?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message))); $('#next').addEventListener('click',()=>api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));
       $('#activate').disabled=true; $('#activate').addEventListener('click',()=>activateBrowser(false).catch(e=>setText('#toast',e.message)));

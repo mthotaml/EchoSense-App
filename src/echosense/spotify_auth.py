@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from echosense.evaluation_service import EvaluationService
+from echosense.listening_context import ListeningContextService, ListeningMoment
 from echosense.music_dna import MusicDNAGenerator
 from echosense.music_dna_service import music_dna_service
 from echosense.playback_learning import PlaybackLearningService
@@ -268,6 +269,7 @@ def spotify_session(
 
 @router.get("/data")
 def spotify_data(
+    moment: ListeningMoment = Query(default="general"),
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
@@ -278,18 +280,22 @@ def spotify_data(
         music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
         repository.save_profile(music_dna)
         learning = PlaybackLearningService(get_connection_repository().storage)
+        context_service = ListeningContextService()
+        context_fits = context_service.score(imported, moment)
+        ranking_context = context_service.ranking_context(moment)
         recommendation, candidate_slate = learning.rank(
             user_id=session.provider_user_id,
             provider="spotify",
-            context="general_listening",
+            context=ranking_context,
             tracks=[item.track for item in imported.top_tracks],
+            context_scores={item_id: fit.score for item_id, fit in context_fits.items()},
         )
         decision_id = f"dec_{uuid4().hex}"
         if recommendation is not None:
             get_connection_repository().storage.save_decision_trace(
                 decision_id=decision_id,
                 user_id=session.provider_user_id,
-                context="general_listening",
+                context=ranking_context,
                 context_confidence=music_dna.confidence,
                 provider="spotify",
                 item_id=recommendation.provider_id,
@@ -297,6 +303,7 @@ def spotify_data(
                     "candidate_slate": candidate_slate,
                     "music_dna_confidence": music_dna.confidence,
                     "evidence_count": music_dna.evidence_count,
+                    "listening_moment": moment,
                 },
             )
     except SpotifyRateLimited as exc:
@@ -319,6 +326,27 @@ def spotify_data(
         music_dna=music_dna,
         recommendation=recommendation,
         decision_id=decision_id if recommendation else None,
+        moment=moment,
+        decision_evidence=(
+            {
+                "noticed": f"You selected {moment}.",
+                "remembered": (
+                    f"Your Music DNA currently has {music_dna.evidence_count} listening signals."
+                ),
+                "matched_genres": list(context_fits[recommendation.provider_id].matched_genres),
+                "context_fit": context_fits[recommendation.provider_id].score,
+                "learned_preference": next(
+                    (
+                        item["preference_weight"]
+                        for item in candidate_slate
+                        if item["item_id"] == recommendation.provider_id
+                    ),
+                    0.0,
+                ),
+            }
+            if recommendation
+            else None
+        ),
     )
 
 

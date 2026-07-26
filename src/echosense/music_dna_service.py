@@ -30,6 +30,8 @@ class MusicDNAService:
         music_dna: MusicDNAProfile | None = None,
         recommendation: Track | None = None,
         decision_id: str | None = None,
+        moment: str = "general",
+        decision_evidence: dict[str, object] | None = None,
     ) -> dict[str, object]:
         artists = [artist for artist, _ in imported.top_artists]
         top_tracks = [item.track for item in imported.top_tracks]
@@ -47,6 +49,8 @@ class MusicDNAService:
             if leading_artists
             else f"This reflects your recent {imported.provider.title()} listening."
         )
+        if moment != "general":
+            reason = f"For {moment}, {reason[0].lower()}{reason[1:]}"
         average_popularity = (
             round(sum(track.popularity or 0 for track in top_tracks) / len(top_tracks))
             if top_tracks
@@ -73,6 +77,7 @@ class MusicDNAService:
                     "decision_id": decision_id,
                     "reason": reason,
                     "match_score": 96,
+                    "evidence": decision_evidence or {},
                 }
                 if recommendation
                 else None

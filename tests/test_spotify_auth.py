@@ -136,7 +136,7 @@ def test_spotify_data_builds_live_music_profile(
     monkeypatch.setattr(spotify_auth.SpotifyClient, "items", fake_items)
 
     response = client.get(
-        "/auth/spotify/data",
+        "/auth/spotify/data?moment=working",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
     )
 
@@ -152,7 +152,16 @@ def test_spotify_data_builds_live_music_profile(
     ]
     assert payload["recommendation"]["title"] == "A Real Track"
     assert payload["recommendation"]["decision_id"].startswith("dec_")
+    assert payload["recommendation"]["evidence"]["noticed"] == "You selected working."
+    assert payload["recommendation"]["evidence"]["matched_genres"] == ["ambient"]
+    assert "For working" in payload["recommendation"]["reason"]
     assert payload["recommendation"]["spotify_url"].endswith("/track/1")
+    trace = connection_repository.storage.get_decision_trace(
+        payload["recommendation"]["decision_id"]
+    )
+    assert trace is not None
+    assert trace["context"] == "working"
+    assert trace["factors"]["listening_moment"] == "working"
     snapshot = connection_repository.storage._execute
     with connection_repository.storage.connect() as database:
         row = snapshot(

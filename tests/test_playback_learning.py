@@ -89,3 +89,23 @@ def test_completion_and_rating_strength_are_bounded(tmp_path) -> None:
     assert rating.delta == 0.12
     assert rating.weight == 0.16
     assert rating.evidence_count == 2
+
+
+def test_explicit_context_fit_can_change_candidate_order(tmp_path) -> None:
+    service = PlaybackLearningService(Storage(f"sqlite:///{tmp_path / 'context.db'}"))
+    tracks = [
+        Track("spotify", "track-a", "A", ("Artist A",)),
+        Track("spotify", "track-b", "B", ("Artist B",)),
+    ]
+
+    selected, slate = service.rank(
+        user_id="user-1",
+        provider="spotify",
+        context="working",
+        tracks=tracks,
+        context_scores={"track-a": 0.0, "track-b": 1.0},
+    )
+
+    assert selected == tracks[1]
+    assert slate[0]["item_id"] == "track-b"
+    assert slate[0]["context_fit"] == 1.0
