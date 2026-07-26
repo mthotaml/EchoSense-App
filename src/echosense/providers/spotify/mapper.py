@@ -49,6 +49,7 @@ def map_track(item: dict[str, Any]) -> Track | None:
         if isinstance(artist, dict) and isinstance(artist.get("name"), str)
     )
     album = item.get("album")
+    external_ids = item.get("external_ids")
     return Track(
         provider=PROVIDER,
         provider_id=provider_id,
@@ -58,6 +59,12 @@ def map_track(item: dict[str, Any]) -> Track | None:
         popularity=item.get("popularity") if isinstance(item.get("popularity"), int) else None,
         image_url=_first_image(album.get("images")) if isinstance(album, dict) else None,
         external_url=_spotify_url(item),
+        isrc=(
+            external_ids.get("isrc")
+            if isinstance(external_ids, dict) and isinstance(external_ids.get("isrc"), str)
+            else None
+        ),
+        duration_ms=item.get("duration_ms") if isinstance(item.get("duration_ms"), int) else None,
     )
 
 

@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import httpx
 
 from echosense.providers.spotify.client import SpotifyClient, SpotifyRateLimited
+from echosense.providers.spotify.mapper import map_track
 from echosense.providers.spotify.provider import (
     RECENT_TRACKS_PATH,
     TOP_ARTISTS_PATH,
@@ -39,6 +40,22 @@ class FakeClient:
             }
             yield item
             yield item
+
+
+def test_track_mapper_preserves_identity_metadata() -> None:
+    track = map_track(
+        {
+            "id": "track-identity",
+            "name": "Identity",
+            "artists": [{"name": "Echo Artist"}],
+            "external_ids": {"isrc": "USABC1234567"},
+            "duration_ms": 201000,
+        }
+    )
+
+    assert track is not None
+    assert track.isrc == "USABC1234567"
+    assert track.duration_ms == 201000
 
 
 def test_provider_uses_bounded_sources_and_preserves_lineage() -> None:

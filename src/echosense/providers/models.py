@@ -33,6 +33,8 @@ class Track:
     popularity: int | None = None
     image_url: str | None = None
     external_url: str | None = None
+    isrc: str | None = None
+    duration_ms: int | None = None
 
     @property
     def primary_artist(self) -> str:
