@@ -12,6 +12,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   const savedTracks = new Set();
   const libraryMutations = [];
   const feedback = [];
+  const controlEvents = [];
 
   await page.route('https://sdk.scdn.co/spotify-player.js', route =>
     route.fulfill({
@@ -71,6 +72,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         recommendations: [
           {
             id: working ? 'working-track' : 'general-track',
+            decision_id: working ? 'decision-working' : 'decision-general',
             rank: 1,
             title: working ? 'Focused Motion' : 'Open Road',
             artist: 'Echo Artist',
@@ -78,6 +80,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
           },
           {
             id: working ? 'distinct-track' : 'alternate-track',
+            decision_id: working ? 'decision-distinct' : 'decision-alternate',
             rank: 2,
             title: working ? 'Distinct Motion' : 'Open Sky',
             artist: 'Another Artist',
@@ -141,6 +144,10 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       },
     });
   });
+  await page.route('**/v1/player/next?*', route => {
+    controlEvents.push('next');
+    return route.fulfill({status: 204});
+  });
   await page.route('**/v1/player/shuffle', async route => {
     playbackModes.push({kind: 'shuffle', ...(await route.request().postDataJSON())});
     return route.fulfill({status: 204});
@@ -169,6 +176,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await page.route('**/auth/spotify/feedback', async route => {
     feedback.push(await route.request().postDataJSON());
+    controlEvents.push('feedback');
     return route.fulfill({
       json: {applied: true, weight: 0.1, evidence_count: feedback.length},
     });
@@ -299,6 +307,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     'working-track',
     'distinct-track',
   ]);
+  await page.locator('#dna-queue-items .playlist-track').nth(1).getByRole('button', {name: 'Play now'}).click();
+  await expect.poll(() => recommendationPlays.map(item => item.decision_id)).toContain(
+    'decision-distinct',
+  );
+  await page.locator('#dna-queue-items .playlist-track').nth(1).getByRole('button', {name: 'Add next'}).click();
+  await expect.poll(() => queueCommands).toHaveLength(4);
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
@@ -315,14 +329,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   expect(libraryMutations[1]).toEqual({method: 'DELETE', trackId: 'working-track'});
 
   await page.locator('#play').click();
-  await expect.poll(() => recommendationPlays).toHaveLength(1);
-  expect(recommendationPlays[0]).toMatchObject({
+  await expect.poll(() => recommendationPlays).toHaveLength(2);
+  expect(recommendationPlays[1]).toMatchObject({
     decision_id: 'decision-working',
     device_id: 'guardian-device',
   });
   await page.locator('#play').click();
-  await expect.poll(() => recommendationPlays).toHaveLength(2);
-  expect(recommendationPlays[1].outcome_id).toBe(recommendationPlays[0].outcome_id);
+  await expect.poll(() => recommendationPlays).toHaveLength(3);
+  expect(recommendationPlays[2].outcome_id).toBe(recommendationPlays[1].outcome_id);
 
   await page.evaluate(() => {
     const track = {
@@ -349,6 +363,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
+  await expect.poll(() => controlEvents.slice(-2)).toEqual(['feedback', 'next']);
 
   restoreFromSnapshot = true;
   await page.reload();
@@ -430,6 +445,7 @@ test('Guardian isolates a Spotify playlist outage from core listening', async ({
   await page.route('**/auth/spotify/feedback', route =>
     route.fulfill({json: {applied: true}}),
   );
+  await page.route('**/v1/player/next?*', route => route.fulfill({status: 204}));
 
   await page.goto('/');
 
@@ -438,5 +454,5 @@ test('Guardian isolates a Spotify playlist outage from core listening', async ({
   await expect(page.locator('#more-playlists')).toHaveText('Retry');
   await expect(page.locator('#queue-add')).toBeEnabled();
   await page.locator('#skip').click();
-  await expect(page.locator('#toast')).toContainText('EchoSense will adjust');
+  await expect(page.locator('#toast')).toContainText('learned from it');
 });

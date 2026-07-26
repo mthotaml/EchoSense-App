@@ -318,22 +318,28 @@ def spotify_data(
             candidate_slate,
             limit=5,
         )
-        decision_id = f"dec_{uuid4().hex}"
-        if recommendation is not None:
+        decision_ids: dict[str, str] = {}
+        for slate_item in diverse_slate:
+            slate_decision_id = f"dec_{uuid4().hex}"
+            decision_ids[slate_item.track.provider_id] = slate_decision_id
             get_connection_repository().storage.save_decision_trace(
-                decision_id=decision_id,
+                decision_id=slate_decision_id,
                 user_id=session.provider_user_id,
                 context=ranking_context,
                 context_confidence=music_dna.confidence,
                 provider="spotify",
-                item_id=recommendation.provider_id,
+                item_id=slate_item.track.provider_id,
                 factors={
                     "candidate_slate": candidate_slate,
                     "music_dna_confidence": music_dna.confidence,
                     "evidence_count": music_dna.evidence_count,
                     "listening_moment": moment,
+                    "diverse_slate_rank": slate_item.rank,
                 },
             )
+        decision_id = (
+            decision_ids.get(recommendation.provider_id) if recommendation is not None else None
+        )
     except SpotifyRateLimited as exc:
         raise HTTPException(
             status_code=429,
@@ -353,7 +359,7 @@ def spotify_data(
         display_name=str(session.profile.get("display_name") or "Spotify listener"),
         music_dna=music_dna,
         recommendation=recommendation,
-        decision_id=decision_id if recommendation else None,
+        decision_id=decision_id,
         moment=moment,
         decision_evidence=(
             {
@@ -390,6 +396,7 @@ def spotify_data(
             "rank": item.rank,
             "score": item.score,
             "reason": item.reason,
+            "decision_id": decision_ids[item.track.provider_id],
         }
         for item in diverse_slate
     ]
