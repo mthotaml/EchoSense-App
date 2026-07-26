@@ -63,6 +63,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "restorePlaybackState" in response.text
     assert "/v1/player/pause" in response.text
     assert "/v1/player/play" in response.text
+    assert "/v1/player/recommendations/" in response.text
+    assert "currentPlayOutcomeId" in response.text
+    assert "The outcome is linked to this decision." in response.text
     assert "/auth/spotify/feedback" in response.text
     assert "pick.decision_id" in response.text
     assert "feedback('completed'" in response.text

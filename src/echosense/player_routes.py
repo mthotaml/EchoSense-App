@@ -10,8 +10,11 @@ from pydantic import BaseModel, Field
 from echosense.spotify_auth import (
     SESSION_COOKIE,
     SPOTIFY_API_URL,
+    SpotifyFeedbackRequest,
     _connected_session,
     _refresh_session,
+    get_connection_repository,
+    spotify_feedback,
 )
 
 router = APIRouter(prefix="/v1/player", tags=["spotify-player"])
@@ -26,6 +29,11 @@ class PlayRequest(BaseModel):
     device_id: str | None = None
     spotify_uri: str | None = None
     position_ms: int | None = Field(default=None, ge=0)
+
+
+class RecommendationPlayRequest(BaseModel):
+    device_id: str = Field(min_length=1)
+    outcome_id: str = Field(min_length=1)
 
 
 class SeekRequest(BaseModel):
@@ -158,6 +166,48 @@ def play(
         payload["position_ms"] = request.position_ms
     _spotify_request(session_id, "PUT", "/me/player/play", params=params, json=payload or None)
     return Response(status_code=204)
+
+
+@router.put("/recommendations/{decision_id}/play")
+def play_recommendation(
+    decision_id: str,
+    request: RecommendationPlayRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    trace = get_connection_repository().storage.get_decision_trace(decision_id)
+    if (
+        trace is None
+        or trace["user_id"] != session.provider_user_id
+        or trace["provider"] != "spotify"
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "recommendation_decision_not_found"},
+        )
+    item_id = str(trace["item_id"])
+    _spotify_request(
+        session_id,
+        "PUT",
+        "/me/player/play",
+        params={"device_id": request.device_id},
+        json={"uris": [f"spotify:track:{item_id}"]},
+    )
+    learning = spotify_feedback(
+        SpotifyFeedbackRequest(
+            outcome_id=request.outcome_id,
+            decision_id=decision_id,
+            signal="played",
+        ),
+        session_id,
+    )
+    return {
+        "status": "playing",
+        "decision_id": decision_id,
+        "provider": "spotify",
+        "item_id": item_id,
+        "learning": learning,
+    }
 
 
 @router.put("/pause", status_code=204)

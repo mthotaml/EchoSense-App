@@ -22,6 +22,8 @@
         "playlists-browsed",
         "unavailable-track-guarded",
         "playlist-track-played",
+        "decision-owned-playback",
+        "played-outcome-idempotent",
         "playback-started",
         "feedback-learned",
         "refresh-restored",

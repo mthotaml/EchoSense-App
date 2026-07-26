@@ -151,8 +151,8 @@ PAGE = r"""<!doctype html>
   <script src="/ui/player-lifecycle.js"></script>
   <script>
     let currentRecommendationId = null;
-    let currentTrackUri = null;
     let currentTrackId = null;
+    let currentPlayOutcomeId = null;
     let currentTrackSaved = false;
     let playlistsNextOffset = null;
     let selectedPlaylistId = null;
@@ -175,7 +175,6 @@ PAGE = r"""<!doctype html>
     const setText = (selector, value) => { $(selector).textContent = value || ''; };
     const greetingForHour = (h) => h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
     const formatTime = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2,'0')}`;
-    const spotifyUri = (url, id) => id ? `spotify:track:${id}` : (url || '').replace('https://open.spotify.com/track/', 'spotify:track:').split('?')[0];
 
     function dnaLine(label, value) { const row=document.createElement('div'); row.className='dna-line'; const key=document.createElement('span'); key.textContent=label; const strong=document.createElement('strong'); strong.textContent=value; row.append(key,strong); return row; }
     function renderTimeline(items) { const c=$('#timeline'); c.replaceChildren(); items.forEach((label,index)=>{ if(index){const a=document.createElement('span');a.className='arrow';a.textContent='→';c.appendChild(a);} const s=document.createElement('span');s.className='journey-step';s.textContent=label;c.appendChild(s); }); }
@@ -209,7 +208,7 @@ PAGE = r"""<!doctype html>
     async function loadLiveSpotify(moment=$('#moment').value) {
       const data = await (await fetch(`/auth/spotify/data?moment=${encodeURIComponent(moment)}`)).json(); const profile=data.profile; const pick=data.recommendation;
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentTrackUri=spotifyUri(pick.spotify_url,pick.id); reportedSignals.clear(); await refreshSavedState(pick.id); }
+      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']);
@@ -284,7 +283,14 @@ PAGE = r"""<!doctype html>
       lifecycle.setSdk(window.Spotify);
     };
 
-    async function playRecommendation() { if(!spotifyConnected){location.href='/auth/spotify/login';return;} if(!deviceId) throw new Error('Player is not ready yet.'); await activateBrowser(false); await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:deviceId,spotify_uri:currentTrackUri})}); await feedback('played'); setText('#toast','Playing inside EchoSense.'); }
+    async function playRecommendation() {
+      if(!spotifyConnected){location.href='/auth/spotify/login';return;}
+      if(!deviceId) throw new Error('Player is not ready yet.');
+      if(!currentRecommendationId||!currentPlayOutcomeId) throw new Error('Recommendation is not ready yet.');
+      await activateBrowser(false);
+      await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId})});
+      setText('#toast','Playing inside EchoSense. The outcome is linked to this decision.');
+    }
     function renderSavedState(saved) {
       currentTrackSaved=saved;
       $('#save').textContent=saved?'Saved':'Save';

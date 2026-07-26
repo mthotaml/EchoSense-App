@@ -4,6 +4,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let connected = true;
   let playbackStarted = false;
   const playRequests = [];
+  const recommendationPlays = [];
   const savedTracks = new Set();
   const libraryMutations = [];
   const feedback = [];
@@ -91,6 +92,24 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     playbackStarted = true;
     playRequests.push(route.request().postDataJSON());
     return route.fulfill({status: 204});
+  });
+  await page.route('**/v1/player/recommendations/*/play', async route => {
+    playbackStarted = true;
+    const request = await route.request().postDataJSON();
+    const decisionId = new URL(route.request().url()).pathname.split('/').at(-2);
+    recommendationPlays.push({...request, decision_id: decisionId});
+    return route.fulfill({
+      json: {
+        status: 'playing',
+        decision_id: decisionId,
+        provider: 'spotify',
+        item_id: 'working-track',
+        learning: {
+          signal: 'played',
+          applied: recommendationPlays.length === 1,
+        },
+      },
+    });
   });
   await page.route('**/auth/spotify/feedback', async route => {
     feedback.push(await route.request().postDataJSON());
@@ -221,7 +240,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   expect(libraryMutations[1]).toEqual({method: 'DELETE', trackId: 'working-track'});
 
   await page.locator('#play').click();
-  await expect.poll(() => feedback.map(item => item.signal)).toContain('played');
+  await expect.poll(() => recommendationPlays).toHaveLength(1);
+  expect(recommendationPlays[0]).toMatchObject({
+    decision_id: 'decision-working',
+    device_id: 'guardian-device',
+  });
+  await page.locator('#play').click();
+  await expect.poll(() => recommendationPlays).toHaveLength(2);
+  expect(recommendationPlays[1].outcome_id).toBe(recommendationPlays[0].outcome_id);
 
   await page.evaluate(() => {
     const track = {
