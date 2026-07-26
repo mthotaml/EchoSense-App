@@ -5,13 +5,17 @@ import hashlib
 import os
 import secrets
 from collections import Counter
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+
+from echosense.repositories.provider_connections import (
+    ProviderConnection,
+    ProviderConnectionRepository,
+)
 
 router = APIRouter(prefix="/auth/spotify", tags=["spotify-auth"])
 
@@ -26,15 +30,24 @@ STATE_COOKIE = "echosense_spotify_oauth_state"
 VERIFIER_COOKIE = "echosense_spotify_pkce_verifier"
 
 
-@dataclass
-class SpotifySession:
-    access_token: str
-    refresh_token: str | None
-    expires_at: datetime
-    profile: dict[str, object]
+SpotifySession = ProviderConnection
+_connection_repository: ProviderConnectionRepository | None = None
 
 
-_sessions: dict[str, SpotifySession] = {}
+def get_connection_repository() -> ProviderConnectionRepository:
+    global _connection_repository
+    if _connection_repository is None:
+        try:
+            _connection_repository = ProviderConnectionRepository.from_environment()
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "spotify_token_storage_not_configured",
+                    "missing": "ECHOSENSE_TOKEN_ENCRYPTION_KEY",
+                },
+            ) from exc
+    return _connection_repository
 
 
 def _required_environment(name: str) -> str:
@@ -48,16 +61,7 @@ def _required_environment(name: str) -> str:
 
 
 def _redirect_uri() -> str:
-    value = os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_REDIRECT_URI).strip()
-
-    print("=" * 60)
-    print("Spotify redirect URI debug")
-    print("SPOTIFY_REDIRECT_URI env :", os.getenv("SPOTIFY_REDIRECT_URI"))
-    print("DEFAULT_REDIRECT_URI     :", DEFAULT_REDIRECT_URI)
-    print("Using redirect URI       :", value)
-    print("=" * 60)
-
-    return value
+    return os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_REDIRECT_URI).strip()
 
 
 def _scopes() -> str:
@@ -70,7 +74,7 @@ def _code_challenge(verifier: str) -> str:
 
 
 def _basic_authorization(client_id: str, client_secret: str) -> str:
-    raw = f"{client_id}:{client_secret}".encode("utf-8")
+    raw = f"{client_id}:{client_secret}".encode()
     return base64.b64encode(raw).decode("ascii")
 
 
@@ -79,7 +83,7 @@ def _cookie_secure(request: Request) -> bool:
 
 
 def _refresh_session(session: SpotifySession) -> None:
-    if session.expires_at > datetime.now(timezone.utc) + timedelta(seconds=30):
+    if session.expires_at > datetime.now(UTC) + timedelta(seconds=30):
         return
     if not session.refresh_token:
         raise HTTPException(status_code=401, detail={"code": "spotify_reconnect_required"})
@@ -104,9 +108,8 @@ def _refresh_session(session: SpotifySession) -> None:
         ) from exc
     session.access_token = str(payload["access_token"])
     session.refresh_token = payload.get("refresh_token", session.refresh_token)
-    session.expires_at = datetime.now(timezone.utc) + timedelta(
-        seconds=int(payload.get("expires_in", 3600))
-    )
+    session.expires_at = datetime.now(UTC) + timedelta(seconds=int(payload.get("expires_in", 3600)))
+    get_connection_repository().save(session)
 
 
 def _spotify_get(
@@ -130,7 +133,7 @@ def _spotify_get(
 
 
 def _connected_session(session_id: str | None) -> SpotifySession:
-    session = _sessions.get(session_id or "")
+    session = get_connection_repository().get(session_id, "spotify") if session_id else None
     if session is None:
         raise HTTPException(status_code=401, detail={"code": "spotify_not_connected"})
     return session
@@ -157,7 +160,9 @@ def _track_summary(item: dict[str, object]) -> dict[str, object]:
     return {
         "id": item.get("id"),
         "title": item.get("name"),
-        "artist": artists[0].get("name") if isinstance(artists, list) and artists else "Unknown artist",
+        "artist": artists[0].get("name")
+        if isinstance(artists, list) and artists
+        else "Unknown artist",
         "artists": [artist.get("name") for artist in artists if isinstance(artist, dict)],
         "album": album.get("name") if isinstance(album, dict) else None,
         "popularity": item.get("popularity"),
@@ -185,8 +190,12 @@ def spotify_login(request: Request) -> RedirectResponse:
     )
     response = RedirectResponse(f"{SPOTIFY_AUTHORIZE_URL}?{query}", status_code=302)
     secure = _cookie_secure(request)
-    response.set_cookie(STATE_COOKIE, state, max_age=600, httponly=True, secure=secure, samesite="lax")
-    response.set_cookie(VERIFIER_COOKIE, verifier, max_age=600, httponly=True, secure=secure, samesite="lax")
+    response.set_cookie(
+        STATE_COOKIE, state, max_age=600, httponly=True, secure=secure, samesite="lax"
+    )
+    response.set_cookie(
+        VERIFIER_COOKIE, verifier, max_age=600, httponly=True, secure=secure, samesite="lax"
+    )
     return response
 
 
@@ -201,14 +210,12 @@ def spotify_callback(
 ) -> RedirectResponse:
     if error:
         return RedirectResponse(f"/?spotify_error={error}", status_code=302)
-    print("=== Spotify OAuth Callback ===")
-    print("Query state :", state)
-    print("Cookie state:", expected_state)
-    print("Has verifier:", verifier is not None)
-    print("Cookies     :", dict(request.cookies))
-    print("==============================")    
-   
-    if not code or not state or not expected_state or not secrets.compare_digest(state, expected_state):
+    if (
+        not code
+        or not state
+        or not expected_state
+        or not secrets.compare_digest(state, expected_state)
+    ):
         raise HTTPException(status_code=400, detail={"code": "invalid_oauth_state"})
     if not verifier:
         raise HTTPException(status_code=400, detail={"code": "missing_pkce_verifier"})
@@ -247,12 +254,16 @@ def spotify_callback(
 
     session_id = secrets.token_urlsafe(32)
     expires_in = int(token_payload.get("expires_in", 3600))
-    _sessions[session_id] = SpotifySession(
+    connection = SpotifySession(
+        session_id=session_id,
+        provider="spotify",
+        provider_user_id=str(profile["id"]),
         access_token=access_token,
         refresh_token=token_payload.get("refresh_token"),
-        expires_at=datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+        expires_at=datetime.now(UTC) + timedelta(seconds=expires_in),
         profile=profile,
     )
+    get_connection_repository().save(connection)
     response = RedirectResponse("/?spotify=connected", status_code=302)
     response.delete_cookie(STATE_COOKIE)
     response.delete_cookie(VERIFIER_COOKIE)
@@ -271,7 +282,7 @@ def spotify_callback(
 def spotify_session(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
-    session = _sessions.get(session_id or "")
+    session = get_connection_repository().get(session_id, "spotify") if session_id else None
     if session is None:
         return {"connected": False}
     profile = session.profile
@@ -294,8 +305,12 @@ def spotify_data(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
-    top_artists_payload = _spotify_get(session, "/me/top/artists", {"limit": 10, "time_range": "medium_term"})
-    top_tracks_payload = _spotify_get(session, "/me/top/tracks", {"limit": 10, "time_range": "medium_term"})
+    top_artists_payload = _spotify_get(
+        session, "/me/top/artists", {"limit": 10, "time_range": "medium_term"}
+    )
+    top_tracks_payload = _spotify_get(
+        session, "/me/top/tracks", {"limit": 10, "time_range": "medium_term"}
+    )
     recent_payload = _spotify_get(session, "/me/player/recently-played", {"limit": 20})
 
     artist_items = top_artists_payload.get("items") or []
@@ -323,9 +338,11 @@ def spotify_data(
         if leading_artists
         else "This reflects your recent Spotify listening."
     )
-    average_popularity = round(
-        sum(int(track.get("popularity") or 0) for track in top_tracks) / len(top_tracks)
-    ) if top_tracks else 0
+    average_popularity = (
+        round(sum(int(track.get("popularity") or 0) for track in top_tracks) / len(top_tracks))
+        if top_tracks
+        else 0
+    )
 
     return {
         "profile": {
@@ -336,14 +353,16 @@ def spotify_data(
             "recent_tracks": recent_tracks,
             "average_popularity": average_popularity,
         },
-        "recommendation": ({**recommendation, "reason": reason, "match_score": 96} if recommendation else None),
+        "recommendation": (
+            {**recommendation, "reason": reason, "match_score": 96} if recommendation else None
+        ),
         "insight": (
             f"Your strongest current signal is {genres[0]['name']}."
             if genres
             else "EchoSense is still collecting enough listening history to identify your strongest signal."
         ),
         "timeline": [artist["name"] for artist in top_artists[:4] if artist.get("name")],
-        "generated_at": datetime.now(timezone.utc),
+        "generated_at": datetime.now(UTC),
     }
 
 
@@ -352,7 +371,7 @@ def spotify_logout(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> JSONResponse:
     if session_id:
-        _sessions.pop(session_id, None)
+        get_connection_repository().revoke(session_id, "spotify")
     response = JSONResponse({"status": "disconnected"})
     response.delete_cookie(SESSION_COOKIE)
     return response

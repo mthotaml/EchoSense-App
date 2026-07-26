@@ -1,38 +1,60 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
+import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from echosense import player_routes, spotify_auth
 from echosense.product_app import app
+from echosense.repositories.provider_connections import ProviderConnectionRepository
+from echosense.storage import Storage
 
 client = TestClient(app)
 
 
-def _session() -> str:
+@pytest.fixture(autouse=True)
+def connection_repository(tmp_path, monkeypatch) -> ProviderConnectionRepository:
+    repository = ProviderConnectionRepository(
+        Storage(f"sqlite:///{tmp_path / 'connections.db'}"),
+        Fernet.generate_key(),
+    )
+    monkeypatch.setattr(spotify_auth, "_connection_repository", repository)
+    return repository
+
+
+def _session(repository: ProviderConnectionRepository) -> str:
     session_id = "player-test-session"
-    spotify_auth._sessions[session_id] = spotify_auth.SpotifySession(
-        access_token="access-token",
-        refresh_token="refresh-token",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        profile={"display_name": "Mohan", "product": "premium"},
+    repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id="spotify-user",
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"display_name": "Mohan", "product": "premium"},
+        )
     )
     return session_id
 
 
-def test_player_token_returns_current_access_token() -> None:
-    session_id = _session()
+def test_player_token_returns_current_access_token(
+    connection_repository: ProviderConnectionRepository,
+) -> None:
+    session_id = _session(connection_repository)
     response = client.get(
         "/v1/player/token",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
     )
     assert response.status_code == 200
     assert response.json()["access_token"] == "access-token"
-    spotify_auth._sessions.pop(session_id, None)
 
 
-def test_transfer_playback_targets_browser_device(monkeypatch) -> None:
-    session_id = _session()
+def test_transfer_playback_targets_browser_device(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
     captured: dict[str, object] = {}
 
     def fake_request(method, url, **kwargs):
@@ -49,11 +71,12 @@ def test_transfer_playback_targets_browser_device(monkeypatch) -> None:
     assert response.status_code == 204
     assert captured["method"] == "PUT"
     assert captured["json"] == {"device_ids": ["browser-device"], "play": False}
-    spotify_auth._sessions.pop(session_id, None)
 
 
-def test_play_recommendation_sends_spotify_uri(monkeypatch) -> None:
-    session_id = _session()
+def test_play_recommendation_sends_spotify_uri(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
     captured: dict[str, object] = {}
 
     def fake_request(method, url, **kwargs):
@@ -70,4 +93,3 @@ def test_play_recommendation_sends_spotify_uri(monkeypatch) -> None:
     assert response.status_code == 204
     assert captured["params"] == {"device_id": "browser-device"}
     assert captured["json"] == {"uris": ["spotify:track:abc"]}
-    spotify_auth._sessions.pop(session_id, None)
