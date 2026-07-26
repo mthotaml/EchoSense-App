@@ -29,6 +29,9 @@
         "refresh-restored",
         "snapshot-confirmation-required",
         "device-handoff-reconciled",
+        "devices-discovered",
+        "restricted-device-guarded",
+        "explicit-device-transfer",
         "disconnected"
       ]
     }

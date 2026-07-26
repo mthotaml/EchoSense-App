@@ -6,6 +6,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let restoreFromSnapshot = false;
   const playRequests = [];
   const recommendationPlays = [];
+  const transfers = [];
   const savedTracks = new Set();
   const libraryMutations = [];
   const feedback = [];
@@ -91,7 +92,20 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         })
       : route.fulfill({status: 204}),
   );
-  await page.route('**/v1/player/transfer', route => route.fulfill({status: 204}));
+  await page.route('**/v1/player/devices', route =>
+    route.fulfill({
+      json: {
+        items: [
+          {id: 'phone-device', name: 'Guardian Phone', type: 'smartphone', active: true, restricted: false},
+          {id: 'restricted-device', name: 'Restricted Speaker', type: 'speaker', active: false, restricted: true},
+        ],
+      },
+    }),
+  );
+  await page.route('**/v1/player/transfer', async route => {
+    transfers.push(await route.request().postDataJSON());
+    return route.fulfill({status: 204});
+  });
   await page.route('**/v1/player/play', route => {
     playbackStarted = true;
     playRequests.push(route.request().postDataJSON());
@@ -213,6 +227,11 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
   await expect(page.locator('#player-status')).toContainText('ready');
+  await expect(page.locator('#device-picker option')).toHaveCount(3);
+  await expect(page.locator('#device-picker option').nth(2)).toBeDisabled();
+  await page.locator('#device-picker').selectOption('phone-device');
+  await page.locator('#transfer-device').click();
+  await expect.poll(() => transfers).toContainEqual({device_id: 'phone-device', play: false});
   await expect(page.locator('.playlist-card')).toHaveCount(2);
   await expect(page.locator('.playlist-card').nth(1)).toBeDisabled();
 

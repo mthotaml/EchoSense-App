@@ -160,7 +160,27 @@ def player_state(
 def player_devices(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
-    return _spotify_request(session_id, "GET", "/me/player/devices").json()
+    payload = _spotify_request(session_id, "GET", "/me/player/devices").json()
+    devices = payload.get("devices") if isinstance(payload, dict) else None
+    if not isinstance(devices, list):
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "spotify_devices_invalid", "correlation_id": uuid4().hex},
+        )
+    return {
+        "items": [
+            {
+                "id": device.get("id"),
+                "name": device.get("name") or "Unnamed device",
+                "type": device.get("type") or "unknown",
+                "active": device.get("is_active") is True,
+                "restricted": device.get("is_restricted") is True,
+                "volume_percent": device.get("volume_percent"),
+            }
+            for device in devices
+            if isinstance(device, dict) and isinstance(device.get("id"), str)
+        ]
+    }
 
 
 @router.put("/transfer", status_code=204)

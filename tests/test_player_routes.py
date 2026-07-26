@@ -128,6 +128,45 @@ def test_transfer_playback_targets_browser_device(
     assert captured["json"] == {"device_ids": ["browser-device"], "play": False}
 
 
+def test_devices_are_normalized_and_restricted_state_is_preserved(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    payload = {
+        "devices": [
+            {
+                "id": "phone",
+                "name": "Mohan's phone",
+                "type": "smartphone",
+                "is_active": True,
+                "is_restricted": False,
+                "volume_percent": 64,
+            },
+            {
+                "id": "speaker",
+                "name": "Office speaker",
+                "type": "speaker",
+                "is_restricted": True,
+            },
+        ]
+    }
+    monkeypatch.setattr(
+        player_routes.httpx,
+        "request",
+        lambda method, url, **kwargs: httpx.Response(
+            200, request=httpx.Request(method, url), json=payload
+        ),
+    )
+    response = client.get(
+        "/v1/player/devices",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert response.json()["items"][0]["active"] is True
+    assert response.json()["items"][0]["volume_percent"] == 64
+    assert response.json()["items"][1]["restricted"] is True
+
+
 def test_play_recommendation_sends_spotify_uri(
     monkeypatch, connection_repository: ProviderConnectionRepository
 ) -> None:

@@ -144,7 +144,7 @@ PAGE = r"""<!doctype html>
   <section class="player" aria-label="EchoSense player">
     <div class="now"><img id="player-cover" class="cover" alt=""><div class="meta"><strong id="player-title">Nothing playing</strong><span id="player-artist">Connect Spotify to listen here</span><span id="player-status" class="player-status">EchoSense Browser</span></div></div>
     <div class="transport"><div class="controls"><button id="previous" class="icon" aria-label="Previous">‹</button><button id="toggle" class="icon toggle" aria-label="Play or pause">▶</button><button id="next" class="icon" aria-label="Next">›</button></div><div class="progress-row"><span id="elapsed">0:00</span><input id="progress" type="range" min="0" max="1000" value="0"><span id="duration">0:00</span></div></div>
-    <div class="player-side"><span>🔊</span><input id="volume" class="volume" type="range" min="0" max="100" value="70"><button id="activate" class="secondary" type="button">Use this browser</button></div>
+    <div class="player-side"><span>🔊</span><input id="volume" class="volume" type="range" min="0" max="100" value="70"><select id="device-picker" class="secondary" aria-label="Playback device"><option value="">Choose device</option></select><button id="transfer-device" class="secondary" type="button" disabled>Transfer</button><button id="activate" class="secondary" type="button">Use this browser</button></div>
   </section>
 
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
@@ -275,6 +275,17 @@ PAGE = r"""<!doctype html>
       if (!deviceId) throw new Error('The EchoSense player is still starting.');
       await api('/v1/player/transfer',{method:'PUT',body:JSON.stringify({device_id:deviceId,play})}); lifecycle.markDeviceActive(); setText('#player-status','EchoSense Browser active');
     }
+    async function loadDevices() {
+      const payload=await (await api('/v1/player/devices')).json(); const picker=$('#device-picker'); picker.replaceChildren();
+      const placeholder=document.createElement('option'); placeholder.value=''; placeholder.textContent=payload.items.length?'Choose device':'No devices available'; picker.appendChild(placeholder);
+      payload.items.forEach(device=>{const option=document.createElement('option');option.value=device.id;option.textContent=`${device.name}${device.active?' · active':''}${device.restricted?' · unavailable':''}`;option.disabled=device.restricted;option.dataset.name=device.name;picker.appendChild(option);});
+      $('#transfer-device').disabled=true;
+    }
+    async function transferSelectedDevice() {
+      const picker=$('#device-picker'); if(!picker.value)return;
+      await api('/v1/player/transfer',{method:'PUT',body:JSON.stringify({device_id:picker.value,play:false})});
+      setText('#player-status',`Transferred to ${picker.selectedOptions[0].dataset.name}`); await restorePlaybackState(); await loadDevices();
+    }
 
     function initializeSpotifyPlayer() {
       return lifecycle.setConnection(spotifyConnected);
@@ -382,7 +393,7 @@ PAGE = r"""<!doctype html>
 
     async function load() {
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await loadPlaylists(); } else await loadDemo();
+      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.all([loadPlaylists(),loadDevices()]); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#more-playlists').addEventListener('click',()=>loadPlaylists(playlistsNextOffset).catch(e=>setText('#toast',e.message)));
@@ -392,6 +403,8 @@ PAGE = r"""<!doctype html>
       $('#toggle').addEventListener('click',()=>togglePlayback().catch(e=>setText('#toast',e.message)));
       $('#previous').addEventListener('click',()=>api(`/v1/player/previous?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message))); $('#next').addEventListener('click',()=>api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));
       $('#activate').disabled=true; $('#activate').addEventListener('click',()=>activateBrowser(false).catch(e=>setText('#toast',e.message)));
+      $('#device-picker').addEventListener('change',()=>{$('#transfer-device').disabled=!$('#device-picker').value;});
+      $('#transfer-device').addEventListener('click',()=>transferSelectedDevice().catch(e=>setText('#toast',e.message)));
       $('#progress').addEventListener('change',()=>api('/v1/player/seek',{method:'PUT',body:JSON.stringify({device_id:deviceId,position_ms:Number($('#progress').value)})}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));
       $('#volume').addEventListener('input',()=>api('/v1/player/volume',{method:'PUT',body:JSON.stringify({device_id:deviceId,volume_percent:Number($('#volume').value)})}).catch(e=>setText('#toast',e.message)));
       progressTimer=setInterval(updateProgressClock,500);
