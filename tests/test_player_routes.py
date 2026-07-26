@@ -209,6 +209,34 @@ def test_queue_is_ordered_and_add_command_is_idempotent(
     assert len([call for call in calls if call[0] == "POST"]) == 1
 
 
+def test_shuffle_and_repeat_commands_are_device_scoped(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((url, kwargs["params"]))
+        return httpx.Response(204, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(player_routes.httpx, "request", fake_request)
+    shuffle = client.put(
+        "/v1/player/shuffle",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={"enabled": True, "device_id": "browser"},
+    )
+    repeat = client.put(
+        "/v1/player/repeat",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={"mode": "track", "device_id": "browser"},
+    )
+
+    assert shuffle.status_code == 204
+    assert repeat.status_code == 204
+    assert calls[0][1] == {"state": "true", "device_id": "browser"}
+    assert calls[1][1] == {"state": "track", "device_id": "browser"}
+
+
 def test_play_recommendation_sends_spotify_uri(
     monkeypatch, connection_repository: ProviderConnectionRepository
 ) -> None:

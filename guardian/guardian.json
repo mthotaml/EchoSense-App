@@ -34,6 +34,8 @@
         "explicit-device-transfer",
         "queue-order-preserved",
         "queue-command-idempotent",
+        "shuffle-state-reconciled",
+        "repeat-mode-reconciled",
         "disconnected"
       ]
     }

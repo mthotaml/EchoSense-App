@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
@@ -50,6 +50,16 @@ class VolumeRequest(BaseModel):
 class QueueRequest(BaseModel):
     item_id: str = Field(min_length=1)
     command_id: str = Field(min_length=1)
+    device_id: str | None = None
+
+
+class ShuffleRequest(BaseModel):
+    enabled: bool
+    device_id: str | None = None
+
+
+class RepeatRequest(BaseModel):
+    mode: Literal["off", "track", "context"]
     device_id: str | None = None
 
 
@@ -399,4 +409,28 @@ def volume(
     if request.device_id:
         params["device_id"] = request.device_id
     _spotify_request(session_id, "PUT", "/me/player/volume", params=params)
+    return Response(status_code=204)
+
+
+@router.put("/shuffle", status_code=204)
+def shuffle(
+    request: ShuffleRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> Response:
+    params: dict[str, object] = {"state": str(request.enabled).lower()}
+    if request.device_id:
+        params["device_id"] = request.device_id
+    _spotify_request(session_id, "PUT", "/me/player/shuffle", params=params)
+    return Response(status_code=204)
+
+
+@router.put("/repeat", status_code=204)
+def repeat(
+    request: RepeatRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> Response:
+    params: dict[str, object] = {"state": request.mode}
+    if request.device_id:
+        params["device_id"] = request.device_id
+    _spotify_request(session_id, "PUT", "/me/player/repeat", params=params)
     return Response(status_code=204)

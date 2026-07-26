@@ -8,6 +8,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   const recommendationPlays = [];
   const transfers = [];
   const queueCommands = [];
+  const playbackModes = [];
   const savedTracks = new Set();
   const libraryMutations = [];
   const feedback = [];
@@ -123,6 +124,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         up_next: [{id: 'next-track', title: 'Next Motion', artists: ['Echo Artist'], playable: true}],
       },
     });
+  });
+  await page.route('**/v1/player/shuffle', async route => {
+    playbackModes.push({kind: 'shuffle', ...(await route.request().postDataJSON())});
+    return route.fulfill({status: 204});
+  });
+  await page.route('**/v1/player/repeat', async route => {
+    playbackModes.push({kind: 'repeat', ...(await route.request().postDataJSON())});
+    return route.fulfill({status: 204});
   });
   await page.route('**/v1/player/recommendations/*/play', async route => {
     playbackStarted = true;
@@ -240,6 +249,10 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
   await expect(page.locator('#player-status')).toContainText('ready');
+  await page.locator('#shuffle').click();
+  await page.locator('#repeat').selectOption('track');
+  await expect.poll(() => playbackModes).toContainEqual({kind: 'shuffle', enabled: true, device_id: 'guardian-device'});
+  await expect.poll(() => playbackModes).toContainEqual({kind: 'repeat', mode: 'track', device_id: 'guardian-device'});
   await expect(page.locator('#device-picker option')).toHaveCount(3);
   await expect(page.locator('#device-picker option').nth(2)).toBeDisabled();
   await page.locator('#device-picker').selectOption('phone-device');

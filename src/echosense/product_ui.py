@@ -145,7 +145,7 @@ PAGE = r"""<!doctype html>
   <section class="player" aria-label="EchoSense player">
     <div class="now"><img id="player-cover" class="cover" alt=""><div class="meta"><strong id="player-title">Nothing playing</strong><span id="player-artist">Connect Spotify to listen here</span><span id="player-status" class="player-status">EchoSense Browser</span></div></div>
     <div class="transport"><div class="controls"><button id="previous" class="icon" aria-label="Previous">‹</button><button id="toggle" class="icon toggle" aria-label="Play or pause">▶</button><button id="next" class="icon" aria-label="Next">›</button></div><div class="progress-row"><span id="elapsed">0:00</span><input id="progress" type="range" min="0" max="1000" value="0"><span id="duration">0:00</span></div></div>
-    <div class="player-side"><span>🔊</span><input id="volume" class="volume" type="range" min="0" max="100" value="70"><select id="device-picker" class="secondary" aria-label="Playback device"><option value="">Choose device</option></select><button id="transfer-device" class="secondary" type="button" disabled>Transfer</button><button id="activate" class="secondary" type="button">Use this browser</button></div>
+    <div class="player-side"><button id="shuffle" class="secondary" type="button" aria-pressed="false">Shuffle</button><select id="repeat" class="secondary" aria-label="Repeat mode"><option value="off">Repeat off</option><option value="context">Repeat context</option><option value="track">Repeat track</option></select><span>🔊</span><input id="volume" class="volume" type="range" min="0" max="100" value="70"><select id="device-picker" class="secondary" aria-label="Playback device"><option value="">Choose device</option></select><button id="transfer-device" class="secondary" type="button" disabled>Transfer</button><button id="activate" class="secondary" type="button">Use this browser</button></div>
   </section>
 
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
@@ -235,6 +235,8 @@ PAGE = r"""<!doctype html>
         duration:track?.duration_ms||0,
         track_window:{current_track:track},
         device:state.device||null,
+        shuffle_state:state.shuffle_state,
+        repeat_state:state.repeat_state,
         updatedAt:Date.now(),
         source:'api'
       };
@@ -248,6 +250,8 @@ PAGE = r"""<!doctype html>
       setText('#player-title',track?.name||'Nothing playing'); setText('#player-artist',track?.artists?.map(a=>a.name).join(', ')||'Choose a recommendation');
       $('#player-cover').src=image||''; $('#player-cover').style.visibility=image?'visible':'hidden'; $('#toggle').textContent=state?.paused?'▶':'❚❚';
       $('#progress').max=state?.duration||1000; $('#progress').value=state?.position||0; setText('#elapsed',formatTime(state?.position||0)); setText('#duration',formatTime(state?.duration||0));
+      const shuffle=state?.shuffle_state??state?.shuffle??false; $('#shuffle').setAttribute('aria-pressed',String(shuffle)); $('#shuffle').textContent=shuffle?'Shuffle on':'Shuffle';
+      const repeat=state?.repeat_state??({0:'off',1:'context',2:'track'}[state?.repeat_mode]||'off'); $('#repeat').value=repeat;
       if(spotifyConnected && track?.id===currentTrackId && previous?.paused===false && state?.paused && state.duration && state.position/state.duration>=.95) {
         feedback('completed',{completion_ratio:state.position/state.duration,playback_seconds:state.position/1000}).catch(()=>{});
       }
@@ -297,6 +301,13 @@ PAGE = r"""<!doctype html>
       if(!currentTrackId||!currentQueueCommandId)return;
       const result=await (await api('/v1/player/queue',{method:'POST',body:JSON.stringify({item_id:currentTrackId,command_id:currentQueueCommandId,device_id:deviceId})})).json();
       setText('#toast',result.applied?'Added to your Spotify queue.':'Already in your queue.'); await loadQueue();
+    }
+    async function toggleShuffle() {
+      const enabled=$('#shuffle').getAttribute('aria-pressed')!=='true';
+      await api('/v1/player/shuffle',{method:'PUT',body:JSON.stringify({enabled,device_id:deviceId})}); await restorePlaybackState();
+    }
+    async function setRepeat() {
+      await api('/v1/player/repeat',{method:'PUT',body:JSON.stringify({mode:$('#repeat').value,device_id:deviceId})}); await restorePlaybackState();
     }
 
     function initializeSpotifyPlayer() {
@@ -421,6 +432,8 @@ PAGE = r"""<!doctype html>
       $('#transfer-device').addEventListener('click',()=>transferSelectedDevice().catch(e=>setText('#toast',e.message)));
       $('#progress').addEventListener('change',()=>api('/v1/player/seek',{method:'PUT',body:JSON.stringify({device_id:deviceId,position_ms:Number($('#progress').value)})}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));
       $('#volume').addEventListener('input',()=>api('/v1/player/volume',{method:'PUT',body:JSON.stringify({device_id:deviceId,volume_percent:Number($('#volume').value)})}).catch(e=>setText('#toast',e.message)));
+      $('#shuffle').addEventListener('click',()=>toggleShuffle().catch(e=>setText('#toast',e.message)));
+      $('#repeat').addEventListener('change',()=>setRepeat().catch(e=>setText('#toast',e.message)));
       progressTimer=setInterval(updateProgressClock,500);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden) restorePlaybackState();});
       window.addEventListener('focus',restorePlaybackState);
