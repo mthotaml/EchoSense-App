@@ -31,6 +31,11 @@
             "minItems": 2,
             "uniqueItems": true,
             "items": {"type": "string", "minLength": 1}
+          },
+          "planned_states": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
           }
         },
         "additionalProperties": false

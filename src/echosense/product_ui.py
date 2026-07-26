@@ -112,6 +112,9 @@ PAGE = r"""<!doctype html>
     .dna-line { display:flex; justify-content:space-between; gap:20px; padding-bottom:14px; border-bottom:1px solid var(--line); }
     .journey { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:22px; }
     .journey-step { padding:10px 13px; background:var(--soft); border:1px solid var(--line); border-radius:999px; }
+    .context-chips,.factor-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+    .context-chip,.factor-chip { padding:7px 10px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:.78rem; }
+    .factor-chip { padding:5px 8px; font-size:.72rem; }
     .arrow { color:#667186; }
     #toast { min-height:22px; margin-top:14px; color:var(--accent); }
     .player { position:fixed; left:0; right:0; bottom:0; z-index:20; min-height:96px; border-top:1px solid #30394a; background:rgba(8,11,16,.96); backdrop-filter:blur(18px); display:grid; grid-template-columns:minmax(220px,1fr) minmax(280px,1.3fr) minmax(180px,1fr); align-items:center; gap:24px; padding:14px 24px; }
@@ -136,6 +139,7 @@ PAGE = r"""<!doctype html>
   <main>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. A persistent listening surface powered by your Music DNA.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
+    <section id="live-context-panel" class="panel connection"><div><div class="eyebrow">Context fusion</div><h2>Why this music, right now?</h2><p id="context-status" class="connection-copy">Time is automatic. Enable live context for permission-based weather, coarse location, and movement.</p><div id="context-chips" class="context-chips"></div><p class="evidence">Raw coordinates are used transiently for current weather and are not stored by EchoSense.</p></div><button id="context-toggle" class="secondary" type="button">Enable live context</button></section>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play now</button><button id="queue-add" class="secondary" type="button" disabled>Add next</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip &amp; play next</button></div><div id="toast" aria-live="polite"></div></section>
       <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA queue</div><h2>Different tracks, ranked for this moment</h2><p class="copy">Context, learned preference, familiarity, and diversity shape this sequence.</p></div><button id="dna-queue-add" class="primary" type="button">Add DNA queue</button></div><div id="dna-queue-items" class="track-list"></div></section>
@@ -161,6 +165,9 @@ PAGE = r"""<!doctype html>
     let currentQueueCommandId = null;
     let currentTrackSaved = false;
     let recommendationSlate = [];
+    let liveContext = null;
+    let contextWatchId = null;
+    let lastContextKey = '';
     let playlistsNextOffset = null;
     let selectedPlaylistId = null;
     let tracksNextOffset = null;
@@ -213,7 +220,10 @@ PAGE = r"""<!doctype html>
     }
 
     async function loadLiveSpotify(moment=$('#moment').value) {
-      const response=await api(`/auth/spotify/data?moment=${encodeURIComponent(moment)}`); const data=await response.json();
+      const hour=new Date().getHours(); const automaticDaypart=hour<6?'late_night':hour<12?'morning':hour<17?'afternoon':hour<21?'evening':'night';
+      const params=new URLSearchParams({moment,daypart:liveContext?.daypart||automaticDaypart});
+      if(liveContext){['weather','region','road_setting','activity'].forEach(key=>liveContext[key]&&params.set(key,liveContext[key]));}
+      const response=await api(`/auth/spotify/data?${params}`); const data=await response.json();
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
@@ -311,8 +321,49 @@ PAGE = r"""<!doctype html>
     }
     function renderDnaQueue() {
       const container=$('#dna-queue-items'); container.replaceChildren();
-      recommendationSlate.forEach(item=>{const row=document.createElement('div');row.className='playlist-track';const copy=document.createElement('div');copy.className='track-copy';const title=document.createElement('strong');title.textContent=`${item.rank||''} · ${item.title}`;const evidence=document.createElement('span');evidence.textContent=`${item.artist} · ${item.reason||'Ranked from your Music DNA.'}`;copy.append(title,evidence);const actions=document.createElement('div');actions.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='Play now';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const next=document.createElement('button');next.type='button';next.className='secondary';next.textContent='Add next';next.addEventListener('click',()=>queueDnaTrack(item,next).catch(e=>setText('#toast',e.message)));actions.append(play,next);row.append(copy,actions);container.appendChild(row);});
+      recommendationSlate.forEach(item=>{const row=document.createElement('div');row.className='playlist-track';const copy=document.createElement('div');copy.className='track-copy';const title=document.createElement('strong');title.textContent=`${item.rank||''} · ${item.title}`;const evidence=document.createElement('span');evidence.textContent=`${item.artist} · ${item.why_now?.summary||item.reason||'Ranked from your Music DNA.'}`;const factors=document.createElement('div');factors.className='factor-chips';(item.why_now?.factors||[]).forEach(factor=>{const chip=document.createElement('span');chip.className='factor-chip';chip.textContent=`${factor.name} ${factor.score}%`;factors.appendChild(chip);});(item.why_now?.observations||[]).forEach(observation=>{const chip=document.createElement('span');chip.className='factor-chip';chip.textContent=observation;factors.appendChild(chip);});copy.append(title,evidence,factors);const actions=document.createElement('div');actions.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='Play now';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const next=document.createElement('button');next.type='button';next.className='secondary';next.textContent='Add next';next.addEventListener('click',()=>queueDnaTrack(item,next).catch(e=>setText('#toast',e.message)));actions.append(play,next);row.append(copy,actions);container.appendChild(row);});
       $('#dna-queue-panel').hidden=recommendationSlate.length<2;
+    }
+    function renderLiveContext() {
+      const chips=$('#context-chips'); chips.replaceChildren();
+      if(!liveContext)return;
+      const values=[
+        liveContext.daypart?.replace('_',' '),
+        liveContext.weather==='unknown'?'Weather unavailable':`${liveContext.weather?.replace('_',' ')}${liveContext.temperature_f!==null?` · ${liveContext.temperature_f}°F`:''}`,
+        liveContext.region,
+        liveContext.road_setting!=='general'?`${liveContext.road_setting?.replace('_',' ')} drive`:null,
+        liveContext.activity?.replace('_',' '),
+        liveContext.speed_mph!==null?`${liveContext.speed_mph} mph`:null,
+      ].filter(Boolean);
+      values.forEach(value=>{const chip=document.createElement('span');chip.className='context-chip';chip.textContent=value;chips.appendChild(chip);});
+      setText('#context-status',liveContext.faster_than_usual?'Faster-than-usual driving detected. Energy is increased gradually.':'Live context is shaping candidate generation and ranking.');
+    }
+    function speedBaseline(speed) {
+      const samples=JSON.parse(localStorage.getItem('echosenseDrivingSpeeds')||'[]').filter(value=>Number.isFinite(value)&&value>=8);
+      const baseline=samples.length>=3?samples.reduce((total,value)=>total+value,0)/samples.length:null;
+      if(Number.isFinite(speed)&&speed>=8){samples.push(speed);localStorage.setItem('echosenseDrivingSpeeds',JSON.stringify(samples.slice(-20)));}
+      return baseline;
+    }
+    async function resolveLiveContext(position) {
+      const speed=Number.isFinite(position.coords.speed)?Math.max(0,position.coords.speed):null;
+      const snapshot=await (await api('/v1/context/resolve',{method:'POST',body:JSON.stringify({latitude:position.coords.latitude,longitude:position.coords.longitude,local_hour:new Date().getHours(),speed_mps:speed,baseline_speed_mps:speedBaseline(speed)})})).json();
+      const key=JSON.stringify([snapshot.daypart,snapshot.weather,snapshot.region,snapshot.road_setting,snapshot.activity,snapshot.faster_than_usual]);
+      liveContext=snapshot; renderLiveContext();
+      if(key!==lastContextKey){lastContextKey=key;if(spotifyConnected)await loadLiveSpotify();}
+    }
+    function enableLiveContext() {
+      if(!navigator.geolocation){setText('#context-status','This browser does not provide location or motion context. Time-based context remains active.');return;}
+      localStorage.setItem('echosenseContextConsent','granted'); $('#context-toggle').textContent='Disable live context';
+      contextWatchId=navigator.geolocation.watchPosition(position=>resolveLiveContext(position).catch(e=>setText('#context-status',e.message)),error=>setText('#context-status',`Live context unavailable: ${error.message}`),{enableHighAccuracy:true,maximumAge:30000,timeout:10000});
+    }
+    function disableLiveContext() {
+      if(contextWatchId!==null)navigator.geolocation.clearWatch(contextWatchId);
+      contextWatchId=null; liveContext=null; lastContextKey=''; localStorage.removeItem('echosenseContextConsent'); $('#context-toggle').textContent='Enable live context'; $('#context-chips').replaceChildren();
+      setText('#context-status','Live context disabled. Time and manually selected moments remain available.');
+      if(spotifyConnected)loadLiveSpotify().catch(e=>setText('#toast',e.message));
+    }
+    function toggleLiveContext() {
+      if(contextWatchId!==null||localStorage.getItem('echosenseContextConsent')==='granted')disableLiveContext();else enableLiveContext();
     }
     async function playDnaTrack(item) {
       if(!deviceId)throw new Error('Player is not ready yet.');
@@ -471,6 +522,7 @@ PAGE = r"""<!doctype html>
       $('#more-tracks').addEventListener('click',()=>loadPlaylistTracks(selectedPlaylistId,$('#playlist-title').textContent,tracksNextOffset).catch(e=>setText('#toast',e.message)));
       $('#skip').addEventListener('click',()=>skipAndPlayNext().catch(e=>setText('#toast',e.message)));
       $('#queue-skip').addEventListener('click',()=>skipAndPlayNext().catch(e=>setText('#toast',e.message)));
+      $('#context-toggle').addEventListener('click',toggleLiveContext);
       $('#moment').addEventListener('change',()=>spotifyConnected&&loadLiveSpotify($('#moment').value).catch(e=>setText('#toast',e.message)));
       $('#toggle').addEventListener('click',()=>togglePlayback().catch(e=>setText('#toast',e.message)));
       $('#previous').addEventListener('click',()=>api(`/v1/player/previous?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message))); $('#next').addEventListener('click',()=>api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));
@@ -485,6 +537,7 @@ PAGE = r"""<!doctype html>
       document.addEventListener('visibilitychange',()=>{if(!document.hidden) restorePlaybackState();});
       window.addEventListener('focus',restorePlaybackState);
       if(session) await restorePlaybackState();
+      if(localStorage.getItem('echosenseContextConsent')==='granted')enableLiveContext();
     }
     load().catch(e=>setText('#toast',e.message||'EchoSense could not load.'));
   </script>

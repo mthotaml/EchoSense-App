@@ -44,14 +44,20 @@ class PlaybackLearningService:
         context: str,
         tracks: list[Track],
         context_scores: dict[str, float] | None = None,
+        context_weight: float = 0.15,
     ) -> tuple[Track | None, list[dict[str, object]]]:
+        if not 0.0 <= context_weight <= 0.5:
+            raise ValueError("context_weight must be between 0 and 0.5")
         weights = self._weights(user_id, provider, context, [track.provider_id for track in tracks])
         slate = []
         for rank, track in enumerate(tracks, start=1):
             base_score = round(1.0 - (rank - 1) * 0.05, 3)
             preference_weight = weights.get(track.provider_id, 0.0)
             context_fit = (context_scores or {}).get(track.provider_id, 0.0)
-            ranking_score = round(base_score + 0.15 * context_fit + 0.25 * preference_weight, 6)
+            ranking_score = round(
+                base_score + context_weight * context_fit + 0.25 * preference_weight,
+                6,
+            )
             slate.append(
                 {
                     "provider": provider,
@@ -60,6 +66,7 @@ class PlaybackLearningService:
                     "provider_base_score": base_score,
                     "preference_weight": preference_weight,
                     "context_fit": context_fit,
+                    "context_weight": context_weight,
                     "ranking_score": ranking_score,
                 }
             )

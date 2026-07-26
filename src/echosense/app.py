@@ -638,11 +638,13 @@ def create_app(profile: AppProfile = "api") -> FastAPI:
         return application
 
     if profile == "product":
+        from echosense.context_routes import router as context_router
         from echosense.player_routes import router as player_router
         from echosense.product_ui import router as product_ui_router
         from echosense.spotify_auth import router as spotify_auth_router
 
         application.include_router(spotify_auth_router)
+        application.include_router(context_router)
         application.include_router(player_router)
         application.include_router(product_ui_router)
         return application

@@ -25,3 +25,25 @@ without relying on a person to recognize it.
 Guardian tests behavior and failure handling, not only successful rendering. Provider errors,
 malformed payloads, retries, duplicate actions, stale processes, and partial initialization
 are first-class release scenarios.
+
+## Prospective temporal-mood guards
+
+Temporal mood intelligence must be guarded before release, not only after a production
+failure. Its requirements and executable-test matrix are recorded in
+`docs/temporal-mood-intelligence-requirements.md`.
+
+Guardian must reject:
+
+- a mood pattern inferred from one track;
+- morning evidence leaking into an evening pattern;
+- a recent mood shift that never decays;
+- mood context overriding explicit negative feedback or the Music DNA floor;
+- explanations without evidence provenance;
+- repeated recordings presented as personalization;
+- raw provider errors breaking core playback;
+- reset or correction controls that do not change later decisions; and
+- diagnostic or sensitive claims derived from listening behavior.
+
+Adding a name to `planned_states` in `guardian/guardian.json` records the required contract.
+It moves to certified `states` only with a matching executable assertion and release-evidence
+entry.

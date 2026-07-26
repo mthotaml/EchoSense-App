@@ -15,6 +15,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
+from echosense.context_candidates import ContextCandidateService
 from echosense.diverse_slate import DiverseSlateService
 from echosense.evaluation_service import EvaluationService
 from echosense.listening_context import ListeningContextService, ListeningMoment
@@ -102,6 +103,49 @@ def _redirect_uri() -> str:
 
 def _scopes() -> str:
     return os.getenv("SPOTIFY_SCOPES", DEFAULT_SCOPES).strip()
+
+
+def _why_now(
+    candidate: dict[str, object],
+    context_labels: tuple[str, ...],
+    *,
+    weather: str | None,
+    region: str | None,
+    road_setting: str | None,
+    activity: str | None,
+    daypart: str | None,
+) -> dict[str, object]:
+    preference = float(candidate.get("preference_weight", 0.0))
+    context_fit = float(candidate.get("context_fit", 0.0))
+    observations = list(context_labels)
+    for value, label in (
+        (weather, "weather"),
+        (region, "coarse location"),
+        (road_setting, "road setting"),
+        (activity, "movement"),
+        (daypart, "local time"),
+    ):
+        if value and not any(value.replace("_", " ") in item for item in observations):
+            observations.append(f"{label}: {value.replace('_', ' ')}")
+    return {
+        "overall_score": round(min(1.0, float(candidate["ranking_score"])) * 100),
+        "factors": [
+            {
+                "name": "Music DNA affinity",
+                "score": round(float(candidate["provider_base_score"]) * 100),
+            },
+            {"name": "Live context fit", "score": round(context_fit * 100)},
+            {
+                "name": "Learned preference",
+                "score": round(max(-1.0, min(1.0, preference)) * 100),
+            },
+            {"name": "Diversity guard", "score": 100},
+        ],
+        "observations": observations or ["Music DNA and recent listening"],
+        "summary": (
+            f"Selected from your Music DNA with {round(context_fit * 100)}% live-context fit."
+        ),
+    }
 
 
 def _code_challenge(verifier: str) -> str:
@@ -287,11 +331,17 @@ def spotify_session(
 @router.get("/data")
 def spotify_data(
     moment: ListeningMoment = Query(default="general"),
+    weather: str | None = Query(default=None, max_length=32),
+    region: str | None = Query(default=None, max_length=64),
+    road_setting: str | None = Query(default=None, max_length=32),
+    activity: str | None = Query(default=None, max_length=32),
+    daypart: str | None = Query(default=None, max_length=32),
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
     try:
-        imported = SpotifyProvider(SpotifyClient(session, _refresh_session)).import_music_data()
+        spotify_client = SpotifyClient(session, _refresh_session)
+        imported = SpotifyProvider(spotify_client).import_music_data()
         repository = MusicDNARepository(get_connection_repository().storage)
         repository.save(session.provider_user_id, imported)
         music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
@@ -300,18 +350,40 @@ def spotify_data(
         context_service = ListeningContextService()
         context_fits = context_service.score(imported, moment)
         ranking_context = context_service.ranking_context(moment)
+        top_tracks = {item.track.provider_id: item.track for item in imported.top_tracks}
+        recent_tracks = {item.track.provider_id: item.track for item in imported.recent_tracks}
+        expanded = ContextCandidateService().expand(
+            spotify_client,
+            weather=weather,
+            region=region,
+            road_setting=road_setting,
+            activity=activity,
+            daypart=daypart,
+        )
         candidate_tracks = list(
             {
-                item.track.provider_id: item.track
-                for item in (*imported.top_tracks, *imported.recent_tracks)
+                track.provider_id: track
+                for track in (
+                    *top_tracks.values(),
+                    *expanded.tracks,
+                    *recent_tracks.values(),
+                )
             }.values()
         )
+        combined_context_scores = {item_id: fit.score for item_id, fit in context_fits.items()}
+        for item_id, score in expanded.scores.items():
+            combined_context_scores[item_id] = max(
+                combined_context_scores.get(item_id, 0.0),
+                score,
+            )
+        live_context = any((weather, region, road_setting, activity, daypart))
         recommendation, candidate_slate = learning.rank(
             user_id=session.provider_user_id,
             provider="spotify",
             context=ranking_context,
             tracks=candidate_tracks,
-            context_scores={item_id: fit.score for item_id, fit in context_fits.items()},
+            context_scores=combined_context_scores,
+            context_weight=0.35 if live_context else 0.15,
         )
         diverse_slate = DiverseSlateService().build(
             candidate_tracks,
@@ -335,6 +407,16 @@ def spotify_data(
                     "evidence_count": music_dna.evidence_count,
                     "listening_moment": moment,
                     "diverse_slate_rank": slate_item.rank,
+                    "live_context": {
+                        "weather": weather,
+                        "region": region,
+                        "road_setting": road_setting,
+                        "activity": activity,
+                        "daypart": daypart,
+                    },
+                    "context_evidence": list(
+                        expanded.evidence.get(slate_item.track.provider_id, ())
+                    ),
                 },
             )
         decision_id = (
@@ -397,6 +479,19 @@ def spotify_data(
             "score": item.score,
             "reason": item.reason,
             "decision_id": decision_ids[item.track.provider_id],
+            "why_now": _why_now(
+                next(
+                    candidate
+                    for candidate in candidate_slate
+                    if candidate["item_id"] == item.track.provider_id
+                ),
+                expanded.evidence.get(item.track.provider_id, ()),
+                weather=weather,
+                region=region,
+                road_setting=road_setting,
+                activity=activity,
+                daypart=daypart,
+            ),
         }
         for item in diverse_slate
     ]

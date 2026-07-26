@@ -13,7 +13,22 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   const libraryMutations = [];
   const feedback = [];
   const controlEvents = [];
+  const contextDataRequests = [];
 
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        watchPosition(success) {
+          setTimeout(() => success({
+            coords: {latitude: 33.68, longitude: -117.82, speed: 18},
+          }), 0);
+          return 7;
+        },
+        clearWatch() {},
+      },
+    });
+  });
   await page.route('https://sdk.scdn.co/spotify-player.js', route =>
     route.fulfill({
       contentType: 'application/javascript',
@@ -47,6 +62,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     }),
   );
   await page.route('**/auth/spotify/data?moment=*', route => {
+    contextDataRequests.push(route.request().url());
     const moment = new URL(route.request().url()).searchParams.get('moment');
     const working = moment === 'working';
     return route.fulfill({
@@ -77,6 +93,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             title: working ? 'Focused Motion' : 'Open Road',
             artist: 'Echo Artist',
             reason: 'Ranked from your Music DNA.',
+            why_now: {
+              summary: 'Selected from your Music DNA with live-context fit.',
+              factors: [
+                {name: 'Music DNA affinity', score: 95},
+                {name: 'Live context fit', score: 88},
+              ],
+              observations: ['sunny weather', 'Southern California', 'coastal drive matched to your Music DNA'],
+            },
           },
           {
             id: working ? 'distinct-track' : 'alternate-track',
@@ -112,6 +136,23 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
           },
         })
       : route.fulfill({status: 204}),
+  );
+  await page.route('**/v1/context/resolve', route =>
+    route.fulfill({
+      json: {
+        daypart: 'afternoon',
+        weather: 'sunny',
+        temperature_f: 78,
+        region: 'Southern California',
+        road_setting: 'coastal',
+        elevation_m: 24,
+        activity: 'driving',
+        speed_mph: 40,
+        faster_than_usual: false,
+        weather_available: true,
+        location_precision: 'coarse',
+      },
+    }),
   );
   await page.route('**/v1/player/devices', route =>
     route.fulfill({
@@ -272,6 +313,20 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
+  await page.locator('#context-toggle').click();
+  await expect(page.locator('#context-chips')).toContainText('Southern California');
+  await expect(page.locator('#context-chips')).toContainText('sunny · 78°F');
+  await expect(page.locator('#context-chips')).toContainText('coastal drive');
+  await expect.poll(() => contextDataRequests.some(url => url.includes('weather=sunny'))).toBe(
+    true,
+  );
+  await expect.poll(() => contextDataRequests.some(url => url.includes('road_setting=coastal'))).toBe(
+    true,
+  );
+  await expect(page.locator('#dna-queue-items .factor-chip')).toContainText([
+    'Music DNA affinity 95%',
+    'Live context fit 88%',
+  ]);
   await expect(page.locator('#player-status')).toContainText('ready');
   await page.locator('#shuffle').click();
   await page.locator('#repeat').selectOption('track');
