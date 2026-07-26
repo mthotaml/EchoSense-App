@@ -103,44 +103,37 @@ def test_spotify_data_builds_live_music_profile(
         )
     )
 
-    def fake_get(session, path, params=None):
+    def fake_items(self, path, params, *, limit):
         if path == "/me/top/artists":
-            return {
-                "items": [
-                    {
-                        "id": "artist-1",
-                        "name": "Artist One",
-                        "genres": ["indie rock", "ambient"],
-                        "popularity": 70,
-                        "images": [],
-                        "external_urls": {"spotify": "https://open.spotify.com/artist/1"},
-                    },
-                    {
-                        "id": "artist-2",
-                        "name": "Artist Two",
-                        "genres": ["ambient"],
-                        "popularity": 50,
-                        "images": [],
-                        "external_urls": {"spotify": "https://open.spotify.com/artist/2"},
-                    },
-                ]
-            }
+            yield from [
+                {
+                    "id": "artist-1",
+                    "name": "Artist One",
+                    "genres": ["indie rock", "ambient"],
+                    "popularity": 70,
+                    "images": [],
+                    "external_urls": {"spotify": "https://open.spotify.com/artist/1"},
+                },
+                {
+                    "id": "artist-2",
+                    "name": "Artist Two",
+                    "genres": ["ambient"],
+                    "popularity": 50,
+                    "images": [],
+                    "external_urls": {"spotify": "https://open.spotify.com/artist/2"},
+                },
+            ]
         if path == "/me/top/tracks":
-            return {
-                "items": [
-                    {
-                        "id": "track-1",
-                        "name": "A Real Track",
-                        "artists": [{"name": "Artist One"}],
-                        "album": {"name": "Album", "images": []},
-                        "popularity": 64,
-                        "external_urls": {"spotify": "https://open.spotify.com/track/1"},
-                    }
-                ]
+            yield {
+                "id": "track-1",
+                "name": "A Real Track",
+                "artists": [{"name": "Artist One"}],
+                "album": {"name": "Album", "images": []},
+                "popularity": 64,
+                "external_urls": {"spotify": "https://open.spotify.com/track/1"},
             }
-        return {"items": []}
 
-    monkeypatch.setattr(spotify_auth, "_spotify_get", fake_get)
+    monkeypatch.setattr(spotify_auth.SpotifyClient, "items", fake_items)
 
     response = client.get(
         "/auth/spotify/data",
@@ -153,6 +146,15 @@ def test_spotify_data_builds_live_music_profile(
     assert payload["profile"]["genres"][0]["name"] == "Ambient"
     assert payload["recommendation"]["title"] == "A Real Track"
     assert payload["recommendation"]["spotify_url"].endswith("/track/1")
+    snapshot = connection_repository.storage._execute
+    with connection_repository.storage.connect() as database:
+        row = snapshot(
+            database,
+            "SELECT normalized_json FROM music_data_imports WHERE user_id = %s",
+            ("spotify-user",),
+        ).fetchone()
+    assert row is not None
+    assert "access-token" not in dict(row)["normalized_json"]
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(

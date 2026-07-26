@@ -7,6 +7,14 @@ from typing import Protocol
 import httpx
 
 from echosense.apple_auth import AppleDeveloperTokenProvider, AppleUserTokenVault
+from echosense.providers.base import MusicDataProvider
+from echosense.providers.models import (
+    Artist,
+    MusicDataImport,
+    ProviderProvenance,
+    Track,
+    TrackObservation,
+)
 from echosense.storage import Storage
 
 
@@ -274,3 +282,20 @@ def provider_from_environment(storage: Storage | None = None) -> MusicProvider:
             storefront=os.getenv("APPLE_MUSIC_STOREFRONT", "us"),
         )
     raise ValueError(f"Unsupported music provider: {provider_name}")
+
+
+__all__ = [
+    "AppleMusicProvider",
+    "Artist",
+    "FixtureMusicProvider",
+    "MusicDataImport",
+    "MusicDataProvider",
+    "MusicProvider",
+    "ProviderCapabilities",
+    "ProviderProvenance",
+    "ProviderSignal",
+    "RecommendationCandidate",
+    "Track",
+    "TrackObservation",
+    "provider_from_environment",
+]

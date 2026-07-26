@@ -137,6 +137,7 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "cognitive_memories": 1,
         "memory_lifecycle_runs": 1,
         "recommendation_exposures": 1,
+        "music_data_imports": 0,
         "decision_traces": 1,
         "provider_tokens": 1,
         "outbox_events": 2,

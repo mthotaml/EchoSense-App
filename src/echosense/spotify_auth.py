@@ -4,7 +4,6 @@ import base64
 import hashlib
 import os
 import secrets
-from collections import Counter
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
@@ -12,6 +11,9 @@ import httpx
 from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from echosense.music_dna_service import music_dna_service
+from echosense.providers.spotify import SpotifyClient, SpotifyProvider, SpotifyRateLimited
+from echosense.repositories.music_dna import MusicDNARepository
 from echosense.repositories.provider_connections import (
     ProviderConnection,
     ProviderConnectionRepository,
@@ -112,63 +114,11 @@ def _refresh_session(session: SpotifySession, *, force: bool = False) -> None:
     get_connection_repository().save(session)
 
 
-def _spotify_get(
-    session: SpotifySession, path: str, params: dict[str, object] | None = None
-) -> dict[str, object]:
-    _refresh_session(session)
-    try:
-        response = httpx.get(
-            f"{SPOTIFY_API_URL}{path}",
-            params=params,
-            headers={"Authorization": f"Bearer {session.access_token}"},
-            timeout=15.0,
-        )
-        response.raise_for_status()
-        return response.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(
-            status_code=502,
-            detail={"code": "spotify_api_failed", "message": str(exc)},
-        ) from exc
-
-
 def _connected_session(session_id: str | None) -> SpotifySession:
     session = get_connection_repository().get(session_id, "spotify") if session_id else None
     if session is None:
         raise HTTPException(status_code=401, detail={"code": "spotify_not_connected"})
     return session
-
-
-def _artist_summary(item: dict[str, object]) -> dict[str, object]:
-    images = item.get("images") or []
-    image_url = images[0].get("url") if isinstance(images, list) and images else None
-    return {
-        "id": item.get("id"),
-        "name": item.get("name"),
-        "genres": item.get("genres", []),
-        "popularity": item.get("popularity"),
-        "image_url": image_url,
-        "spotify_url": (item.get("external_urls") or {}).get("spotify"),
-    }
-
-
-def _track_summary(item: dict[str, object]) -> dict[str, object]:
-    artists = item.get("artists") or []
-    album = item.get("album") or {}
-    images = album.get("images") or [] if isinstance(album, dict) else []
-    image_url = images[0].get("url") if isinstance(images, list) and images else None
-    return {
-        "id": item.get("id"),
-        "title": item.get("name"),
-        "artist": artists[0].get("name")
-        if isinstance(artists, list) and artists
-        else "Unknown artist",
-        "artists": [artist.get("name") for artist in artists if isinstance(artist, dict)],
-        "album": album.get("name") if isinstance(album, dict) else None,
-        "popularity": item.get("popularity"),
-        "image_url": image_url,
-        "spotify_url": (item.get("external_urls") or {}).get("spotify"),
-    }
 
 
 @router.get("/login")
@@ -305,65 +255,29 @@ def spotify_data(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
-    top_artists_payload = _spotify_get(
-        session, "/me/top/artists", {"limit": 10, "time_range": "medium_term"}
+    try:
+        imported = SpotifyProvider(SpotifyClient(session, _refresh_session)).import_music_data()
+        MusicDNARepository(get_connection_repository().storage).save(
+            session.provider_user_id, imported
+        )
+    except SpotifyRateLimited as exc:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "spotify_rate_limited",
+                "retry_after_seconds": exc.retry_after,
+            },
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "spotify_api_failed", "message": str(exc)},
+        ) from exc
+    return music_dna_service.build_provider_profile(
+        imported,
+        display_name=str(session.profile.get("display_name") or "Spotify listener"),
     )
-    top_tracks_payload = _spotify_get(
-        session, "/me/top/tracks", {"limit": 10, "time_range": "medium_term"}
-    )
-    recent_payload = _spotify_get(session, "/me/player/recently-played", {"limit": 20})
-
-    artist_items = top_artists_payload.get("items") or []
-    track_items = top_tracks_payload.get("items") or []
-    recent_items = recent_payload.get("items") or []
-    top_artists = [_artist_summary(item) for item in artist_items if isinstance(item, dict)]
-    top_tracks = [_track_summary(item) for item in track_items if isinstance(item, dict)]
-    recent_tracks = [
-        _track_summary(item["track"])
-        for item in recent_items
-        if isinstance(item, dict) and isinstance(item.get("track"), dict)
-    ]
-
-    genre_counts = Counter(
-        genre
-        for artist in top_artists
-        for genre in artist.get("genres", [])
-        if isinstance(genre, str)
-    )
-    genres = [{"name": name.title(), "score": count} for name, count in genre_counts.most_common(5)]
-    recommendation = top_tracks[0] if top_tracks else (recent_tracks[0] if recent_tracks else None)
-    leading_artists = [artist["name"] for artist in top_artists[:3] if artist.get("name")]
-    reason = (
-        f"This fits the pattern formed by {', '.join(leading_artists)}."
-        if leading_artists
-        else "This reflects your recent Spotify listening."
-    )
-    average_popularity = (
-        round(sum(int(track.get("popularity") or 0) for track in top_tracks) / len(top_tracks))
-        if top_tracks
-        else 0
-    )
-
-    return {
-        "profile": {
-            "display_name": session.profile.get("display_name") or "Spotify listener",
-            "genres": genres,
-            "top_artists": top_artists,
-            "top_tracks": top_tracks,
-            "recent_tracks": recent_tracks,
-            "average_popularity": average_popularity,
-        },
-        "recommendation": (
-            {**recommendation, "reason": reason, "match_score": 96} if recommendation else None
-        ),
-        "insight": (
-            f"Your strongest current signal is {genres[0]['name']}."
-            if genres
-            else "EchoSense is still collecting enough listening history to identify your strongest signal."
-        ),
-        "timeline": [artist["name"] for artist in top_artists[:4] if artist.get("name")],
-        "generated_at": datetime.now(UTC),
-    }
 
 
 @router.post("/logout")

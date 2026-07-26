@@ -126,6 +126,15 @@ class Storage:
                 revoked_at TEXT
             )
             """,
+            """
+            CREATE TABLE IF NOT EXISTS music_data_imports (
+                user_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                imported_at TEXT NOT NULL,
+                normalized_json TEXT NOT NULL,
+                PRIMARY KEY (user_id, provider)
+            )
+            """,
             "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON event_outbox (published_at, claim_until, occurred_at)",
             """
             CREATE INDEX IF NOT EXISTS idx_provider_connections_account
