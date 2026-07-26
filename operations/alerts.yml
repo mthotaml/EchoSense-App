@@ -1,0 +1,35 @@
+groups:
+  - name: echosense-event-delivery
+    rules:
+      - alert: EchoSenseOutboxBacklogGrowing
+        expr: echosense_outbox_depth > 1000
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: EchoSense outbox backlog exceeds 1,000 events
+      - alert: EchoSenseOldestOutboxEventStale
+        expr: echosense_outbox_oldest_event_age_seconds > 300
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: Oldest unpublished EchoSense event is over five minutes old
+      - alert: EchoSenseSchemaValidationFailures
+        expr: increase(echosense_event_validation_failures_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: Event schema validation failures detected
+      - alert: EchoSenseDeadLetterRateHigh
+        expr: increase(echosense_events_dead_lettered_total[15m]) > 10
+        labels: {severity: critical}
+        annotations:
+          summary: More than ten events entered the DLQ in fifteen minutes
+      - alert: EchoSenseReplayFailures
+        expr: increase(echosense_events_replayed_total{result="rejected"}[15m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: One or more DLQ replay attempts were rejected
+      - alert: EchoSensePublisherRetryRateHigh
+        expr: increase(echosense_event_retries_total[10m]) > 50
+        labels: {severity: warning}
+        annotations:
+          summary: Event publisher retry volume is elevated

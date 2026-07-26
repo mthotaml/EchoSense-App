@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EchoSense — Your Music Intelligence, Everywhere</title>
+  <link rel="stylesheet" href="/ui/styles.css">
+  <link rel="stylesheet" href="/ui/provider-card.css">
+  <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">E</span><div><strong>EchoSense</strong><small>Your intelligence travels</small></div></div>
+      <nav aria-label="Demo sections">
+        <button class="nav-item active" data-view="story"><span>01</span>Your story</button>
+        <button class="nav-item" data-view="noticed"><span>02</span>What I noticed</button>
+        <button class="nav-item" data-view="memory"><span>03</span>What I know</button>
+        <button class="nav-item" data-view="decision"><span>04</span>How I decided</button>
+        <button class="nav-item" data-view="privacy"><span>05</span>Providers & privacy</button>
+      </nav>
+      <div class="sidebar-foot"><span class="status-dot"></span><span id="health">Checking EchoSense</span></div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div><p class="eyebrow">PORTABLE MUSIC INTELLIGENCE</p><h1>Train once.<br><em>Listen everywhere.</em></h1><p class="lede">Streaming services play the music. EchoSense remembers you, understands the moment, and carries your taste across providers.</p></div>
+        <section id="apple-music-card" class="provider-card" data-state="disconnected" aria-live="polite">
+          <div class="provider-card-head">
+            <div class="provider-identity"><span class="provider-logo" aria-hidden="true">♪</span><div><strong>Apple Music</strong><small>Primary provider</small></div></div>
+            <span class="provider-status"><i class="provider-status-dot"></i><span id="apple-music-state">Not connected</span></span>
+          </div>
+          <small id="apple-music-status" class="provider-detail">Connect your account to begin building portable music intelligence.</small>
+          <div class="provider-meta" aria-label="Apple Music connection details"><div><span>Authorization</span><strong id="apple-music-authorization">Required</strong></div><div><span>Last sync</span><strong id="apple-music-last-sync">Never</strong></div></div>
+          <button id="connect-apple-music" class="provider-action" type="button">Connect Apple Music</button>
+          <div class="run-state"><span>DEMO SESSION</span><code id="session-id">not started</code></div>
+        </section>
+      </header>
+
+      <section class="metrics" aria-label="EchoSense value proposition">
+        <article><span>Persistent intelligence</span><strong>Learns you once</strong></article>
+        <article><span>Provider neutral</span><strong>Works across services</strong></article>
+        <article><span>Explainable</span><strong>Shows why</strong></article>
+        <article><span>Adaptive</span><strong>Responds to context</strong></article>
+      </section>
+
+      <section class="scenario-strip panel">
+        <label>Choose a moment<select id="scenario"><option value="california">First day in California</option><option value="commute">Rainy morning commute</option><option value="focus">Focused work session</option><option value="weekend">Relaxed weekend afternoon</option><option value="night">Night drive through the city</option><option value="airport">Airport arrival</option></select></label>
+        <div class="scenario-copy"><span class="story-kicker" id="scenario-place">LOS ANGELES · 5:38 PM</span><strong id="scenario-title">First day in California</strong><span id="scenario-summary">You arrived from New York and started an evening drive in Los Angeles.</span></div>
+        <button id="run" type="button">Watch EchoSense think <span>→</span></button>
+        <button id="reset" class="secondary" type="button">Reset</button>
+      </section>
+
+      <section id="story" class="view active-view">
+        <div class="cognition-rail" aria-label="Cognitive process"><span data-rail="observation">Observe</span><i></i><span data-rail="understanding">Understand</span><i></i><span data-rail="memory">Remember</span><i></i><span data-rail="reasoning">Reason</span><i></i><span data-rail="recommendation">Recommend</span><i></i><span data-rail="learning">Learn</span></div>
+        <div class="metrics">
+          <article><span>EchoSense believes</span><strong id="metric-context">Waiting to begin</strong></article>
+          <article><span>Confidence</span><strong id="metric-confidence">—</strong></article>
+          <article><span>Now playing</span><strong id="metric-recommendation">—</strong></article>
+          <article><span>Memory update</span><strong id="metric-weight">Waiting</strong></article>
+        </div>
+
+        <div class="story-grid">
+          <section class="journey panel" aria-live="polite">
+            <div class="section-head"><div><p class="eyebrow">LIVE STORY</p><h2>One intelligence layer. Any music service.</h2></div><span id="pipeline-state" class="badge">Ready</span></div>
+            <div class="flow">
+              <article class="stage" data-stage="observation"><span class="stage-icon">👀</span><div><small>What EchoSense noticed</small><h3>Signals from the moment</h3><p id="observation-content">Start the experience to begin.</p></div></article>
+              <article class="stage" data-stage="understanding"><span class="stage-icon">🧠</span><div><small>What it may mean</small><h3>Current situation</h3><p id="understanding-content">Waiting for observable context.</p></div></article>
+              <article class="stage" data-stage="memory"><span class="stage-icon">📚</span><div><small>What follows you</small><h3>Your portable taste memory</h3><p id="memory-content">Waiting for the situation.</p></div></article>
+              <article class="stage" data-stage="reasoning"><span class="stage-icon">◫</span><div><small>How I decided</small><h3>Provider-ready options</h3><p id="reasoning-content">Waiting for relevant memory.</p></div></article>
+            </div>
+          </section>
+
+          <aside class="now-playing panel">
+            <div class="section-head"><div><p class="eyebrow">RECOMMENDATION</p><h2>Play with your provider</h2></div><span class="live-dot">READY</span></div>
+            <div class="album-art" id="album-art"><span id="album-initials">ES</span><div class="vinyl"></div></div>
+            <p class="track-label">SELECTED FOR THIS MOMENT</p>
+            <h2 id="recommendation-title">No recommendation yet</h2>
+            <p id="recommendation-artist" class="artist">Start a story to see the result.</p>
+            <div id="recommendation-content" class="recommendation-reason">EchoSense chooses the track; your connected streaming service delivers it.</div>
+            <div id="feedback-panel" class="feedback-panel" hidden><p>What happened next?</p><div class="feedback-actions"><button data-outcome="loved">♥ Loved it</button><button data-outcome="liked">👍 Good fit</button><button data-outcome="skipped">↷ Skip</button><button data-outcome="disliked">Not for me</button></div></div>
+          </aside>
+        </div>
+
+        <section class="timeline panel"><div class="section-head"><div><p class="eyebrow">MOMENT BY MOMENT</p><h2>Your intelligence in motion</h2></div></div><ol id="timeline-list"><li class="empty">No events yet.</li></ol></section>
+      </section>
+
+      <section id="noticed" class="view"><div class="page-intro"><p class="eyebrow">WHAT I NOTICED</p><h2>Observable facts, not hidden assumptions</h2><p>EchoSense separates permitted signals from interpretation. Every conclusion can be traced back to evidence.</p></div><div id="noticed-cards" class="memory-grid"><article class="memory-card"><span>Current moment</span><h3>No story running</h3><div class="memory-body muted">Run a story to see the signals EchoSense used.</div></article></div></section>
+
+      <section id="memory" class="view"><div class="page-intro"><p class="eyebrow">WHAT FOLLOWS YOU</p><h2>Your taste is not trapped in one service</h2><p>EchoSense keeps a provider-neutral memory of relevant preferences and feedback, so switching services does not mean starting over.</p></div><div class="memory-grid"><article class="memory-card"><span>Right now</span><h3>Working memory</h3><div id="working-memory" class="memory-body muted">No active signals.</div></article><article class="memory-card"><span>Current interpretation</span><h3>Situation</h3><div id="semantic-memory" class="memory-body muted">No inferred situation.</div></article><article class="memory-card"><span>Learned over time</span><h3>Portable preferences</h3><div id="preference-memory" class="memory-body muted">No learning outcome yet.</div></article></div></section>
+
+      <section id="decision" class="view">
+        <div class="section-head page-head"><div><p class="eyebrow">HOW I DECIDED</p><h2>The recommendation, with evidence</h2><p>EchoSense decides what fits. A provider adapter resolves the matching catalog item and hands playback to the user’s chosen service.</p></div><code id="decision-id">No decision</code></div>
+        <div class="dna panel"><div><p class="eyebrow">RECOMMENDATION DNA</p><h3 id="strategy-name">Balanced exploration</h3></div><div id="dna-bars" class="dna-bars"></div></div>
+        <div class="decision-grid"><section class="panel candidate-panel"><h3>Options considered</h3><div class="candidate-head"><span>Song</span><span>Context</span><span>Preference</span><span>Discovery</span></div><div id="candidate-table" class="empty-state">Run a story to see the ranked options.</div></section><section class="panel explanation-panel"><h3>Why this recommendation?</h3><p id="decision-explanation" class="muted">No explanation yet.</p><div id="reason-list" class="reason-list"></div><details><summary>Developer evidence</summary><p class="dev-note">Internal IDs and raw ranking evidence remain available here without cluttering the customer experience.</p><pre id="trace-json">{}</pre></details></section></div>
+      </section>
+
+      <section id="privacy" class="view"><div class="page-intro"><p class="eyebrow">PROVIDERS & PRIVACY</p><h2>Connect services. Keep one intelligence.</h2><p>Apple Music, Spotify, and future providers remain content and playback pipes. EchoSense normalizes permitted metadata, remembers preferences independently, and sends the selected track back to the preferred provider for playback.</p></div><div class="health-grid"><article><span class="health-light"></span><div><strong>1 · Connect</strong><small>Authorize one or more supported music services.</small></div></article><article><span class="health-light"></span><div><strong>2 · Normalize</strong><small>Convert permitted library, playlist, and feedback metadata into a provider-neutral taste profile.</small></div></article><article><span class="health-light"></span><div><strong>3 · Decide</strong><small>Use context, memory, novelty, and safety to select a track and explain why.</small></div></article><article><span class="health-light"></span><div><strong>4 · Play</strong><small>Resolve the track in the preferred connected service; the streaming provider delivers the audio.</small></div></article></div><div class="memory-grid" style="margin-top:16px"><article class="memory-card"><span>Release focus</span><h3>Apple Music first</h3><div class="memory-body muted">First production plumbing: authorization, metadata sync, catalog resolution, and provider-owned playback.</div></article><article class="memory-card"><span>Cold start</span><h3>Fast preference setup</h3><div class="memory-body muted">A few favorite artists, common activities, and a discovery preference establish the initial profile without demographic guessing.</div></article><article class="memory-card"><span>Roadmap</span><h3>Music first. Audio next.</h3><div class="memory-body muted">The same cognitive layer can later support podcasts, audiobooks, and other audio experiences through new adapters.</div></article></div></section>
+    </main>
+  </div>
+  <script src="/ui/app.js" defer></script>
+  <script src="/ui/apple-music.js" defer></script>
+</body>
+</html>

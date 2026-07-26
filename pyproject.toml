@@ -1,0 +1,45 @@
+[project]
+name = "echosense"
+version = "0.24.0"
+description = "EchoSense cognitive platform vertical slice"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic>=2.10,<3",
+  "httpx>=0.28,<1",
+  "python-dotenv>=1.0,<2",
+  "psycopg[binary]>=3.2,<4",
+  "confluent-kafka>=2.8,<3",
+  "PyJWT[crypto]>=2.10,<3",
+  "cryptography>=44,<46",
+  "neo4j>=5.28,<6",
+  "jsonschema>=4.23,<5",
+  "prometheus-client>=0.21,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+echosense-demo = "echosense.demo:main"
+echosense-outbox-publisher = "echosense.outbox_publisher:main"
+echosense-memory-decay = "echosense.memory_decay:main"
+echosense-memory-lifecycle = "echosense.memory_lifecycle_worker:main"
+echosense-dlq-replay = "echosense.dlq_replay:main"
+echosense-deletion-retry = "echosense.deletion_retry:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+  "postgres: requires a running PostgreSQL instance",
+  "infrastructure: requires PostgreSQL and Redpanda",
+  "neo4j: requires a running Neo4j instance",
+]
+
+[tool.ruff]
+line-length = 100

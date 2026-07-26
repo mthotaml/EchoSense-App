@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://echosense.dev/schemas/event-envelope.v1.json",
+  "title": "EchoSense Event Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "schema_version",
+    "occurred_at",
+    "user_id",
+    "trace_id",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 1},
+    "event_type": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"},
+    "schema_version": {"const": "1.0"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "user_id": {"type": "string", "minLength": 1},
+    "trace_id": {"type": "string", "minLength": 1},
+    "payload": {"type": "object"}
+  }
+}
