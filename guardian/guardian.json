@@ -23,6 +23,7 @@
         "library-saved",
         "library-unsaved",
         "playlists-browsed",
+        "playlist-outage-isolated",
         "unavailable-track-guarded",
         "playlist-track-played",
         "decision-owned-playback",

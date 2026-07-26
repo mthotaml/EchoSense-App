@@ -136,7 +136,7 @@ PAGE = r"""<!doctype html>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play in EchoSense</button><button id="queue-add" class="secondary" type="button" disabled>Add next</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Not for me</button></div><div id="toast" aria-live="polite"></div></section>
       <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Playback queue</div><h2>Now and next</h2></div><button id="queue-refresh" class="secondary" type="button">Refresh</button></div><div id="queue-items" class="track-list"></div></section>
-      <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
+      <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
       <section class="panel"><div class="eyebrow">Your journey</div><h2>Your taste, told as a story</h2><div id="timeline" class="journey"></div></section>
     </div>
@@ -363,7 +363,15 @@ PAGE = r"""<!doctype html>
       if(offset===0) $('#playlists').replaceChildren();
       page.items.forEach(item=>$('#playlists').appendChild(playlistCard(item)));
       playlistsNextOffset=page.next_offset;
+      setText('#playlists-status',''); $('#more-playlists').textContent='Load more';
       $('#more-playlists').hidden=playlistsNextOffset===null;
+    }
+    async function loadPlaylistsSafely(offset=0) {
+      try { await loadPlaylists(offset); }
+      catch (_) {
+        playlistsNextOffset=0; setText('#playlists-status','Spotify playlists are temporarily unavailable. Recommendations and playback still work.');
+        $('#more-playlists').textContent='Retry'; $('#more-playlists').hidden=false;
+      }
     }
     function playlistTrackRow(item) {
       const button=document.createElement('button'); button.className='playlist-track'; button.type='button'; button.disabled=!item.playable;
@@ -418,12 +426,12 @@ PAGE = r"""<!doctype html>
 
     async function load() {
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.all([loadPlaylists(),loadDevices()]); } else await loadDemo();
+      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.allSettled([loadPlaylistsSafely(),loadDevices()]); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-add').addEventListener('click',()=>queueRecommendation().catch(e=>setText('#toast',e.message)));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
-      $('#more-playlists').addEventListener('click',()=>loadPlaylists(playlistsNextOffset).catch(e=>setText('#toast',e.message)));
+      $('#more-playlists').addEventListener('click',()=>loadPlaylistsSafely(playlistsNextOffset||0));
       $('#more-tracks').addEventListener('click',()=>loadPlaylistTracks(selectedPlaylistId,$('#playlist-title').textContent,tracksNextOffset).catch(e=>setText('#toast',e.message)));
       $('#skip').addEventListener('click',()=>feedback('skipped').catch(e=>setText('#toast',e.message)));
       $('#moment').addEventListener('change',()=>spotifyConnected&&loadLiveSpotify($('#moment').value).catch(e=>setText('#toast',e.message)));

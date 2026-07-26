@@ -145,3 +145,29 @@ def test_client_preserves_rate_limit_retry_after(monkeypatch) -> None:
         assert exc.retry_after == 7
     else:
         raise AssertionError("Expected SpotifyRateLimited")
+
+
+def test_client_retries_one_transient_provider_failure(monkeypatch) -> None:
+    connection = ProviderConnection(
+        session_id="session",
+        provider="spotify",
+        provider_user_id="user",
+        access_token="token",
+        refresh_token="refresh",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+        profile={},
+    )
+    responses = iter(
+        [
+            httpx.Response(503, request=httpx.Request("GET", "https://api.spotify.com")),
+            httpx.Response(
+                200,
+                json={"items": [{"id": "recovered"}], "next": None},
+                request=httpx.Request("GET", "https://api.spotify.com"),
+            ),
+        ]
+    )
+    monkeypatch.setattr(httpx, "get", lambda url, **kwargs: next(responses))
+    client = SpotifyClient(connection, lambda session, **kwargs: None)
+
+    assert list(client.items("/playlists", {"limit": 1}, limit=1)) == [{"id": "recovered"}]

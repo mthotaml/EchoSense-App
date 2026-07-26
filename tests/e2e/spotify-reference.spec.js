@@ -360,3 +360,61 @@ test('Guardian renders Spotify data failures without leaking JavaScript errors',
   await expect(page.locator('#toast')).toHaveText('Provider unavailable');
   await expect(page.locator('#toast')).not.toContainText('display_name');
 });
+
+test('Guardian isolates a Spotify playlist outage from core listening', async ({page}) => {
+  await page.route('https://sdk.scdn.co/spotify-player.js', route =>
+    route.fulfill({contentType: 'application/javascript', body: ''}),
+  );
+  await page.route('**/auth/spotify/session', route =>
+    route.fulfill({
+      json: {connected: true, profile: {display_name: 'Guardian Listener'}},
+    }),
+  );
+  await page.route('**/auth/spotify/data?moment=*', route =>
+    route.fulfill({
+      json: {
+        profile: {
+          display_name: 'Guardian Listener',
+          genres: [],
+          average_popularity: 50,
+        },
+        recommendation: {
+          id: 'guardian-track',
+          title: 'Resilient Listening',
+          artist: 'Echo Artist',
+          decision_id: 'guardian-decision',
+          match_score: 92,
+          reason: 'Core listening remains available.',
+          evidence: {matched_genres: []},
+        },
+        insight: 'Optional surfaces degrade independently.',
+        timeline: ['Connected', 'Listening'],
+      },
+    }),
+  );
+  await page.route('**/auth/spotify/library/tracks/*', route =>
+    route.fulfill({json: {saved: false}}),
+  );
+  await page.route('**/auth/spotify/playlists?*', route =>
+    route.fulfill({
+      status: 502,
+      json: {detail: {code: 'spotify_library_failed'}},
+    }),
+  );
+  await page.route('**/v1/player/devices', route =>
+    route.fulfill({json: {items: []}}),
+  );
+  await page.route('**/v1/player/state', route => route.fulfill({status: 204}));
+  await page.route('**/auth/spotify/feedback', route =>
+    route.fulfill({json: {applied: true}}),
+  );
+
+  await page.goto('/');
+
+  await expect(page.locator('#pick-heading')).toHaveText('Resilient Listening');
+  await expect(page.locator('#playlists-status')).toContainText('temporarily unavailable');
+  await expect(page.locator('#more-playlists')).toHaveText('Retry');
+  await expect(page.locator('#queue-add')).toBeEnabled();
+  await page.locator('#skip').click();
+  await expect(page.locator('#toast')).toContainText('EchoSense will adjust');
+});
