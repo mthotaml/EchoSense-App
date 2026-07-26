@@ -229,6 +229,12 @@ Providers return bounded candidate sets with base relevance scores. EchoSense co
 
 Outcome learning is grounded in persisted decisions, idempotent by outcome ID, and clamps preference weights to `[-1.0, 1.0]`.
 
+Live Spotify recommendations include a `decision_id`. Authenticated clients submit plays,
+completions, skips, saves, likes/dislikes, or 1–5 ratings to
+`POST /auth/spotify/feedback`. EchoSense records completion strength and playback duration,
+updates the durable item/context preference, evaluates the historical candidate slate, and
+uses the new weight during the next Spotify ranking pass.
+
 ## Consent-derived deletion
 
 `POST /v1/users/{user_id}/deletions` requires the literal confirmation value `delete`. The resumable coordinator removes consent-derived SQL records, encrypted provider credentials, cognitive memory, preference memory, recommendation exposure history, attributed outcomes, counterfactual reports, and attributable learning outcomes.

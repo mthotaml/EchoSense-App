@@ -9,6 +9,7 @@ from echosense.evaluation_service import EvaluationService
 from echosense.exposure_store import ExposureStore
 from echosense.memory import InMemoryPreferenceMemory
 from echosense.memory_lifecycle_service import MemoryLifecycleService
+from echosense.playback_learning import PlaybackLearningService
 from echosense.providers import FixtureMusicProvider
 from echosense.storage import Storage
 
@@ -81,6 +82,13 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
                 },
             ],
         },
+    )
+    PlaybackLearningService(store).record(
+        outcome_id="playback-delete-01",
+        user_id=user_id,
+        decision_id="dec-delete-01",
+        signal="completed",
+        completion_ratio=1.0,
     )
     store.append_event(
         event_id="evt-delete-01",
@@ -157,6 +165,8 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "recommendation_exposures": 1,
         "music_data_imports": 1,
         "music_dna_profiles": 1,
+        "music_item_preferences": 1,
+        "playback_learning_outcomes": 1,
         "decision_traces": 1,
         "provider_tokens": 1,
         "outbox_events": 2,

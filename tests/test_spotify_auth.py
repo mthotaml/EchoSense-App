@@ -151,6 +151,7 @@ def test_spotify_data_builds_live_music_profile(
         "/me/top/tracks",
     ]
     assert payload["recommendation"]["title"] == "A Real Track"
+    assert payload["recommendation"]["decision_id"].startswith("dec_")
     assert payload["recommendation"]["spotify_url"].endswith("/track/1")
     snapshot = connection_repository.storage._execute
     with connection_repository.storage.connect() as database:
@@ -169,6 +170,34 @@ def test_spotify_data_builds_live_music_profile(
         ).fetchone()
     assert profile is not None
     assert "access-token" not in dict(profile)["profile_json"]
+
+    feedback = client.post(
+        "/auth/spotify/feedback",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-feedback-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+            "signal": "skipped",
+            "completion_ratio": 0.1,
+            "playback_seconds": 12,
+        },
+    )
+    duplicate = client.post(
+        "/auth/spotify/feedback",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-feedback-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+            "signal": "skipped",
+            "completion_ratio": 0.1,
+            "playback_seconds": 12,
+        },
+    )
+    assert feedback.status_code == 200
+    assert feedback.json()["delta"] == -0.072
+    assert feedback.json()["applied"] is True
+    assert feedback.json()["evaluation"]["observed_reward"] < 0
+    assert duplicate.json()["applied"] is False
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(

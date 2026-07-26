@@ -143,11 +143,13 @@ PAGE = r"""<!doctype html>
   <script>
     let currentRecommendationId = null;
     let currentTrackUri = null;
+    let currentTrackId = null;
     let spotifyConnected = false;
     let deviceId = null;
     let playerState = null;
     let progressTimer = null;
     let restoreRequest = 0;
+    const reportedSignals = new Set();
     const lifecycle = new EchoSensePlayerLifecycle.PlayerLifecycle({
       createPlayer: SpotifyApi => new SpotifyApi.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}}),
       onReady: async ({device_id}) => {deviceId=device_id;setText('#player-status','EchoSense Browser ready');$('#activate').disabled=false;await restorePlaybackState();},
@@ -186,7 +188,7 @@ PAGE = r"""<!doctype html>
     async function loadLiveSpotify() {
       const data = await (await fetch('/auth/spotify/data')).json(); const profile=data.profile; const pick=data.recommendation;
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); currentRecommendationId=`spotify-${pick.id}`; currentTrackUri=spotifyUri(pick.spotify_url,pick.id); }
+      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentTrackUri=spotifyUri(pick.spotify_url,pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']);
@@ -217,11 +219,15 @@ PAGE = r"""<!doctype html>
 
     function renderPlayer(rawState) {
       const state=normalizePlayerState(rawState);
+      const previous=playerState;
       playerState=state;
       const track=state?.track_window?.current_track; const image=track?.album?.images?.[0]?.url;
       setText('#player-title',track?.name||'Nothing playing'); setText('#player-artist',track?.artists?.map(a=>a.name).join(', ')||'Choose a recommendation');
       $('#player-cover').src=image||''; $('#player-cover').style.visibility=image?'visible':'hidden'; $('#toggle').textContent=state?.paused?'▶':'❚❚';
       $('#progress').max=state?.duration||1000; $('#progress').value=state?.position||0; setText('#elapsed',formatTime(state?.position||0)); setText('#duration',formatTime(state?.duration||0));
+      if(spotifyConnected && track?.id===currentTrackId && previous?.paused===false && state?.paused && state.duration && state.position/state.duration>=.95) {
+        feedback('completed',{completion_ratio:state.position/state.duration,playback_seconds:state.position/1000}).catch(()=>{});
+      }
     }
 
     function updateProgressClock() {
@@ -256,7 +262,7 @@ PAGE = r"""<!doctype html>
       lifecycle.setSdk(window.Spotify);
     };
 
-    async function playRecommendation() { if(!spotifyConnected){location.href='/auth/spotify/login';return;} if(!deviceId) throw new Error('Player is not ready yet.'); await activateBrowser(false); await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:deviceId,spotify_uri:currentTrackUri})}); setText('#toast','Playing inside EchoSense.'); }
+    async function playRecommendation() { if(!spotifyConnected){location.href='/auth/spotify/login';return;} if(!deviceId) throw new Error('Player is not ready yet.'); await activateBrowser(false); await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:deviceId,spotify_uri:currentTrackUri})}); await feedback('played'); setText('#toast','Playing inside EchoSense.'); }
     async function togglePlayback() {
       if(!spotifyConnected) { location.href='/auth/spotify/login'; return; }
       if(!deviceId) throw new Error('Player is not ready yet.');
@@ -271,12 +277,25 @@ PAGE = r"""<!doctype html>
         if(playerState) renderPlayer({...playerState,paused:false,position:Number($('#progress').value),updatedAt:Date.now()});
       }
     }
-    async function feedback(reaction) { if(!currentRecommendationId)return; await fetch('/v1/demo/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recommendation_id:currentRecommendationId,reaction})}); setText('#toast','Understood. EchoSense will adjust your next pick.'); }
+    async function feedback(signal,metrics={}) {
+      if(!currentRecommendationId)return;
+      if(!spotifyConnected) {
+        const reaction=signal==='skipped'?'not_for_me':signal;
+        await api('/v1/demo/feedback',{method:'POST',body:JSON.stringify({recommendation_id:currentRecommendationId,reaction})});
+      } else {
+        const key=`${currentRecommendationId}:${signal}`;
+        if(reportedSignals.has(key))return;
+        const outcomeId=`out_${crypto.randomUUID?.()||Date.now()}`;
+        await api('/auth/spotify/feedback',{method:'POST',body:JSON.stringify({outcome_id:outcomeId,decision_id:currentRecommendationId,signal,...metrics})});
+        reportedSignals.add(key);
+      }
+      setText('#toast','Understood. EchoSense will adjust your next pick.');
+    }
 
     async function load() {
       const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
-      $('#skip').addEventListener('click',()=>feedback('not_for_me'));
+      $('#skip').addEventListener('click',()=>feedback('skipped').catch(e=>setText('#toast',e.message)));
       $('#toggle').addEventListener('click',()=>togglePlayback().catch(e=>setText('#toast',e.message)));
       $('#previous').addEventListener('click',()=>api(`/v1/player/previous?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message))); $('#next').addEventListener('click',()=>api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'}).then(restorePlaybackState).catch(e=>setText('#toast',e.message)));
       $('#activate').disabled=true; $('#activate').addEventListener('click',()=>activateBrowser(false).catch(e=>setText('#toast',e.message)));

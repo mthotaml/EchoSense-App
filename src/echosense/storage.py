@@ -142,6 +142,34 @@ class Storage:
                 profile_json TEXT NOT NULL
             )
             """,
+            """
+            CREATE TABLE IF NOT EXISTS music_item_preferences (
+                user_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                context TEXT NOT NULL,
+                weight REAL NOT NULL,
+                evidence_count INTEGER NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, provider, item_id, context)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS playback_learning_outcomes (
+                outcome_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                decision_id TEXT NOT NULL,
+                signal TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                context TEXT NOT NULL,
+                delta REAL NOT NULL,
+                completion_ratio REAL,
+                playback_seconds REAL,
+                rating INTEGER,
+                observed_at TEXT NOT NULL
+            )
+            """,
             "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON event_outbox (published_at, claim_until, occurred_at)",
             """
             CREATE INDEX IF NOT EXISTS idx_provider_connections_account

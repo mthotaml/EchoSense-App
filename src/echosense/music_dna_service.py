@@ -28,6 +28,8 @@ class MusicDNAService:
         *,
         display_name: str,
         music_dna: MusicDNAProfile | None = None,
+        recommendation: Track | None = None,
+        decision_id: str | None = None,
     ) -> dict[str, object]:
         artists = [artist for artist, _ in imported.top_artists]
         top_tracks = [item.track for item in imported.top_tracks]
@@ -36,7 +38,7 @@ class MusicDNAService:
         genres = [
             {"name": name.title(), "score": count} for name, count in genre_counts.most_common(5)
         ]
-        recommendation = (
+        recommendation = recommendation or (
             top_tracks[0] if top_tracks else (recent_tracks[0] if recent_tracks else None)
         )
         leading_artists = [artist.name for artist in artists[:3]]
@@ -68,6 +70,7 @@ class MusicDNAService:
             "recommendation": (
                 {
                     **self._track_view(recommendation),
+                    "decision_id": decision_id,
                     "reason": reason,
                     "match_score": 96,
                 }

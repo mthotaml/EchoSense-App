@@ -63,6 +63,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "restorePlaybackState" in response.text
     assert "/v1/player/pause" in response.text
     assert "/v1/player/play" in response.text
+    assert "/auth/spotify/feedback" in response.text
+    assert "pick.decision_id" in response.text
+    assert "feedback('completed'" in response.text
+    assert "feedback('skipped')" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text
     assert "/ui/player-lifecycle.js" in response.text
 

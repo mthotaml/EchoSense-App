@@ -4,15 +4,21 @@ import base64
 import hashlib
 import os
 import secrets
+from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from urllib.parse import urlencode
+from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel, Field
 
+from echosense.evaluation_service import EvaluationService
 from echosense.music_dna import MusicDNAGenerator
 from echosense.music_dna_service import music_dna_service
+from echosense.playback_learning import PlaybackLearningService
 from echosense.providers.spotify import SpotifyClient, SpotifyProvider, SpotifyRateLimited
 from echosense.repositories.music_dna import MusicDNARepository
 from echosense.repositories.provider_connections import (
@@ -35,6 +41,15 @@ VERIFIER_COOKIE = "echosense_spotify_pkce_verifier"
 
 SpotifySession = ProviderConnection
 _connection_repository: ProviderConnectionRepository | None = None
+
+
+class SpotifyFeedbackRequest(BaseModel):
+    outcome_id: str = Field(min_length=1)
+    decision_id: str = Field(min_length=1)
+    signal: Literal["played", "completed", "skipped", "saved", "liked", "disliked", "rated"]
+    completion_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
+    playback_seconds: float | None = Field(default=None, ge=0.0)
+    rating: int | None = Field(default=None, ge=1, le=5)
 
 
 def get_connection_repository() -> ProviderConnectionRepository:
@@ -262,6 +277,28 @@ def spotify_data(
         repository.save(session.provider_user_id, imported)
         music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
         repository.save_profile(music_dna)
+        learning = PlaybackLearningService(get_connection_repository().storage)
+        recommendation, candidate_slate = learning.rank(
+            user_id=session.provider_user_id,
+            provider="spotify",
+            context="general_listening",
+            tracks=[item.track for item in imported.top_tracks],
+        )
+        decision_id = f"dec_{uuid4().hex}"
+        if recommendation is not None:
+            get_connection_repository().storage.save_decision_trace(
+                decision_id=decision_id,
+                user_id=session.provider_user_id,
+                context="general_listening",
+                context_confidence=music_dna.confidence,
+                provider="spotify",
+                item_id=recommendation.provider_id,
+                factors={
+                    "candidate_slate": candidate_slate,
+                    "music_dna_confidence": music_dna.confidence,
+                    "evidence_count": music_dna.evidence_count,
+                },
+            )
     except SpotifyRateLimited as exc:
         raise HTTPException(
             status_code=429,
@@ -280,7 +317,79 @@ def spotify_data(
         imported,
         display_name=str(session.profile.get("display_name") or "Spotify listener"),
         music_dna=music_dna,
+        recommendation=recommendation,
+        decision_id=decision_id if recommendation else None,
     )
+
+
+@router.post("/feedback")
+def spotify_feedback(
+    request: SpotifyFeedbackRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    try:
+        storage = get_connection_repository().storage
+        result = PlaybackLearningService(storage).record(
+            outcome_id=request.outcome_id,
+            user_id=session.provider_user_id,
+            decision_id=request.decision_id,
+            signal=request.signal,
+            completion_ratio=request.completion_ratio,
+            playback_seconds=request.playback_seconds,
+            rating=request.rating,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail={"code": "decision_not_found"}) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "invalid_feedback", "message": str(exc)},
+        ) from exc
+    evaluation_outcome = {
+        "completed": "completed",
+        "skipped": "skipped",
+        "saved": "liked",
+        "liked": "liked",
+        "disliked": "disliked",
+        "rated": (
+            "liked"
+            if request.rating and request.rating >= 4
+            else "disliked"
+            if request.rating and request.rating <= 2
+            else None
+        ),
+    }.get(request.signal)
+    report = None
+    if evaluation_outcome:
+        report = EvaluationService(storage).attribute_and_evaluate(
+            outcome_id=request.outcome_id,
+            decision_id=request.decision_id,
+            outcome=evaluation_outcome,
+            playback_seconds=request.playback_seconds,
+            completion_ratio=request.completion_ratio,
+            attribution_window_seconds=86400,
+        )
+    if result.applied:
+        storage.append_event(
+            event_id=f"evt_{uuid4().hex}",
+            event_type="playback.learning.applied",
+            user_id=session.provider_user_id,
+            trace_id=f"trc_{uuid4().hex}",
+            payload=asdict(result),
+        )
+    return {
+        **asdict(result),
+        "evaluation": (
+            {
+                "observed_reward": report.observed_reward,
+                "estimated_regret": report.estimated_regret,
+                "confidence": report.confidence,
+            }
+            if report
+            else None
+        ),
+    }
 
 
 @router.post("/logout")
