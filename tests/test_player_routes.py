@@ -167,6 +167,48 @@ def test_devices_are_normalized_and_restricted_state_is_preserved(
     assert response.json()["items"][1]["restricted"] is True
 
 
+def test_queue_is_ordered_and_add_command_is_idempotent(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if method == "GET":
+            return httpx.Response(
+                200,
+                request=httpx.Request(method, url),
+                json={
+                    "currently_playing": {"id": "now", "name": "Now", "artists": []},
+                    "queue": [
+                        {"id": "next-1", "name": "First", "artists": []},
+                        {"id": "next-2", "name": "Second", "artists": []},
+                    ],
+                },
+            )
+        return httpx.Response(204, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(player_routes.httpx, "request", fake_request)
+    queue = client.get("/v1/player/queue", cookies={spotify_auth.SESSION_COOKIE: session_id})
+    payload = {"item_id": "next-1", "command_id": "queue-command-1"}
+    first = client.post(
+        "/v1/player/queue",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json=payload,
+    )
+    duplicate = client.post(
+        "/v1/player/queue",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json=payload,
+    )
+
+    assert [item["id"] for item in queue.json()["up_next"]] == ["next-1", "next-2"]
+    assert first.json()["applied"] is True
+    assert duplicate.json()["applied"] is False
+    assert len([call for call in calls if call[0] == "POST"]) == 1
+
+
 def test_play_recommendation_sends_spotify_uri(
     monkeypatch, connection_repository: ProviderConnectionRepository
 ) -> None:

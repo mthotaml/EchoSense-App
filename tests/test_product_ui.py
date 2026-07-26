@@ -89,6 +89,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="device-picker"' in response.text
     assert "loadDevices" in response.text
     assert "transferSelectedDevice" in response.text
+    assert 'id="queue-panel"' in response.text
+    assert "queueRecommendation" in response.text
+    assert "loadQueue" in response.text
     assert "/ui/player-lifecycle.js" in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")

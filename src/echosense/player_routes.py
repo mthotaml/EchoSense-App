@@ -47,6 +47,28 @@ class VolumeRequest(BaseModel):
     device_id: str | None = None
 
 
+class QueueRequest(BaseModel):
+    item_id: str = Field(min_length=1)
+    command_id: str = Field(min_length=1)
+    device_id: str | None = None
+
+
+def _queue_track(item: object) -> dict[str, object] | None:
+    if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+        return None
+    artists = item.get("artists") if isinstance(item.get("artists"), list) else []
+    return {
+        "id": item["id"],
+        "title": item.get("name") or "Unavailable track",
+        "artists": [
+            artist["name"]
+            for artist in artists
+            if isinstance(artist, dict) and isinstance(artist.get("name"), str)
+        ],
+        "playable": item.get("is_playable") is not False and item.get("is_local") is not True,
+    }
+
+
 def _spotify_request(
     session_id: str | None,
     method: str,
@@ -181,6 +203,66 @@ def player_devices(
             if isinstance(device, dict) and isinstance(device.get("id"), str)
         ]
     }
+
+
+@router.get("/queue")
+def player_queue(
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    payload = _spotify_request(session_id, "GET", "/me/player/queue").json()
+    current = _queue_track(payload.get("currently_playing"))
+    raw_queue = payload.get("queue") if isinstance(payload.get("queue"), list) else []
+    return {
+        "current": current,
+        "up_next": [track for item in raw_queue if (track := _queue_track(item)) is not None],
+    }
+
+
+@router.post("/queue")
+def add_to_queue(
+    request: QueueRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    storage = get_connection_repository().storage
+    with storage.connect() as database:
+        storage._execute(
+            database,
+            """
+            CREATE TABLE IF NOT EXISTS playback_queue_commands (
+                user_id TEXT NOT NULL,
+                command_id TEXT NOT NULL,
+                item_id TEXT NOT NULL,
+                PRIMARY KEY (user_id, command_id)
+            )
+            """,
+        )
+        existing = storage._execute(
+            database,
+            """
+            SELECT item_id FROM playback_queue_commands
+            WHERE user_id = %s AND command_id = %s
+            """,
+            (session.provider_user_id, request.command_id),
+        ).fetchone()
+    if existing:
+        if dict(existing)["item_id"] != request.item_id:
+            raise HTTPException(status_code=409, detail={"code": "queue_command_conflict"})
+        return {"status": "already_queued", "item_id": request.item_id, "applied": False}
+    params: dict[str, object] = {"uri": f"spotify:track:{request.item_id}"}
+    if request.device_id:
+        params["device_id"] = request.device_id
+    _spotify_request(session_id, "POST", "/me/player/queue", params=params)
+    with storage.connect() as database:
+        storage._execute(
+            database,
+            """
+            INSERT INTO playback_queue_commands (user_id, command_id, item_id)
+            VALUES (%s, %s, %s)
+            """,
+            (session.provider_user_id, request.command_id, request.item_id),
+        )
+    return {"status": "queued", "item_id": request.item_id, "applied": True}
 
 
 @router.put("/transfer", status_code=204)

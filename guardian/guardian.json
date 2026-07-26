@@ -32,6 +32,8 @@
         "devices-discovered",
         "restricted-device-guarded",
         "explicit-device-transfer",
+        "queue-order-preserved",
+        "queue-command-idempotent",
         "disconnected"
       ]
     }

@@ -7,6 +7,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   const playRequests = [];
   const recommendationPlays = [];
   const transfers = [];
+  const queueCommands = [];
   const savedTracks = new Set();
   const libraryMutations = [];
   const feedback = [];
@@ -110,6 +111,18 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     playbackStarted = true;
     playRequests.push(route.request().postDataJSON());
     return route.fulfill({status: 204});
+  });
+  await page.route('**/v1/player/queue', async route => {
+    if (route.request().method() === 'POST') {
+      queueCommands.push(await route.request().postDataJSON());
+      return route.fulfill({json: {status: 'queued', item_id: 'working-track', applied: queueCommands.length === 1}});
+    }
+    return route.fulfill({
+      json: {
+        current: {id: 'working-track', title: 'Focused Motion', artists: ['Echo Artist'], playable: true},
+        up_next: [{id: 'next-track', title: 'Next Motion', artists: ['Echo Artist'], playable: true}],
+      },
+    });
   });
   await page.route('**/v1/player/recommendations/*/play', async route => {
     playbackStarted = true;
@@ -247,6 +260,10 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#pick-heading')).toHaveText('Focused Motion');
   await expect(page.locator('#evidence')).toContainText('Context evidence: ambient');
   await expect(page.locator('#save')).toHaveText('Save');
+  await page.locator('#queue-add').click();
+  await expect(page.locator('#queue-items')).toContainText('Next Motion');
+  await page.locator('#queue-add').click();
+  expect(queueCommands[1].command_id).toBe(queueCommands[0].command_id);
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
