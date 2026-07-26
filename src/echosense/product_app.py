@@ -11,11 +11,6 @@ os.environ.setdefault(
     "streaming user-read-playback-state user-modify-playback-state",
 )
 
-from echosense.app import app
-from echosense.player_routes import router as player_router
-from echosense.product_ui import router as product_ui_router
-from echosense.spotify_auth import router as spotify_auth_router
+from echosense.app import create_app
 
-app.include_router(spotify_auth_router)
-app.include_router(player_router)
-app.include_router(product_ui_router)
+app = create_app("product")
