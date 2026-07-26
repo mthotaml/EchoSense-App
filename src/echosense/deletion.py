@@ -264,6 +264,8 @@ class DeletionCoordinator:
                 ("music_dna_profiles", "music_dna_profiles"),
                 ("music_item_preferences", "music_item_preferences"),
                 ("playback_learning_outcomes", "playback_learning_outcomes"),
+                ("temporal_mood_observations", "temporal_mood_observations"),
+                ("temporal_mood_settings", "temporal_mood_settings"),
                 ("decision_traces", "decision_traces"),
                 ("provider_tokens", "apple_music_user_tokens"),
                 ("outbox_events", "event_outbox"),

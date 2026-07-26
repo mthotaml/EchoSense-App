@@ -98,6 +98,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
               factors: [
                 {name: 'Music DNA affinity', score: 95},
                 {name: 'Live context fit', score: 88},
+                {name: 'Time pattern', score: 83},
               ],
               observations: ['sunny weather', 'Southern California', 'coastal drive matched to your Music DNA'],
             },
@@ -113,6 +114,16 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         ],
         insight: 'Your listening is becoming more focused.',
         timeline: ['Indie', 'Ambient'],
+        temporal_mood: {
+          daypart: 'afternoon',
+          mood: 'uplifting',
+          pattern_type: 'stable_pattern',
+          evidence_count: 4,
+          distinct_days: 3,
+          confidence: 0.83,
+          enabled: true,
+          explanation: 'You often choose uplifting music during afternoon. EchoSense keeps this signal bounded by your Music DNA and feedback.',
+        },
       },
     });
   });
@@ -326,7 +337,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#dna-queue-items .factor-chip')).toContainText([
     'Music DNA affinity 95%',
     'Live context fit 88%',
+    'Time pattern 83%',
   ]);
+  await expect(page.locator('#temporal-mood-status')).toContainText(
+    'often choose uplifting music during afternoon',
+  );
+  await expect(page.locator('#temporal-mood-chips')).toContainText('4 qualifying signals');
   await expect(page.locator('#player-status')).toContainText('ready');
   await page.locator('#shuffle').click();
   await page.locator('#repeat').selectOption('track');

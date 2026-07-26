@@ -118,6 +118,12 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "road_setting?.replace" in response.text
     assert "Raw coordinates are used transiently" in response.text
     assert "why_now?.factors" in response.text
+    assert 'id="temporal-mood-panel"' in response.text
+    assert "renderTemporalMood" in response.text
+    assert "/auth/spotify/temporal-mood/correct" in response.text
+    assert "/auth/spotify/temporal-mood/settings" in response.text
+    assert "Temporal mood patterns reset" in response.text
+    assert "never your mental or medical state" in response.text
     assert "/ui/player-lifecycle.js" in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")

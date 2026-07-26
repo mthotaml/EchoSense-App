@@ -4,6 +4,25 @@
 **Scope:** EchoSense Music DNA learning, recommendation, playlist preparation, explanation,
 privacy, and Guardian coverage
 
+## Implementation status
+
+The first executable slice now includes:
+
+- qualified completion, save, like, rating, skip, and dislike evidence;
+- three-event/two-day stable pattern detection;
+- three-of-five recent-shift detection;
+- daypart isolation and seven-day evidence decay;
+- conservative romantic and melancholy metadata rules plus contextual mood provenance;
+- learned mood candidate expansion bounded by the existing 35% context weight;
+- visible stable-pattern/recent-shift explanations;
+- correction, enable/disable, reset, and account-deletion behavior; and
+- provider-outage fallback for optional mood candidate generation.
+
+Guardian contracts with matching executable tests are certified in `states`. The following
+remain planned: an explicit Music DNA compatibility-floor test, a dedicated mood-influence
+weight test, a mood-specific queue-diversity journey, and cross-provider recording evidence
+deduplication.
+
 ## 1. Product outcome
 
 EchoSense should learn *when* a listener prefers a type of music, detect meaningful changes

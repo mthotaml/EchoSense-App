@@ -47,6 +47,28 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
         store._execute(
             connection,
             """
+            INSERT INTO temporal_mood_observations (
+                outcome_id, user_id, recording_key, daypart, mood, signal,
+                evidence_weight, evidence_source, confidence, observed_at
+            ) VALUES (
+                'temporal-delete-01', %s, 'isrc:test', 'evening', 'romantic',
+                'liked', 1.0, 'synthetic deletion evidence', 0.8,
+                '2026-07-25T00:00:00+00:00'
+            )
+            """,
+            (user_id,),
+        )
+        store._execute(
+            connection,
+            """
+            INSERT INTO temporal_mood_settings (user_id, enabled, updated_at)
+            VALUES (%s, 1, '2026-07-25T00:00:00+00:00')
+            """,
+            (user_id,),
+        )
+        store._execute(
+            connection,
+            """
             INSERT INTO music_dna_profiles (user_id, generated_at, profile_json)
             VALUES (%s, '2026-07-25T00:00:00+00:00', '{}')
             """,
@@ -167,6 +189,8 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "music_dna_profiles": 1,
         "music_item_preferences": 1,
         "playback_learning_outcomes": 1,
+        "temporal_mood_observations": 1,
+        "temporal_mood_settings": 1,
         "decision_traces": 1,
         "provider_tokens": 1,
         "outbox_events": 2,
