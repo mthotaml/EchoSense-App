@@ -102,6 +102,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="repeat"' in response.text
     assert "/v1/player/shuffle" in response.text
     assert "/v1/player/repeat" in response.text
+    assert 'id="dna-queue-panel"' in response.text
+    assert "addDnaQueue" in response.text
+    assert "Tracks already queued were skipped" in response.text
     assert "/ui/player-lifecycle.js" in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")

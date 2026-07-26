@@ -68,6 +68,22 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             matched_genres: working ? ['ambient'] : [],
           },
         },
+        recommendations: [
+          {
+            id: working ? 'working-track' : 'general-track',
+            rank: 1,
+            title: working ? 'Focused Motion' : 'Open Road',
+            artist: 'Echo Artist',
+            reason: 'Ranked from your Music DNA.',
+          },
+          {
+            id: working ? 'distinct-track' : 'alternate-track',
+            rank: 2,
+            title: working ? 'Distinct Motion' : 'Open Sky',
+            artist: 'Another Artist',
+            reason: 'Adds artist diversity.',
+          },
+        ],
         insight: 'Your listening is becoming more focused.',
         timeline: ['Indie', 'Ambient'],
       },
@@ -262,8 +278,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('.playlist-card').nth(1)).toBeDisabled();
 
   await page.getByRole('button', {name: /Guardian Focus/}).click();
-  await expect(page.locator('.playlist-track')).toHaveCount(2);
-  await expect(page.locator('.playlist-track').nth(1)).toBeDisabled();
+  await expect(page.locator('#playlist-tracks .playlist-track')).toHaveCount(2);
+  await expect(page.locator('#playlist-tracks .playlist-track').nth(1)).toBeDisabled();
   await page.getByRole('button', {name: /Playlist Focus/}).click();
   await expect.poll(() => playRequests.map(item => item.spotify_uri)).toContain(
     'spotify:track:playlist-track',
@@ -277,6 +293,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#queue-items')).toContainText('Next Motion');
   await expect(page.locator('#queue-add')).toBeDisabled();
   expect(queueCommands).toHaveLength(1);
+  await page.locator('#dna-queue-add').click();
+  await expect.poll(() => queueCommands).toHaveLength(3);
+  expect(queueCommands.slice(1).map(item => item.item_id)).toEqual([
+    'working-track',
+    'distinct-track',
+  ]);
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
