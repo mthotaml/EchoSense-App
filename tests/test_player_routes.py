@@ -68,6 +68,44 @@ def test_player_token_returns_current_access_token(
     assert response.json()["access_token"] == "access-token"
 
 
+def test_player_state_restores_recent_snapshot_when_provider_has_no_active_device(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    live_state = {
+        "is_playing": True,
+        "progress_ms": 42000,
+        "item": {"id": "track-1", "name": "Continuity"},
+        "device": {"id": "phone", "name": "Mohan's phone"},
+    }
+    responses = iter(
+        [
+            httpx.Response(
+                200,
+                request=httpx.Request("GET", "https://api.spotify.com"),
+                json=live_state,
+            ),
+            httpx.Response(204, request=httpx.Request("GET", "https://api.spotify.com")),
+        ]
+    )
+    monkeypatch.setattr(player_routes.httpx, "request", lambda *args, **kwargs: next(responses))
+
+    live = client.get(
+        "/v1/player/state",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    restored = client.get(
+        "/v1/player/state",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert live.json()["continuity"]["source"] == "live"
+    assert restored.json()["progress_ms"] == 42000
+    assert restored.json()["device"]["id"] == "phone"
+    assert restored.json()["continuity"]["source"] == "snapshot"
+    assert restored.json()["continuity"]["requires_confirmation"] is True
+
+
 def test_transfer_playback_targets_browser_device(
     monkeypatch, connection_repository: ProviderConnectionRepository
 ) -> None:

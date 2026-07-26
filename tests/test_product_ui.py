@@ -84,6 +84,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "disconnectSpotify" in response.text
     assert "/auth/spotify/logout" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text
+    assert "Last session restored · choose a device to resume" in response.text
+    assert "continuity?.requires_confirmation" in response.text
     assert "/ui/player-lifecycle.js" in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")

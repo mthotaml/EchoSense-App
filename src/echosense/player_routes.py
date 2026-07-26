@@ -7,6 +7,7 @@ import httpx
 from fastapi import APIRouter, Cookie, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from echosense.playback_continuity import PlaybackContinuityStore
 from echosense.spotify_auth import (
     SESSION_COOKIE,
     SPOTIFY_API_URL,
@@ -126,10 +127,33 @@ def player_token(
 def player_state(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> Response | dict[str, object]:
+    session = _connected_session(session_id)
+    continuity = PlaybackContinuityStore(get_connection_repository().storage)
     response = _spotify_request(session_id, "GET", "/me/player")
     if response.status_code == 204 or not response.content:
+        snapshot = continuity.latest(session.provider_user_id, "spotify")
+        if snapshot:
+            return {
+                **snapshot.state,
+                "continuity": {
+                    "source": "snapshot",
+                    "revision": snapshot.revision,
+                    "observed_at": snapshot.observed_at.isoformat(),
+                    "requires_confirmation": True,
+                },
+            }
         return Response(status_code=204)
-    return response.json()
+    state = response.json()
+    snapshot = continuity.observe(session.provider_user_id, "spotify", state)
+    return {
+        **state,
+        "continuity": {
+            "source": "live",
+            "revision": snapshot.revision,
+            "observed_at": snapshot.observed_at.isoformat(),
+            "requires_confirmation": False,
+        },
+    }
 
 
 @router.get("/devices")

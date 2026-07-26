@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let connected = true;
   let playbackStarted = false;
+  let restoreFromSnapshot = false;
   const playRequests = [];
   const recommendationPlays = [];
   const savedTracks = new Set();
@@ -83,6 +84,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
               album: {images: []},
             },
             device: {id: 'guardian-device', name: 'EchoSense Browser'},
+            continuity: restoreFromSnapshot
+              ? {source: 'snapshot', requires_confirmation: true, revision: 2}
+              : {source: 'live', requires_confirmation: false, revision: 1},
           },
         })
       : route.fulfill({status: 204}),
@@ -275,9 +279,11 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
 
+  restoreFromSnapshot = true;
   await page.reload();
   await expect(page.locator('#player-title')).toHaveText('Focused Motion');
-  await expect(page.locator('#player-status')).toContainText('active');
+  await expect(page.locator('#player-status')).toContainText('Last session restored');
+  await expect(page.locator('#toggle')).toHaveText('▶');
 
   await page.locator('#account-action').click();
   await expect(page.locator('#account-status')).toHaveText('Spotify not connected');

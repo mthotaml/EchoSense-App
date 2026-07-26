@@ -27,6 +27,8 @@
         "playback-started",
         "feedback-learned",
         "refresh-restored",
+        "snapshot-confirmation-required",
+        "device-handoff-reconciled",
         "disconnected"
       ]
     }

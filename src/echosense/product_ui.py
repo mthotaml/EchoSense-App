@@ -228,7 +228,7 @@ PAGE = r"""<!doctype html>
       }
       const track=state.item;
       return {
-        paused:!state.is_playing,
+        paused:state.continuity?.requires_confirmation?true:!state.is_playing,
         position:state.progress_ms||0,
         duration:track?.duration_ms||0,
         track_window:{current_track:track},
@@ -266,7 +266,8 @@ PAGE = r"""<!doctype html>
       if (!response.ok) return;
       const state=await response.json();
       renderPlayer(state);
-      if (state.device?.id===deviceId) setText('#player-status','EchoSense Browser active');
+      if (state.continuity?.source==='snapshot') setText('#player-status','Last session restored · choose a device to resume');
+      else if (state.device?.id===deviceId) setText('#player-status','EchoSense Browser active');
       else if (state.device?.name) setText('#player-status',`Playing on ${state.device.name}`);
     }
 
