@@ -20,3 +20,5 @@ def test_release_smoke_certifies_every_app_profile(tmp_path, monkeypatch) -> Non
         "product_health": True,
     }
     assert report["blocking_severities"] == ["severity-1", "severity-2"]
+    assert report["artifact_identity"]["guardian_version"] == 2
+    assert all(len(digest) == 64 for digest in report["artifact_identity"]["files"].values())

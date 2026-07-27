@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from fastapi.testclient import TestClient  # noqa: E402
 
-from echosense.app import create_app
+from echosense.app import create_app  # noqa: E402
+from echosense.guardian import release_identity  # noqa: E402
 
 
 def main() -> None:
@@ -24,6 +28,7 @@ def main() -> None:
         "generated_at": datetime.now(UTC).isoformat(),
         "commit": os.getenv("GITHUB_SHA", "local"),
         "checks": checks,
+        "artifact_identity": release_identity(),
         "release_ready": all(checks.values()),
         "blocking_severities": ["severity-1", "severity-2"],
     }

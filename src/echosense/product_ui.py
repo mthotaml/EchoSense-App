@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
@@ -12,6 +13,8 @@ from echosense.music_dna_service import music_dna_service
 
 router = APIRouter(tags=["product-ui"])
 UI_DIR = Path(__file__).with_name("web")
+PLAYER_LIFECYCLE_PATH = UI_DIR / "player-lifecycle.js"
+PLAYER_LIFECYCLE_VERSION = sha256(PLAYER_LIFECYCLE_PATH.read_bytes()).hexdigest()[:12]
 
 
 class DemoFeedbackRequest(BaseModel):
@@ -21,17 +24,21 @@ class DemoFeedbackRequest(BaseModel):
 
 @router.get("/", response_class=HTMLResponse)
 def landing_page() -> str:
-    return PAGE
+    return PAGE.replace("__PLAYER_LIFECYCLE_VERSION__", PLAYER_LIFECYCLE_VERSION)
 
 
 @router.get("/demo", response_class=HTMLResponse)
 def demo_page() -> str:
-    return PAGE
+    return PAGE.replace("__PLAYER_LIFECYCLE_VERSION__", PLAYER_LIFECYCLE_VERSION)
 
 
 @router.get("/ui/player-lifecycle.js", include_in_schema=False)
 def player_lifecycle_script() -> FileResponse:
-    return FileResponse(UI_DIR / "player-lifecycle.js", media_type="text/javascript")
+    return FileResponse(
+        PLAYER_LIFECYCLE_PATH,
+        media_type="text/javascript",
+        headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
+    )
 
 
 @router.get("/v1/demo/taste-profile")
@@ -158,7 +165,7 @@ PAGE = r"""<!doctype html>
     <section id="live-context-panel" class="panel connection context-compact"><div><div class="eyebrow">Live context</div><h2>Why this music now</h2><p id="context-status" class="connection-copy">Time is automatic. Add weather and location when useful.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location is used only to resolve current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
-      <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Start listening</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip</button></div><div id="toast" aria-live="polite"></div></section>
+      <section class="panel"><div class="pick-top"><div><div id="pick-label" class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play recommendation</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip current song</button></div><div id="toast" aria-live="polite"></div></section>
       <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA Autopilot</div><h2>Up next, continuously</h2><p class="copy">EchoSense keeps a rolling queue ready while you listen.</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="context-chip">Autopilot on</span></div><div id="dna-queue-items" class="table-wrap"></div></section>
       <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Spotify playback queue</div><h2>Now and next</h2></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next</button><button id="queue-refresh" class="secondary" type="button">Refresh</button></div></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
@@ -174,7 +181,7 @@ PAGE = r"""<!doctype html>
   </section>
 
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
-  <script src="/ui/player-lifecycle.js"></script>
+  <script src="/ui/player-lifecycle.js?v=__PLAYER_LIFECYCLE_VERSION__"></script>
   <script>
     let currentRecommendationId = null;
     let currentTrackId = null;
@@ -182,6 +189,9 @@ PAGE = r"""<!doctype html>
     let currentQueueCommandId = null;
     let currentTrackSaved = false;
     let recommendationSlate = [];
+    let activePlaybackTrackId = null;
+    let activePlaybackDecisionId = null;
+    const decisionByTrackId = new Map();
     let liveContext = null;
     let temporalMoodProfile = null;
     let contextWatchId = null;
@@ -265,10 +275,11 @@ PAGE = r"""<!doctype html>
       const response=await api(`/auth/spotify/data?${params}`); const data=await response.json();
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
+      recommendationSlate.forEach(item=>item?.id&&item?.decision_id&&decisionByTrackId.set(item.id,item.decision_id));
       if(!updateCurrentPick){renderDnaQueue();return data;}
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · From your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); await refreshSavedState(pick.id); }
+      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderDnaQueue();
@@ -301,11 +312,23 @@ PAGE = r"""<!doctype html>
       };
     }
 
+    function syncPickLabel() {
+      setText('#pick-label',activePlaybackTrackId?'Recommended next':'Today’s pick');
+    }
+
     function renderPlayer(rawState) {
       const state=normalizePlayerState(rawState);
       const previous=playerState;
       playerState=state;
       const track=state?.track_window?.current_track; const image=track?.album?.images?.[0]?.url;
+      if(track?.id) {
+        activePlaybackTrackId=track.id;
+        activePlaybackDecisionId=decisionByTrackId.get(track.id)||(track.id===currentTrackId?currentRecommendationId:null);
+      } else {
+        activePlaybackTrackId=null;
+        activePlaybackDecisionId=null;
+      }
+      syncPickLabel();
       setText('#player-title',track?.name||'Nothing playing'); setText('#player-artist',track?.artists?.map(a=>a.name).join(', ')||'Choose a recommendation');
       $('#player-cover').src=image||''; $('#player-cover').style.visibility=image?'visible':'hidden'; $('#toggle').textContent=state?.paused?'▶':'❚❚';
       $('#progress').max=state?.duration||1000; $('#progress').value=state?.position||0; setText('#elapsed',formatTime(state?.position||0)); setText('#duration',formatTime(state?.duration||0));
@@ -508,6 +531,7 @@ PAGE = r"""<!doctype html>
     }
     async function playDnaTrack(item) {
       if(!deviceId)throw new Error('Player is not ready yet.');
+      activePlaybackTrackId=item.id; activePlaybackDecisionId=item.decision_id;
       await activateBrowser(false);
       await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`})});
       await restorePlaybackState();
@@ -535,6 +559,7 @@ PAGE = r"""<!doctype html>
       if(!spotifyConnected){location.href='/auth/spotify/login';return;}
       if(!deviceId) throw new Error('Player is not ready yet.');
       if(!currentRecommendationId||!currentPlayOutcomeId) throw new Error('Recommendation is not ready yet.');
+      activePlaybackTrackId=currentTrackId; activePlaybackDecisionId=currentRecommendationId;
       await activateBrowser(false);
       await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId})});
       await restorePlaybackState();
@@ -624,15 +649,16 @@ PAGE = r"""<!doctype html>
       }
     }
     async function feedback(signal,metrics={}) {
-      if(!currentRecommendationId)return;
+      const decisionId=activePlaybackTrackId?activePlaybackDecisionId:currentRecommendationId;
+      if(!decisionId)return;
       if(!spotifyConnected) {
         const reaction=signal==='skipped'?'not_for_me':signal;
-        await api('/v1/demo/feedback',{method:'POST',body:JSON.stringify({recommendation_id:currentRecommendationId,reaction})});
+        await api('/v1/demo/feedback',{method:'POST',body:JSON.stringify({recommendation_id:decisionId,reaction})});
       } else {
-        const key=`${currentRecommendationId}:${signal}`;
+        const key=`${decisionId}:${signal}`;
         if(reportedSignals.has(key))return;
         const outcomeId=`out_${crypto.randomUUID?.()||Date.now()}`;
-        await api('/auth/spotify/feedback',{method:'POST',body:JSON.stringify({outcome_id:outcomeId,decision_id:currentRecommendationId,signal,...metrics})});
+        await api('/auth/spotify/feedback',{method:'POST',body:JSON.stringify({outcome_id:outcomeId,decision_id:decisionId,signal,...metrics})});
         reportedSignals.add(key);
       }
       setText('#toast','Understood. EchoSense will adjust your next pick.');

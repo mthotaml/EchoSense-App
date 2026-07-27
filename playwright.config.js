@@ -1,5 +1,7 @@
 const { defineConfig } = require('@playwright/test');
-const python = process.env.ECHOSENSE_PYTHON || 'python';
+const fs = require('fs');
+const localPython = process.platform === 'win32' ? '.venv/Scripts/python.exe' : '.venv/bin/python';
+const python = process.env.ECHOSENSE_PYTHON || (fs.existsSync(localPython) ? localPython : 'python');
 
 module.exports = defineConfig({
   testDir: './tests/e2e',

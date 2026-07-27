@@ -28,16 +28,8 @@ jobs:
           python -m pip install -e ".[dev]"
           npm ci
           npx playwright install --with-deps chromium
-      - name: Static and contract gates
-        run: |
-          ruff check src tests scripts
-          ruff format --check src tests scripts
-          pytest -m "not infrastructure and not postgres and not neo4j"
-          node tests/player_lifecycle.test.js
-      - name: Application smoke
-        run: python scripts/release_smoke.py
-      - name: Guardian critical journey
-        run: npm run test:e2e
+      - name: Guardian release gate
+        run: python scripts/release_gate.py
       - name: Upload release evidence
         if: always()
         uses: actions/upload-artifact@v6

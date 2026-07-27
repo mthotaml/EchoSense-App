@@ -506,6 +506,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   ]);
   await expect(page.locator('#player-title')).toHaveText('Next Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
+  await expect(page.locator('#pick-label')).toHaveText('Recommended next');
   await expect(page.locator('#toast')).toContainText('verified Next Motion is playing');
 
   restoreFromSnapshot = true;
@@ -540,6 +541,32 @@ test('Guardian renders Spotify data failures without leaking JavaScript errors',
   await expect(page.locator('#toast')).toHaveText('Provider unavailable');
   await expect(page.locator('#toast')).not.toContainText('display_name');
 });
+
+for (const status of [401, 403, 429, 503]) {
+  test(`Guardian safely renders Spotify ${status} failures`, async ({page}) => {
+    const pageErrors = [];
+    page.on('pageerror', error => pageErrors.push(error.message));
+    await page.route('https://sdk.scdn.co/spotify-player.js', route =>
+      route.fulfill({contentType: 'application/javascript', body: ''}),
+    );
+    await page.route('**/auth/spotify/session', route =>
+      route.fulfill({
+        json: {connected: true, profile: {display_name: 'Guardian Listener'}},
+      }),
+    );
+    await page.route('**/auth/spotify/data?moment=*', route =>
+      route.fulfill({
+        status,
+        json: {detail: {code: `spotify_${status}`, message: 'Spotify is temporarily unavailable'}},
+      }),
+    );
+
+    await page.goto('/');
+
+    await expect(page.locator('#toast')).toHaveText('Spotify is temporarily unavailable');
+    expect(pageErrors).toEqual([]);
+  });
+}
 
 test('Guardian isolates a Spotify playlist outage from core listening', async ({page}) => {
   await page.route('https://sdk.scdn.co/spotify-player.js', route =>
