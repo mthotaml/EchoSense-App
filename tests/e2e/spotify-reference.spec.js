@@ -506,6 +506,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   ]);
   await expect(page.locator('#player-title')).toHaveText('Next Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
+  await expect(page.locator('#pick-label')).toHaveText('Recommended next');
   await expect(page.locator('#toast')).toContainText('verified Next Motion is playing');
 
   restoreFromSnapshot = true;

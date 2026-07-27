@@ -114,7 +114,13 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "if(!updateCurrentPick){renderDnaQueue();return data;}" in response.text
     assert "Autopilot on" in response.text
     assert "Up next, continuously" in response.text
-    assert "Start listening" in response.text
+    assert "Play recommendation" in response.text
+    assert "Skip current song" in response.text
+    assert 'id="pick-label"' in response.text
+    assert "Recommended next" in response.text
+    assert "activePlaybackDecisionId" in response.text
+    assert "decisionByTrackId" in response.text
+    assert "const decisionId=activePlaybackTrackId?activePlaybackDecisionId:currentRecommendationId" in response.text
     assert 'id="queue-add"' not in response.text
     assert 'id="dna-queue-add"' not in response.text
     assert "Skip &amp; play next" not in response.text
@@ -145,8 +151,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "/auth/spotify/temporal-mood/settings" in response.text
     assert "Temporal mood patterns reset" in response.text
     assert "never your mental or medical state" in response.text
-    assert "/ui/player-lifecycle.js" in response.text
+    assert "/ui/player-lifecycle.js?v=audible-playback-v2" in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")
     assert lifecycle.status_code == 200
     assert "class PlayerLifecycle" in lifecycle.text
+    assert "activateElement()" in lifecycle.text
+    assert lifecycle.headers["cache-control"] == "no-store, max-age=0"
