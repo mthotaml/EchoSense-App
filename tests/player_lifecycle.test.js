@@ -8,6 +8,7 @@ class FakePlayer {
     this.listeners = new Map();
     this.connectCalls = 0;
     this.disconnectCalls = 0;
+    this.activateCalls = 0;
   }
   addListener(name, listener) {
     this.listeners.set(name, listener);
@@ -18,6 +19,9 @@ class FakePlayer {
   }
   disconnect() {
     this.disconnectCalls += 1;
+  }
+  activateElement() {
+    this.activateCalls += 1;
   }
   emit(name, payload) {
     this.listeners.get(name)?.(payload);
@@ -73,6 +77,8 @@ function harness() {
   assert.equal(lifecycle.snapshot().device, "INACTIVE");
   lifecycle.markDeviceActive();
   assert.equal(lifecycle.snapshot().device, "ACTIVE");
+  lifecycle.activateElement();
+  assert.equal(player.activateCalls, 1);
   player.emit("player_state_changed", { paused: true });
   assert.equal(lifecycle.snapshot().playback, "PAUSED");
   player.emit("player_state_changed", { paused: false });

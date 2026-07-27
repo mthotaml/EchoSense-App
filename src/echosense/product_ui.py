@@ -210,7 +210,17 @@ PAGE = r"""<!doctype html>
       },
       onNotReady: () => setText('#player-status','EchoSense Browser offline'),
       onPlayback: renderPlayer,
-      onError: (_, error) => {setText('#toast',error.message);setText('#player-status','Player needs attention');}
+      onError: (kind, error) => {
+        const messages={
+          autoplay_failed:'Browser blocked audio. Click Start listening again to allow sound.',
+          account_error:'Browser playback requires Spotify Premium.',
+          authentication_error:'Spotify player authorization expired. Reconnect Spotify.',
+          initialization_error:'This browser could not initialize protected Spotify audio.',
+          playback_error:'Spotify could not load audio in this browser. Reconnect the player and try again.',
+        };
+        setText('#toast',messages[kind]||error?.message||'Spotify playback needs attention.');
+        setText('#player-status','Player needs attention');
+      }
     });
 
     const $ = (selector) => document.querySelector(selector);
@@ -334,7 +344,21 @@ PAGE = r"""<!doctype html>
 
     async function activateBrowser(play=false) {
       if (!deviceId) throw new Error('The EchoSense player is still starting.');
+      await lifecycle.activateElement();
       await api('/v1/player/transfer',{method:'PUT',body:JSON.stringify({device_id:deviceId,play})}); lifecycle.markDeviceActive(); setText('#player-status','EchoSense Browser active');
+    }
+    async function waitForAudibleBrowserPlayback(expectedTrackId=null) {
+      for(let attempt=0;attempt<12;attempt+=1) {
+        const local=await lifecycle.player?.getCurrentState?.();
+        const trackId=local?.track_window?.current_track?.id||null;
+        if(local&&local.paused===false&&(!expectedTrackId||trackId===expectedTrackId)) {
+          renderPlayer(local);
+          setText('#player-status','Playing with browser audio');
+          return local;
+        }
+        await new Promise(resolve=>setTimeout(resolve,300));
+      }
+      throw new Error('The track started on Spotify, but browser audio did not start. Click Start listening again or choose EchoSense Browser as your Spotify device.');
     }
     async function loadDevices() {
       const payload=await (await api('/v1/player/devices')).json(); const picker=$('#device-picker'); picker.replaceChildren();
@@ -487,6 +511,7 @@ PAGE = r"""<!doctype html>
       await activateBrowser(false);
       await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`})});
       await restorePlaybackState();
+      await waitForAudibleBrowserPlayback(item.id);
       await maintainAutopilot(true);
       setText('#toast',`Playing ${item.title}. Autopilot will keep the Music DNA queue moving.`);
     }
@@ -513,6 +538,7 @@ PAGE = r"""<!doctype html>
       await activateBrowser(false);
       await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId})});
       await restorePlaybackState();
+      await waitForAudibleBrowserPlayback(currentTrackId);
       await maintainAutopilot(true);
       setText('#toast','EchoSense Autopilot started. Your Music DNA queue will replenish continuously.');
     }

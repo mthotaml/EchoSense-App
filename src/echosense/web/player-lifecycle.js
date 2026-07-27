@@ -75,6 +75,12 @@
         this.transition({ playback });
         this.options.onPlayback?.(state);
       });
+      player.addListener("autoplay_failed", () => {
+        this.transition({ playback: "BLOCKED" });
+        this.options.onError?.("autoplay_failed", {
+          message: "Browser autoplay permission is required.",
+        });
+      });
       [
         "initialization_error",
         "authentication_error",
@@ -102,6 +108,11 @@
 
     markDeviceActive() {
       this.transition({ device: "ACTIVE" });
+    }
+
+    activateElement() {
+      if (!this.player?.activateElement) return Promise.resolve();
+      return Promise.resolve(this.player.activateElement());
     }
 
     disconnect() {
