@@ -85,6 +85,8 @@ jobs:
         run: python scripts/validate_guardian.py
       - name: Certify Spotify reference journey
         run: npm run test:e2e
+      - name: Record artifact identity
+        run: python scripts/release_smoke.py
       - name: Upload Guardian report
         if: always()
         uses: actions/upload-artifact@v6

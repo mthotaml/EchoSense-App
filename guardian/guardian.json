@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "release_gate": {
     "required_checks": [
       "configuration",
@@ -10,6 +10,120 @@
       "release-evidence"
     ]
   },
+  "invariants": [
+    {
+      "id": "frontend-failure-safety",
+      "severity": "severity-1",
+      "description": "Unsuccessful API responses render a bounded product message without an uncaught JavaScript failure.",
+      "covers": ["spotify-data-failure-rendered", "playlist-outage-isolated"],
+      "evidence": [
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Guardian safely renders Spotify ${status} failures"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Guardian isolates a Spotify playlist outage from core listening"
+        }
+      ]
+    },
+    {
+      "id": "audible-browser-playback",
+      "severity": "severity-1",
+      "description": "Playback success requires an activated browser player and observed unpaused SDK state.",
+      "covers": ["browser-audio-user-gesture-activated", "browser-audio-playing-verified", "silent-playback-not-reported-success"],
+      "evidence": [
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "__activateElementCalls"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "waitForAudibleBrowserPlayback"
+        }
+      ]
+    },
+    {
+      "id": "player-asset-contract",
+      "severity": "severity-1",
+      "description": "The page and player lifecycle asset are version aligned and stale assets are not cached.",
+      "covers": ["player-lifecycle-asset-versioned", "player-ready"],
+      "evidence": [
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "cache-control"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "PLAYER_LIFECYCLE_VERSION"
+        }
+      ]
+    },
+    {
+      "id": "playback-identity-attribution",
+      "severity": "severity-1",
+      "description": "Feedback is attributed to the actively playing decision, never merely the displayed next recommendation.",
+      "covers": ["current-and-next-identities-separated", "playback-feedback-decision-bound", "autopilot-current-decision-stable"],
+      "evidence": [
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "activePlaybackDecisionId"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "decision_id"
+        }
+      ]
+    },
+    {
+      "id": "verified-skip",
+      "severity": "severity-1",
+      "description": "Skip is successful only after playback identity advances; duplicate/no-op queues use a distinct-track fallback.",
+      "covers": ["skip-transition-verified", "skip-noop-not-reported-success", "skip-duplicate-queue-bypassed", "skip-active-device-targeted"],
+      "evidence": [
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "Spotify did not advance playback"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "nextDistinct=(queue.up_next||[]).find"
+        }
+      ]
+    },
+    {
+      "id": "continuous-diverse-autopilot",
+      "severity": "severity-2",
+      "description": "Autopilot maintains a distinct rolling queue without manual add controls.",
+      "covers": ["autopilot-five-distinct-ahead", "autopilot-queue-replenished", "autopilot-manual-add-absent", "autopilot-candidate-exclusions-honored"],
+      "evidence": [
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "AUTOPILOT_HORIZON = 5"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "queue-add"
+        }
+      ]
+    },
+    {
+      "id": "provider-outage-isolation",
+      "severity": "severity-2",
+      "description": "Transient Spotify failures do not collapse the core listening experience.",
+      "covers": ["playlist-outage-isolated", "weather-fallback-preserves-ranking"],
+      "evidence": [
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "spotify_library_failed"
+        },
+        {
+          "source": "tests/test_context_fusion.py",
+          "pattern": "weather"
+        }
+      ]
+    }
+  ],
   "journeys": [
     {
       "id": "spotify-reference",

@@ -120,7 +120,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Recommended next" in response.text
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
-    assert "const decisionId=activePlaybackTrackId?activePlaybackDecisionId:currentRecommendationId" in response.text
+    assert (
+        "const decisionId=activePlaybackTrackId?activePlaybackDecisionId:currentRecommendationId"
+        in response.text
+    )
     assert 'id="queue-add"' not in response.text
     assert 'id="dna-queue-add"' not in response.text
     assert "Skip &amp; play next" not in response.text
@@ -151,7 +154,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "/auth/spotify/temporal-mood/settings" in response.text
     assert "Temporal mood patterns reset" in response.text
     assert "never your mental or medical state" in response.text
-    assert "/ui/player-lifecycle.js?v=audible-playback-v2" in response.text
+    from echosense.product_ui import PLAYER_LIFECYCLE_VERSION
+
+    assert f"/ui/player-lifecycle.js?v={PLAYER_LIFECYCLE_VERSION}" in response.text
+    assert "__PLAYER_LIFECYCLE_VERSION__" not in response.text
 
     lifecycle = client.get("/ui/player-lifecycle.js")
     assert lifecycle.status_code == 200

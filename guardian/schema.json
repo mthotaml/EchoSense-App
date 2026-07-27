@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["version", "release_gate", "journeys"],
+  "required": ["version", "release_gate", "invariants", "journeys"],
   "properties": {
     "version": {"type": "integer", "minimum": 1},
     "release_gate": {
@@ -16,6 +16,39 @@
         }
       },
       "additionalProperties": false
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "description", "covers", "evidence"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "severity": {"enum": ["severity-1", "severity-2", "severity-3"]},
+          "description": {"type": "string", "minLength": 1},
+          "covers": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["source", "pattern"],
+              "properties": {
+                "source": {"type": "string", "minLength": 1},
+                "pattern": {"type": "string", "minLength": 1}
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "journeys": {
       "type": "array",

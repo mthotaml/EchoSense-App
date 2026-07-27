@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import Literal
 
@@ -12,6 +13,8 @@ from echosense.music_dna_service import music_dna_service
 
 router = APIRouter(tags=["product-ui"])
 UI_DIR = Path(__file__).with_name("web")
+PLAYER_LIFECYCLE_PATH = UI_DIR / "player-lifecycle.js"
+PLAYER_LIFECYCLE_VERSION = sha256(PLAYER_LIFECYCLE_PATH.read_bytes()).hexdigest()[:12]
 
 
 class DemoFeedbackRequest(BaseModel):
@@ -21,18 +24,18 @@ class DemoFeedbackRequest(BaseModel):
 
 @router.get("/", response_class=HTMLResponse)
 def landing_page() -> str:
-    return PAGE
+    return PAGE.replace("__PLAYER_LIFECYCLE_VERSION__", PLAYER_LIFECYCLE_VERSION)
 
 
 @router.get("/demo", response_class=HTMLResponse)
 def demo_page() -> str:
-    return PAGE
+    return PAGE.replace("__PLAYER_LIFECYCLE_VERSION__", PLAYER_LIFECYCLE_VERSION)
 
 
 @router.get("/ui/player-lifecycle.js", include_in_schema=False)
 def player_lifecycle_script() -> FileResponse:
     return FileResponse(
-        UI_DIR / "player-lifecycle.js",
+        PLAYER_LIFECYCLE_PATH,
         media_type="text/javascript",
         headers={"Cache-Control": "no-store, max-age=0", "Pragma": "no-cache"},
     )
@@ -178,7 +181,7 @@ PAGE = r"""<!doctype html>
   </section>
 
   <script src="https://sdk.scdn.co/spotify-player.js"></script>
-  <script src="/ui/player-lifecycle.js?v=audible-playback-v2"></script>
+  <script src="/ui/player-lifecycle.js?v=__PLAYER_LIFECYCLE_VERSION__"></script>
   <script>
     let currentRecommendationId = null;
     let currentTrackId = null;
