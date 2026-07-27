@@ -115,6 +115,22 @@ PAGE = r"""<!doctype html>
     .context-chips,.factor-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
     .context-chip,.factor-chip { padding:7px 10px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:.78rem; }
     .factor-chip { padding:5px 8px; font-size:.72rem; }
+    .context-compact { align-items:center; padding-block:24px; }
+    .context-compact h2 { margin-bottom:5px; }
+    .context-compact .connection-copy { margin:0; }
+    .context-compact .context-chips { margin-top:10px; }
+    .privacy-note { color:var(--muted); font-size:.78rem; margin-top:10px; }
+    .privacy-note summary { cursor:pointer; width:max-content; }
+    .table-wrap { overflow-x:auto; margin-top:20px; border:1px solid var(--line); border-radius:16px; }
+    .dna-table { width:100%; min-width:840px; border-collapse:collapse; font-size:.86rem; }
+    .dna-table th { padding:11px 12px; color:var(--muted); background:var(--soft); text-align:left; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+    .dna-table td { padding:14px 12px; border-top:1px solid var(--line); vertical-align:middle; }
+    .dna-table td.metric { text-align:center; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .dna-table .track-cell { min-width:210px; }
+    .dna-table .track-cell strong,.dna-table .track-cell span { display:block; }
+    .dna-table .track-cell span,.dna-table .why-cell { color:var(--muted); }
+    .dna-table .why-cell { min-width:210px; line-height:1.35; }
+    .dna-table .track-actions { white-space:nowrap; }
     .arrow { color:#667186; }
     #toast { min-height:22px; margin-top:14px; color:var(--accent); }
     .player { position:fixed; left:0; right:0; bottom:0; z-index:20; min-height:96px; border-top:1px solid #30394a; background:rgba(8,11,16,.96); backdrop-filter:blur(18px); display:grid; grid-template-columns:minmax(220px,1fr) minmax(280px,1.3fr) minmax(180px,1fr); align-items:center; gap:24px; padding:14px 24px; }
@@ -139,11 +155,11 @@ PAGE = r"""<!doctype html>
   <main>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. A persistent listening surface powered by your Music DNA.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
-    <section id="live-context-panel" class="panel connection"><div><div class="eyebrow">Context fusion</div><h2>Why this music, right now?</h2><p id="context-status" class="connection-copy">Time is automatic. Enable live context for permission-based weather, coarse location, and movement.</p><div id="context-chips" class="context-chips"></div><p class="evidence">Raw coordinates are used transiently for current weather and are not stored by EchoSense.</p></div><button id="context-toggle" class="secondary" type="button">Enable live context</button></section>
+    <section id="live-context-panel" class="panel connection context-compact"><div><div class="eyebrow">Live context</div><h2>Why this music now</h2><p id="context-status" class="connection-copy">Time is automatic. Add weather and location when useful.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location is used only to resolve current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play now</button><button id="queue-add" class="secondary" type="button" disabled>Add next</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip &amp; play next</button></div><div id="toast" aria-live="polite"></div></section>
-      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA queue</div><h2>Different tracks, ranked for this moment</h2><p class="copy">Context, learned preference, familiarity, and diversity shape this sequence.</p></div><button id="dna-queue-add" class="primary" type="button">Add DNA queue</button></div><div id="dna-queue-items" class="track-list"></div></section>
+      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA queue</div><h2>Ranked for this moment</h2><p class="copy">Compare what shaped each pick.</p></div><button id="dna-queue-add" class="primary" type="button">Add all</button></div><div id="dna-queue-items" class="table-wrap"></div></section>
       <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Spotify playback queue</div><h2>Now and next</h2></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next</button><button id="queue-refresh" class="secondary" type="button">Refresh</button></div></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
@@ -263,6 +279,7 @@ PAGE = r"""<!doctype html>
         device:state.device||null,
         shuffle_state:state.shuffle_state,
         repeat_state:state.repeat_state,
+        continuity:state.continuity||null,
         updatedAt:Date.now(),
         source:'api'
       };
@@ -331,7 +348,21 @@ PAGE = r"""<!doctype html>
     }
     function renderDnaQueue() {
       const container=$('#dna-queue-items'); container.replaceChildren();
-      recommendationSlate.forEach(item=>{const row=document.createElement('div');row.className='playlist-track';const copy=document.createElement('div');copy.className='track-copy';const title=document.createElement('strong');title.textContent=`${item.rank||''} · ${item.title}`;const evidence=document.createElement('span');evidence.textContent=`${item.artist} · ${item.why_now?.summary||item.reason||'Ranked from your Music DNA.'}`;const factors=document.createElement('div');factors.className='factor-chips';(item.why_now?.factors||[]).forEach(factor=>{const chip=document.createElement('span');chip.className='factor-chip';chip.textContent=`${factor.name} ${factor.score}%`;factors.appendChild(chip);});(item.why_now?.observations||[]).forEach(observation=>{const chip=document.createElement('span');chip.className='factor-chip';chip.textContent=observation;factors.appendChild(chip);});copy.append(title,evidence,factors);const actions=document.createElement('div');actions.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='Play now';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const next=document.createElement('button');next.type='button';next.className='secondary';next.textContent='Add next';next.addEventListener('click',()=>queueDnaTrack(item,next).catch(e=>setText('#toast',e.message)));actions.append(play,next);row.append(copy,actions);container.appendChild(row);});
+      const factorNames=[...new Set(recommendationSlate.flatMap(item=>(item.why_now?.factors||[]).map(factor=>factor.name)))];
+      const table=document.createElement('table'); table.className='dna-table';
+      const head=document.createElement('thead'); const header=document.createElement('tr');
+      ['Track',...factorNames,'Why now','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';cell.textContent=label;header.appendChild(cell);});
+      head.appendChild(header); table.appendChild(head);
+      const body=document.createElement('tbody');
+      recommendationSlate.forEach(item=>{
+        const row=document.createElement('tr');
+        const track=document.createElement('td');track.className='track-cell';const title=document.createElement('strong');title.textContent=`${item.rank||''}. ${item.title}`;const artist=document.createElement('span');artist.textContent=item.artist;track.append(title,artist);row.appendChild(track);
+        const scores=new Map((item.why_now?.factors||[]).map(factor=>[factor.name,factor.score]));
+        factorNames.forEach(name=>{const cell=document.createElement('td');cell.className='metric';const score=scores.get(name);cell.textContent=Number.isFinite(score)?`${score}%`:'—';row.appendChild(cell);});
+        const why=document.createElement('td');why.className='why-cell';why.textContent=item.why_now?.summary||item.reason||'Ranked from your Music DNA.';row.appendChild(why);
+        const actionCell=document.createElement('td');const actions=document.createElement('div');actions.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='Play';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const next=document.createElement('button');next.type='button';next.className='secondary';next.textContent='Add';next.addEventListener('click',()=>queueDnaTrack(item,next).catch(e=>setText('#toast',e.message)));actions.append(play,next);actionCell.appendChild(actions);row.appendChild(actionCell);body.appendChild(row);
+      });
+      table.appendChild(body);container.appendChild(table);
       $('#dna-queue-panel').hidden=recommendationSlate.length<2;
     }
     function renderLiveContext() {
@@ -388,12 +419,12 @@ PAGE = r"""<!doctype html>
     }
     function enableLiveContext() {
       if(!navigator.geolocation){setText('#context-status','This browser does not provide location or motion context. Time-based context remains active.');return;}
-      localStorage.setItem('echosenseContextConsent','granted'); $('#context-toggle').textContent='Disable live context';
+      localStorage.setItem('echosenseContextConsent','granted'); $('#context-toggle').textContent='Disable context';
       contextWatchId=navigator.geolocation.watchPosition(position=>resolveLiveContext(position).catch(e=>setText('#context-status',e.message)),error=>setText('#context-status',`Live context unavailable: ${error.message}`),{enableHighAccuracy:true,maximumAge:30000,timeout:10000});
     }
     function disableLiveContext() {
       if(contextWatchId!==null)navigator.geolocation.clearWatch(contextWatchId);
-      contextWatchId=null; liveContext=null; lastContextKey=''; localStorage.removeItem('echosenseContextConsent'); $('#context-toggle').textContent='Enable live context'; $('#context-chips').replaceChildren();
+      contextWatchId=null; liveContext=null; lastContextKey=''; localStorage.removeItem('echosenseContextConsent'); $('#context-toggle').textContent='Enable context'; $('#context-chips').replaceChildren();
       setText('#context-status','Live context disabled. Time and manually selected moments remain available.');
       if(spotifyConnected)loadLiveSpotify().catch(e=>setText('#toast',e.message));
     }
@@ -547,15 +578,16 @@ PAGE = r"""<!doctype html>
         const previousId=before?.track_window?.current_track?.id||null;
         if(!previousId)throw new Error('No active Spotify track is available to skip.');
         await feedback('skipped');
-        await api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'});
+        const targetDeviceId=before?.device?.id||deviceId||'';
+        await api(`/v1/player/next?device_id=${encodeURIComponent(targetDeviceId)}`,{method:'POST'});
         let changed=null;
-        for(let attempt=0;attempt<8&&!changed;attempt+=1) {
-          await new Promise(resolve=>setTimeout(resolve,350));
+        for(let attempt=0;attempt<12&&!changed;attempt+=1) {
+          await new Promise(resolve=>setTimeout(resolve,500));
           const state=await restorePlaybackState();
           const nextId=state?.track_window?.current_track?.id||null;
-          if(nextId&&nextId!==previousId)changed=state;
+          if(state?.continuity?.source!=='snapshot'&&nextId&&nextId!==previousId)changed=state;
         }
-        if(!changed)throw new Error('Spotify accepted the skip, but EchoSense could not confirm a track change. Refresh the player and try again.');
+        if(!changed)throw new Error('Spotify did not advance playback. Make sure an active device is playing, then try again.');
         await Promise.allSettled([loadQueue(),loadLiveSpotify()]);
         const title=changed.track_window.current_track?.name||'the next track';
         setText('#toast',`Skipped. EchoSense learned from it, verified ${title} is playing, and refreshed your recommendations.`);

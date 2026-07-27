@@ -24,6 +24,8 @@ without relying on a person to recognize it.
 | Skip displayed success after provider command acceptance without proving a transition | A Spotify `204` acknowledges the command but does not prove that playback advanced | Guardian verifies a changed track ID before success and tests the no-active/no-transition path |
 | Skip feedback changed memory but left the same recommendation visible | Successful skip refreshes playback state, provider queue, and the recommendation slate | Guardian asserts both the player title and Today's Pick change after a verified skip |
 | Browser SDK readiness overwrote the restored-session status | Generic readiness must not outrank a more specific continuity state, and status computation must run before returning restored data | Restore state first on SDK readiness, use the generic ready label only when no state was restored, and retain the snapshot reload assertion |
+| Skip targeted the browser SDK device while another Spotify device was actively playing | Playback commands must follow the active device reported immediately before the action | Target the live state's device, allow Spotify propagation time, and reject continuity snapshots as transition proof |
+| Context and ranking explanations became repetitive visual clutter | Explainability must remain scannable as the candidate slate grows | Keep live context in one compact summary and compare per-track factors in shared table columns |
 
 Guardian tests behavior and failure handling, not only successful rendering. Provider errors,
 malformed payloads, retries, duplicate actions, stale processes, and partial initialization

@@ -110,9 +110,14 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Skip &amp; play next" in response.text
     assert "skipAndPlayNext" in response.text
     assert "skipInFlight" in response.text
-    assert "could not confirm a track change" in response.text
+    assert "Spotify did not advance playback" in response.text
     assert "Promise.allSettled([loadQueue(),loadLiveSpotify()])" in response.text
     assert "verified ${title} is playing" in response.text
+    assert "targetDeviceId=before?.device?.id||deviceId||''" in response.text
+    assert "state?.continuity?.source!=='snapshot'" in response.text
+    assert "className='dna-table'" in response.text
+    assert "factorNames" in response.text
+    assert "Compare what shaped each pick." in response.text
     assert 'id="queue-skip"' in response.text
     assert 'id="live-context-panel"' in response.text
     assert "enableLiveContext" in response.text
@@ -120,7 +125,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "/v1/context/resolve" in response.text
     assert "road_setting" in response.text
     assert "road_setting?.replace" in response.text
-    assert "Raw coordinates are used transiently" in response.text
+    assert "raw coordinates are not stored" in response.text
     assert "why_now?.factors" in response.text
     assert 'id="temporal-mood-panel"' in response.text
     assert "renderTemporalMood" in response.text
