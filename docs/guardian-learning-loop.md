@@ -21,6 +21,9 @@ without relying on a person to recognize it.
 | Same track added under fresh command IDs | Queue idempotency covers both command identity and membership in the live provider queue | Player route regression and disabled Add next control |
 | Spotify playlist `503` interrupted initialization | Optional provider surfaces retry once, degrade independently, and keep core listening interactive | Spotify client retry test and Guardian playlist-outage journey |
 | Stale application mistaken for current MVP | Release evidence identifies commit and application profile | Profile smoke report and `/healthz` |
+| Skip displayed success after provider command acceptance without proving a transition | A Spotify `204` acknowledges the command but does not prove that playback advanced | Guardian verifies a changed track ID before success and tests the no-active/no-transition path |
+| Skip feedback changed memory but left the same recommendation visible | Successful skip refreshes playback state, provider queue, and the recommendation slate | Guardian asserts both the player title and Today's Pick change after a verified skip |
+| Browser SDK readiness overwrote the restored-session status | Generic readiness must not outrank a more specific continuity state, and status computation must run before returning restored data | Restore state first on SDK readiness, use the generic ready label only when no state was restored, and retain the snapshot reload assertion |
 
 Guardian tests behavior and failure handling, not only successful rendering. Provider errors,
 malformed payloads, retries, duplicate actions, stale processes, and partial initialization

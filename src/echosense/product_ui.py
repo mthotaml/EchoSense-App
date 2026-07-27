@@ -178,10 +178,16 @@ PAGE = r"""<!doctype html>
     let playerState = null;
     let progressTimer = null;
     let restoreRequest = 0;
+    let skipInFlight = false;
     const reportedSignals = new Set();
     const lifecycle = new EchoSensePlayerLifecycle.PlayerLifecycle({
       createPlayer: SpotifyApi => new SpotifyApi.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}}),
-      onReady: async ({device_id}) => {deviceId=device_id;setText('#player-status','EchoSense Browser ready');$('#activate').disabled=false;await restorePlaybackState();},
+      onReady: async ({device_id}) => {
+        deviceId=device_id;
+        $('#activate').disabled=false;
+        const restored=await restorePlaybackState();
+        if (!restored) setText('#player-status','EchoSense Browser ready');
+      },
       onNotReady: () => setText('#player-status','EchoSense Browser offline'),
       onPlayback: renderPlayer,
       onError: (_, error) => {setText('#toast',error.message);setText('#player-status','Player needs attention');}
@@ -284,17 +290,18 @@ PAGE = r"""<!doctype html>
     }
 
     async function restorePlaybackState() {
-      if (!spotifyConnected) return;
+      if (!spotifyConnected) return null;
       const request=++restoreRequest;
       const response=await fetch('/v1/player/state');
-      if (request!==restoreRequest) return;
-      if (response.status===204) { renderPlayer(null); return; }
-      if (!response.ok) return;
+      if (request!==restoreRequest) return null;
+      if (response.status===204) { renderPlayer(null); return null; }
+      if (!response.ok) return null;
       const state=await response.json();
       renderPlayer(state);
       if (state.continuity?.source==='snapshot') setText('#player-status','Last session restored · choose a device to resume');
       else if (state.device?.id===deviceId) setText('#player-status','EchoSense Browser active');
       else if (state.device?.name) setText('#player-status',`Playing on ${state.device.name}`);
+      return normalizePlayerState(state);
     }
 
     async function activateBrowser(play=false) {
@@ -532,10 +539,29 @@ PAGE = r"""<!doctype html>
       setText('#toast','Understood. EchoSense will adjust your next pick.');
     }
     async function skipAndPlayNext() {
-      await feedback('skipped');
-      await api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'});
-      setText('#toast','Skipped. EchoSense learned from it and moved to the next track.');
-      await restorePlaybackState();
+      if(skipInFlight)return;
+      if(!spotifyConnected)throw new Error('Connect Spotify before skipping playback.');
+      skipInFlight=true; $('#skip').disabled=true; $('#queue-skip').disabled=true;
+      try {
+        const before=await restorePlaybackState();
+        const previousId=before?.track_window?.current_track?.id||null;
+        if(!previousId)throw new Error('No active Spotify track is available to skip.');
+        await feedback('skipped');
+        await api(`/v1/player/next?device_id=${encodeURIComponent(deviceId||'')}`,{method:'POST'});
+        let changed=null;
+        for(let attempt=0;attempt<8&&!changed;attempt+=1) {
+          await new Promise(resolve=>setTimeout(resolve,350));
+          const state=await restorePlaybackState();
+          const nextId=state?.track_window?.current_track?.id||null;
+          if(nextId&&nextId!==previousId)changed=state;
+        }
+        if(!changed)throw new Error('Spotify accepted the skip, but EchoSense could not confirm a track change. Refresh the player and try again.');
+        await Promise.allSettled([loadQueue(),loadLiveSpotify()]);
+        const title=changed.track_window.current_track?.name||'the next track';
+        setText('#toast',`Skipped. EchoSense learned from it, verified ${title} is playing, and refreshed your recommendations.`);
+      } finally {
+        skipInFlight=false; $('#skip').disabled=false; $('#queue-skip').disabled=false;
+      }
     }
 
     async function load() {
