@@ -577,15 +577,26 @@ PAGE = r"""<!doctype html>
         const before=await restorePlaybackState();
         const previousId=before?.track_window?.current_track?.id||null;
         if(!previousId)throw new Error('No active Spotify track is available to skip.');
+        const queue=await (await api('/v1/player/queue')).json();
+        const nextDistinct=(queue.up_next||[]).find(track=>track?.id&&track.id!==previousId);
         await feedback('skipped');
         const targetDeviceId=before?.device?.id||deviceId||'';
         await api(`/v1/player/next?device_id=${encodeURIComponent(targetDeviceId)}`,{method:'POST'});
         let changed=null;
-        for(let attempt=0;attempt<12&&!changed;attempt+=1) {
-          await new Promise(resolve=>setTimeout(resolve,500));
+        for(let attempt=0;attempt<3&&!changed;attempt+=1) {
+          await new Promise(resolve=>setTimeout(resolve,400));
           const state=await restorePlaybackState();
           const nextId=state?.track_window?.current_track?.id||null;
           if(state?.continuity?.source!=='snapshot'&&nextId&&nextId!==previousId)changed=state;
+        }
+        if(!changed&&nextDistinct) {
+          await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:targetDeviceId,spotify_uri:`spotify:track:${nextDistinct.id}`})});
+          for(let attempt=0;attempt<10&&!changed;attempt+=1) {
+            await new Promise(resolve=>setTimeout(resolve,400));
+            const state=await restorePlaybackState();
+            const nextId=state?.track_window?.current_track?.id||null;
+            if(state?.continuity?.source!=='snapshot'&&nextId===nextDistinct.id)changed=state;
+          }
         }
         if(!changed)throw new Error('Spotify did not advance playback. Make sure an active device is playing, then try again.');
         await Promise.allSettled([loadQueue(),loadLiveSpotify()]);
