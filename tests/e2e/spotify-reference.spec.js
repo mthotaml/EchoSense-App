@@ -9,6 +9,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   const recommendationPlays = [];
   const transfers = [];
   const queueCommands = [];
+  const queuedTrackIds = [];
   const playbackModes = [];
   const savedTracks = new Set();
   const libraryMutations = [];
@@ -115,6 +116,30 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             artist: 'Another Artist',
             reason: 'Adds artist diversity.',
           },
+          {
+            id: 'autopilot-3',
+            decision_id: 'decision-autopilot-3',
+            rank: 3,
+            title: 'Open Current',
+            artist: 'Third Artist',
+            reason: 'Extends the listening flow.',
+          },
+          {
+            id: 'autopilot-4',
+            decision_id: 'decision-autopilot-4',
+            rank: 4,
+            title: 'Night Lines',
+            artist: 'Fourth Artist',
+            reason: 'Balances familiarity and discovery.',
+          },
+          {
+            id: 'autopilot-5',
+            decision_id: 'decision-autopilot-5',
+            rank: 5,
+            title: 'Coastal Signal',
+            artist: 'Fifth Artist',
+            reason: 'Keeps the queue diverse.',
+          },
         ],
         insight: 'Your listening is becoming more focused.',
         timeline: ['Indie', 'Ambient'],
@@ -195,13 +220,19 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await page.route('**/v1/player/queue', async route => {
     if (route.request().method() === 'POST') {
-      queueCommands.push(await route.request().postDataJSON());
-      return route.fulfill({json: {status: 'queued', item_id: 'working-track', applied: queueCommands.length === 1}});
+      const command = await route.request().postDataJSON();
+      queueCommands.push(command);
+      const applied = !queuedTrackIds.includes(command.item_id);
+      if (applied) queuedTrackIds.push(command.item_id);
+      return route.fulfill({json: {status: applied ? 'queued' : 'already_queued', item_id: command.item_id, applied}});
     }
     return route.fulfill({
       json: {
         current: {id: 'working-track', title: 'Focused Motion', artists: ['Echo Artist'], playable: true},
-        up_next: [{id: 'next-track', title: 'Next Motion', artists: ['Echo Artist'], playable: true}],
+        up_next: [
+          {id: 'next-track', title: 'Next Motion', artists: ['Echo Artist'], playable: true},
+          ...queuedTrackIds.map(id => ({id, title: id, artists: ['Autopilot Artist'], playable: true})),
+        ],
       },
     });
   });
@@ -382,22 +413,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#pick-heading')).toHaveText('Focused Motion');
   await expect(page.locator('#evidence')).toContainText('Context evidence: ambient');
   await expect(page.locator('#save')).toHaveText('Save');
-  await page.locator('#queue-add').click();
-  await expect(page.locator('#queue-items')).toContainText('Next Motion');
-  await expect(page.locator('#queue-add')).toBeDisabled();
-  expect(queueCommands).toHaveLength(1);
-  await page.locator('#dna-queue-add').click();
-  await expect.poll(() => queueCommands).toHaveLength(3);
-  expect(queueCommands.slice(1).map(item => item.item_id)).toEqual([
-    'working-track',
-    'distinct-track',
-  ]);
+  await expect(page.locator('#queue-add')).toHaveCount(0);
+  await expect(page.locator('#dna-queue-add')).toHaveCount(0);
   await page.locator('#dna-queue-items tbody tr').nth(1).getByRole('button', {name: 'Play'}).click();
   await expect.poll(() => recommendationPlays.map(item => item.decision_id)).toContain(
     'decision-distinct',
   );
-  await page.locator('#dna-queue-items tbody tr').nth(1).getByRole('button', {name: 'Add'}).click();
-  await expect.poll(() => queueCommands).toHaveLength(4);
+  await expect.poll(() => new Set(queueCommands.map(item => item.item_id)).size).toBe(4);
+  await expect(page.locator('#autopilot-status')).toContainText('5 distinct tracks ready ahead');
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
@@ -445,6 +468,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     });
   });
   await expect.poll(() => feedback.map(item => item.signal)).toContain('completed');
+  expect(feedback.find(item => item.signal === 'completed').decision_id).toBe(
+    'decision-working',
+  );
 
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
@@ -544,7 +570,7 @@ test('Guardian isolates a Spotify playlist outage from core listening', async ({
   await expect(page.locator('#pick-heading')).toHaveText('Resilient Listening');
   await expect(page.locator('#playlists-status')).toContainText('temporarily unavailable');
   await expect(page.locator('#more-playlists')).toHaveText('Retry');
-  await expect(page.locator('#queue-add')).toBeEnabled();
+  await expect(page.locator('#queue-add')).toHaveCount(0);
   await page.locator('#skip').click();
   await expect(page.locator('#toast')).toContainText('No active Spotify track is available to skip');
 });
