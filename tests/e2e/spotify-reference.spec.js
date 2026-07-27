@@ -3,6 +3,7 @@ const { test, expect } = require('@playwright/test');
 test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let connected = true;
   let playbackStarted = false;
+  let skippedToNext = false;
   let restoreFromSnapshot = false;
   const playRequests = [];
   const recommendationPlays = [];
@@ -65,6 +66,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     contextDataRequests.push(route.request().url());
     const moment = new URL(route.request().url()).searchParams.get('moment');
     const working = moment === 'working';
+    const selectedId = skippedToNext ? 'post-skip-track' : working ? 'working-track' : 'general-track';
+    const selectedTitle = skippedToNext ? 'Fresh Horizon' : working ? 'Focused Motion' : 'Open Road';
+    const selectedDecision = skippedToNext ? 'decision-post-skip' : working ? 'decision-working' : 'decision-general';
     return route.fulfill({
       json: {
         profile: {
@@ -73,11 +77,11 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
           average_popularity: 55,
         },
         recommendation: {
-          id: working ? 'working-track' : 'general-track',
-          title: working ? 'Focused Motion' : 'Open Road',
+          id: selectedId,
+          title: selectedTitle,
           artist: 'Echo Artist',
-          spotify_url: `https://open.spotify.com/track/${working ? 'working-track' : 'general-track'}`,
-          decision_id: working ? 'decision-working' : 'decision-general',
+          spotify_url: `https://open.spotify.com/track/${selectedId}`,
+          decision_id: selectedDecision,
           match_score: 96,
           reason: working ? 'For working, this matches your Music DNA.' : 'This matches your Music DNA.',
           evidence: {
@@ -87,10 +91,10 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         },
         recommendations: [
           {
-            id: working ? 'working-track' : 'general-track',
-            decision_id: working ? 'decision-working' : 'decision-general',
+            id: selectedId,
+            decision_id: selectedDecision,
             rank: 1,
-            title: working ? 'Focused Motion' : 'Open Road',
+            title: selectedTitle,
             artist: 'Echo Artist',
             reason: 'Ranked from your Music DNA.',
             why_now: {
@@ -134,8 +138,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             is_playing: true,
             progress_ms: 30000,
             item: {
-              id: 'working-track',
-              name: 'Focused Motion',
+              id: skippedToNext ? 'next-track' : 'working-track',
+              name: skippedToNext ? 'Next Motion' : 'Focused Motion',
               duration_ms: 180000,
               artists: [{name: 'Echo Artist'}],
               album: {images: []},
@@ -198,6 +202,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await page.route('**/v1/player/next?*', route => {
     controlEvents.push('next');
+    skippedToNext = true;
     return route.fulfill({status: 204});
   });
   await page.route('**/v1/player/shuffle', async route => {
@@ -435,10 +440,13 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
   await expect.poll(() => controlEvents.slice(-2)).toEqual(['feedback', 'next']);
+  await expect(page.locator('#player-title')).toHaveText('Next Motion');
+  await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
+  await expect(page.locator('#toast')).toContainText('verified Next Motion is playing');
 
   restoreFromSnapshot = true;
   await page.reload();
-  await expect(page.locator('#player-title')).toHaveText('Focused Motion');
+  await expect(page.locator('#player-title')).toHaveText('Next Motion');
   await expect(page.locator('#player-status')).toContainText('Last session restored');
   await expect(page.locator('#toggle')).toHaveText('▶');
 
@@ -525,5 +533,5 @@ test('Guardian isolates a Spotify playlist outage from core listening', async ({
   await expect(page.locator('#more-playlists')).toHaveText('Retry');
   await expect(page.locator('#queue-add')).toBeEnabled();
   await page.locator('#skip').click();
-  await expect(page.locator('#toast')).toContainText('learned from it');
+  await expect(page.locator('#toast')).toContainText('No active Spotify track is available to skip');
 });

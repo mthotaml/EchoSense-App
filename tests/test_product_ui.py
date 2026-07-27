@@ -109,6 +109,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "queueDnaTrack" in response.text
     assert "Skip &amp; play next" in response.text
     assert "skipAndPlayNext" in response.text
+    assert "skipInFlight" in response.text
+    assert "could not confirm a track change" in response.text
+    assert "Promise.allSettled([loadQueue(),loadLiveSpotify()])" in response.text
+    assert "verified ${title} is playing" in response.text
     assert 'id="queue-skip"' in response.text
     assert 'id="live-context-panel"' in response.text
     assert "enableLiveContext" in response.text
