@@ -339,11 +339,16 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect.poll(() => contextDataRequests.some(url => url.includes('road_setting=coastal'))).toBe(
     true,
   );
-  await expect(page.locator('#dna-queue-items .factor-chip')).toContainText([
-    'Music DNA affinity 95%',
-    'Live context fit 88%',
-    'Time pattern 83%',
-  ]);
+  await expect(page.locator('#dna-queue-items thead')).toContainText(
+    'Music DNA affinity',
+  );
+  await expect(page.locator('#dna-queue-items thead')).toContainText(
+    'Live context fit',
+  );
+  await expect(page.locator('#dna-queue-items thead')).toContainText('Time pattern');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('95%');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('88%');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('83%');
   await expect(page.locator('#temporal-mood-status')).toContainText(
     'often choose uplifting music during afternoon',
   );
@@ -383,11 +388,11 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     'working-track',
     'distinct-track',
   ]);
-  await page.locator('#dna-queue-items .playlist-track').nth(1).getByRole('button', {name: 'Play now'}).click();
+  await page.locator('#dna-queue-items tbody tr').nth(1).getByRole('button', {name: 'Play'}).click();
   await expect.poll(() => recommendationPlays.map(item => item.decision_id)).toContain(
     'decision-distinct',
   );
-  await page.locator('#dna-queue-items .playlist-track').nth(1).getByRole('button', {name: 'Add next'}).click();
+  await page.locator('#dna-queue-items tbody tr').nth(1).getByRole('button', {name: 'Add'}).click();
   await expect.poll(() => queueCommands).toHaveLength(4);
 
   await page.locator('#save').click();
