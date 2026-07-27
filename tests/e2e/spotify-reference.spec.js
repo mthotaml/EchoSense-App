@@ -183,9 +183,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     transfers.push(await route.request().postDataJSON());
     return route.fulfill({status: 204});
   });
-  await page.route('**/v1/player/play', route => {
+  await page.route('**/v1/player/play', async route => {
     playbackStarted = true;
-    playRequests.push(route.request().postDataJSON());
+    const request = await route.request().postDataJSON();
+    playRequests.push(request);
+    if (request.spotify_uri === 'spotify:track:next-track') {
+      controlEvents.push('distinct-play');
+      skippedToNext = true;
+    }
     return route.fulfill({status: 204});
   });
   await page.route('**/v1/player/queue', async route => {
@@ -202,7 +207,6 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await page.route('**/v1/player/next?*', route => {
     controlEvents.push('next');
-    skippedToNext = true;
     return route.fulfill({status: 204});
   });
   await page.route('**/v1/player/shuffle', async route => {
@@ -444,7 +448,11 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
-  await expect.poll(() => controlEvents.slice(-2)).toEqual(['feedback', 'next']);
+  await expect.poll(() => controlEvents.slice(-3)).toEqual([
+    'feedback',
+    'next',
+    'distinct-play',
+  ]);
   await expect(page.locator('#player-title')).toHaveText('Next Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
   await expect(page.locator('#toast')).toContainText('verified Next Motion is playing');

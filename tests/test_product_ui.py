@@ -115,6 +115,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "verified ${title} is playing" in response.text
     assert "targetDeviceId=before?.device?.id||deviceId||''" in response.text
     assert "state?.continuity?.source!=='snapshot'" in response.text
+    assert "nextDistinct=(queue.up_next||[]).find" in response.text
+    assert "spotify_uri:`spotify:track:${nextDistinct.id}`" in response.text
     assert "className='dna-table'" in response.text
     assert "factorNames" in response.text
     assert "Compare what shaped each pick." in response.text
