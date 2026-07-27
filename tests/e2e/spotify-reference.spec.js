@@ -42,8 +42,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             setTimeout(() => this.listeners.ready?.({device_id:'guardian-device'}), 0);
             return Promise.resolve(true);
           }
+          activateElement() {
+            window.__activateElementCalls = (window.__activateElementCalls || 0) + 1;
+            return Promise.resolve();
+          }
           disconnect() {}
-          getCurrentState() { return Promise.resolve(null); }
+          getCurrentState() { return Promise.resolve(window.__sdkPlaybackState || null); }
           emit(state) { this.listeners.player_state_changed?.(state); }
         }
         window.Spotify = {Player: MockPlayer};
@@ -253,7 +257,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     const request = await route.request().postDataJSON();
     const decisionId = new URL(route.request().url()).pathname.split('/').at(-2);
     recommendationPlays.push({...request, decision_id: decisionId});
-    return route.fulfill({
+    await route.fulfill({
       json: {
         status: 'playing',
         decision_id: decisionId,
@@ -265,6 +269,25 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         },
       },
     });
+    const trackId = decisionId === 'decision-distinct' ? 'distinct-track' : 'working-track';
+    await page.evaluate(id => {
+      const state = {
+        paused: false,
+        position: 0,
+        duration: 180000,
+        track_window: {
+          current_track: {
+            id,
+            name: id === 'distinct-track' ? 'Distinct Motion' : 'Focused Motion',
+            duration_ms: 180000,
+            artists: [{name: 'Echo Artist'}],
+            album: {images: []},
+          },
+        },
+      };
+      window.__sdkPlaybackState = state;
+      window.__mockPlayer.emit(state);
+    }, trackId);
   });
   await page.route('**/auth/spotify/feedback', async route => {
     feedback.push(await route.request().postDataJSON());
@@ -442,6 +465,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     decision_id: 'decision-working',
     device_id: 'guardian-device',
   });
+  await expect.poll(() => page.evaluate(() => window.__activateElementCalls || 0)).toBeGreaterThan(0);
+  await expect(page.locator('#player-status')).toContainText('browser audio');
   await page.locator('#play').click();
   await expect.poll(() => recommendationPlays).toHaveLength(3);
   expect(recommendationPlays[2].outcome_id).toBe(recommendationPlays[1].outcome_id);

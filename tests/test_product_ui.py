@@ -66,6 +66,11 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "/v1/player/recommendations/" in response.text
     assert "currentPlayOutcomeId" in response.text
     assert "EchoSense Autopilot started" in response.text
+    assert "lifecycle.activateElement()" in response.text
+    assert "waitForAudibleBrowserPlayback" in response.text
+    assert "Playing with browser audio" in response.text
+    assert "Browser blocked audio" in response.text
+    assert "browser audio did not start" in response.text
     assert "/auth/spotify/feedback" in response.text
     assert "pick.decision_id" in response.text
     assert "feedback('completed'" in response.text
