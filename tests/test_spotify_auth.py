@@ -159,6 +159,13 @@ def test_spotify_data_builds_live_music_profile(
     assert payload["recommendation"]["evidence"]["matched_genres"] == ["ambient"]
     assert "For working" in payload["recommendation"]["reason"]
     assert payload["recommendation"]["spotify_url"].endswith("/track/1")
+    rotated = client.get(
+        "/auth/spotify/data?moment=working&exclude=track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    assert rotated.status_code == 200
+    assert rotated.json()["recommendation"] is None
+    assert rotated.json()["recommendations"] == []
     trace = connection_repository.storage.get_decision_trace(
         payload["recommendation"]["decision_id"]
     )

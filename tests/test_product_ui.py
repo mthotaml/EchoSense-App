@@ -65,7 +65,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "/v1/player/play" in response.text
     assert "/v1/player/recommendations/" in response.text
     assert "currentPlayOutcomeId" in response.text
-    assert "The outcome is linked to this decision." in response.text
+    assert "EchoSense Autopilot started" in response.text
     assert "/auth/spotify/feedback" in response.text
     assert "pick.decision_id" in response.text
     assert "feedback('completed'" in response.text
@@ -93,21 +93,26 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "loadDevices" in response.text
     assert "transferSelectedDevice" in response.text
     assert 'id="queue-panel"' in response.text
-    assert "queueRecommendation" in response.text
     assert "loadQueue" in response.text
     assert "Spotify returned an incomplete listening profile" in response.text
     assert "detail.detail?.code" in response.text
-    assert "$('#queue-add').disabled=true" in response.text
     assert 'id="shuffle"' in response.text
     assert 'id="repeat"' in response.text
     assert "/v1/player/shuffle" in response.text
     assert "/v1/player/repeat" in response.text
     assert 'id="dna-queue-panel"' in response.text
-    assert "addDnaQueue" in response.text
-    assert "Tracks already queued were skipped" in response.text
     assert "playDnaTrack" in response.text
-    assert "queueDnaTrack" in response.text
-    assert "Skip &amp; play next" in response.text
+    assert "maintainAutopilot" in response.text
+    assert "AUTOPILOT_HORIZON = 5" in response.text
+    assert "autopilotTimer=setInterval" in response.text
+    assert "updateCurrentPick=true" in response.text
+    assert "if(!updateCurrentPick){renderDnaQueue();return data;}" in response.text
+    assert "Autopilot on" in response.text
+    assert "Up next, continuously" in response.text
+    assert "Start listening" in response.text
+    assert 'id="queue-add"' not in response.text
+    assert 'id="dna-queue-add"' not in response.text
+    assert "Skip &amp; play next" not in response.text
     assert "skipAndPlayNext" in response.text
     assert "skipInFlight" in response.text
     assert "Spotify did not advance playback" in response.text
@@ -119,7 +124,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "spotify_uri:`spotify:track:${nextDistinct.id}`" in response.text
     assert "className='dna-table'" in response.text
     assert "factorNames" in response.text
-    assert "Compare what shaped each pick." in response.text
+    assert "Compare what shaped each pick." not in response.text
     assert 'id="queue-skip"' in response.text
     assert 'id="live-context-panel"' in response.text
     assert "enableLiveContext" in response.text

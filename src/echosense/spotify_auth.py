@@ -367,6 +367,7 @@ def spotify_data(
     road_setting: str | None = Query(default=None, max_length=32),
     activity: str | None = Query(default=None, max_length=32),
     daypart: str | None = Query(default=None, max_length=32),
+    exclude: list[str] = Query(default=[]),
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
@@ -423,11 +424,14 @@ def spotify_data(
             context_scores=combined_context_scores,
             context_weight=0.35 if live_context else 0.15,
         )
+        excluded_ids = {item_id for item_id in exclude[:50] if item_id}
         diverse_slate = DiverseSlateService().build(
             candidate_tracks,
             candidate_slate,
             limit=5,
+            excluded_ids=excluded_ids,
         )
+        recommendation = diverse_slate[0].track if diverse_slate else None
         decision_ids: dict[str, str] = {}
         for slate_item in diverse_slate:
             slate_decision_id = f"dec_{uuid4().hex}"
@@ -544,6 +548,8 @@ def spotify_data(
             else None
         ),
     )
+    if recommendation is None:
+        result["recommendation"] = None
     result["recommendations"] = [
         {
             **music_dna_service._track_view(item.track),
