@@ -108,6 +108,15 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="dna-queue-panel"' in response.text
     assert "playDnaTrack" in response.text
     assert "maintainAutopilot" in response.text
+    assert "EchoSense controls playback" in response.text
+    assert "recommendationExplanation" in response.text
+    assert "Picked because ${factors.join(', ')}" in response.text
+    autopilot = response.text[
+        response.text.index("async function maintainAutopilot") : response.text.index(
+            "function recommendationExplanation"
+        )
+    ]
+    assert "/v1/player/queue" not in autopilot
     assert "DNA_ROUND_SIZE = 6" in response.text
     assert "AUTOPILOT_HORIZON = DNA_ROUND_SIZE" in response.text
     assert "autopilotTimer=setInterval" in response.text

@@ -114,8 +114,8 @@
     {
       "id": "dna-sequence-playback-ownership",
       "severity": "severity-1",
-      "description": "Starting or skipping to a Music DNA track installs that track and the remaining ranked DNA round as one ordered Spotify playback sequence; a pre-existing Spotify provider queue must not become authoritative.",
-      "covers": ["dna-sequence-ordered", "dna-continuation-decision-owned", "provider-queue-not-authoritative"],
+      "description": "Starting or skipping to a Music DNA track disables shuffle and repeat, installs the remaining ranked DNA round as one ordered Spotify sequence, and never appends Autopilot tracks through Spotify's provider queue.",
+      "covers": ["dna-sequence-ordered", "dna-continuation-decision-owned", "provider-queue-not-authoritative", "dna-shuffle-disabled", "dna-repeat-disabled", "autopilot-provider-queue-write-prohibited"],
       "evidence": [
         {
           "source": "tests/test_player_routes.py",
@@ -128,6 +128,14 @@
         {
           "source": "tests/test_product_ui.py",
           "pattern": "continuation_decision_ids"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "EchoSense controls playback"
+        },
+        {
+          "source": "tests/test_player_routes.py",
+          "pattern": "playback_mode"
         }
       ]
     },
@@ -228,6 +236,9 @@
         "dna-sequence-ordered",
         "dna-continuation-decision-owned",
         "provider-queue-not-authoritative",
+        "dna-shuffle-disabled",
+        "dna-repeat-disabled",
+        "autopilot-provider-queue-write-prohibited",
         "autopilot-single-start",
         "autopilot-six-track-round",
         "autopilot-hero-skip-new-round",

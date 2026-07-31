@@ -339,11 +339,24 @@ def play_recommendation(
         )
     item_ids = list(dict.fromkeys(str(trace["item_id"]) for trace in traces if trace is not None))
     item_id = item_ids[0]
+    playback_params = {"device_id": request.device_id}
+    _spotify_request(
+        session_id,
+        "PUT",
+        "/me/player/shuffle",
+        params={"state": "false", **playback_params},
+    )
+    _spotify_request(
+        session_id,
+        "PUT",
+        "/me/player/repeat",
+        params={"state": "off", **playback_params},
+    )
     _spotify_request(
         session_id,
         "PUT",
         "/me/player/play",
-        params={"device_id": request.device_id},
+        params=playback_params,
         json={"uris": [f"spotify:track:{candidate_item_id}" for candidate_item_id in item_ids]},
     )
     learning = spotify_feedback(
@@ -360,6 +373,7 @@ def play_recommendation(
         "provider": "spotify",
         "item_id": item_id,
         "sequence_item_ids": item_ids,
+        "playback_mode": {"shuffle": False, "repeat": "off"},
         "learning": learning,
     }
 
