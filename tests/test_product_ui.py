@@ -144,6 +144,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "skipInFlight" in response.text
     assert "Spotify did not start the selected Music DNA track" in response.text
     assert "Promise.allSettled([loadQueue(),recommendationRefresh])" in response.text
+    assert "const refreshExclusions=startNewRound" in response.text
+    assert "refreshExclusions," in response.text
     assert "selected the next Music DNA track and verified ${title} is playing" in response.text
     assert "targetDeviceId=before?.device?.id||deviceId||''" in response.text
     assert "state?.continuity?.source!=='snapshot'" in response.text
