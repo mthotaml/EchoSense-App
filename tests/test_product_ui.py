@@ -119,7 +119,12 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "rememberDnaRound" in response.text
     assert "generateNextDnaRound('completed')" in response.text
     assert "if(roundGenerationInFlight)return roundGenerationInFlight" in response.text
-    assert "if(!skipInFlight)await playDnaTrack(next)" in response.text
+    assert "if(skipInFlight)return" in response.text
+    assert "completionTransitionInFlight" in response.text
+    assert "const completedIndex=activeRound.findIndex" in response.text
+    assert ".slice(completedIndex+1)" in response.text
+    assert "await playDnaTrack(next)" in response.text
+    assert "continued with ${next.title} from your Music DNA" in response.text
     live_loader = response.text[
         response.text.index("async function loadLiveSpotify(") : response.text.index(
             "async function loadDemo()"
