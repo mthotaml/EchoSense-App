@@ -200,6 +200,7 @@ PAGE = r"""<!doctype html>
     let dnaPageIndex = 0;
     const completedDnaTrackIds = new Set();
     let roundGenerationInFlight = null;
+    let completionTransitionInFlight = null;
     let activePlaybackTrackId = null;
     let activePlaybackDecisionId = null;
     const decisionByTrackId = new Map();
@@ -395,11 +396,25 @@ PAGE = r"""<!doctype html>
 
     async function markDnaTrackCompleted(trackId) {
       const activeRound=dnaRounds.at(-1)||[];
-      if(!activeRound.some(item=>item.id===trackId))return;
+      const completedIndex=activeRound.findIndex(item=>item.id===trackId);
+      if(completedIndex<0||completedDnaTrackIds.has(trackId))return;
       completedDnaTrackIds.add(trackId);
-      if(activeRound.length===DNA_ROUND_SIZE&&activeRound.every(item=>completedDnaTrackIds.has(item.id))) {
-        const next=await generateNextDnaRound('completed');
-        if(!skipInFlight)await playDnaTrack(next);
+      if(skipInFlight)return;
+      if(completionTransitionInFlight)return completionTransitionInFlight;
+      completionTransitionInFlight=(async()=>{
+        const nextInRound=activeRound
+          .slice(completedIndex+1)
+          .find(item=>item?.id&&item?.decision_id&&!completedDnaTrackIds.has(item.id));
+        const next=nextInRound||await generateNextDnaRound('completed');
+        if(!next)throw new Error('EchoSense could not select the next Music DNA track after completion.');
+        await playDnaTrack(next);
+        setText('#toast',`Completed. EchoSense continued with ${next.title} from your Music DNA.`);
+        return next;
+      })();
+      try {
+        return await completionTransitionInFlight;
+      } finally {
+        completionTransitionInFlight=null;
       }
     }
 
