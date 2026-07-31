@@ -48,8 +48,7 @@ def test_slate_excludes_live_queue_items() -> None:
 
 def test_default_music_dna_round_contains_six_tracks() -> None:
     tracks = [
-        _track(f"track-{index}", f"Track {index}", f"Artist {index}")
-        for index in range(1, 8)
+        _track(f"track-{index}", f"Track {index}", f"Artist {index}") for index in range(1, 8)
     ]
     ranked = [
         {"item_id": track.provider_id, "ranking_score": 1 - index * 0.05}
