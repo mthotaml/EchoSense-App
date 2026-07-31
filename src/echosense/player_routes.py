@@ -35,6 +35,7 @@ class PlayRequest(BaseModel):
 class RecommendationPlayRequest(BaseModel):
     device_id: str = Field(min_length=1)
     outcome_id: str = Field(min_length=1)
+    continuation_decision_ids: list[str] = Field(default_factory=list, max_length=49)
 
 
 class SeekRequest(BaseModel):
@@ -321,23 +322,29 @@ def play_recommendation(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
-    trace = get_connection_repository().storage.get_decision_trace(decision_id)
-    if (
+    decision_ids = list(dict.fromkeys([decision_id, *request.continuation_decision_ids]))
+    traces = [
+        get_connection_repository().storage.get_decision_trace(candidate_decision_id)
+        for candidate_decision_id in decision_ids
+    ]
+    if any(
         trace is None
         or trace["user_id"] != session.provider_user_id
         or trace["provider"] != "spotify"
+        for trace in traces
     ):
         raise HTTPException(
             status_code=404,
             detail={"code": "recommendation_decision_not_found"},
         )
-    item_id = str(trace["item_id"])
+    item_ids = list(dict.fromkeys(str(trace["item_id"]) for trace in traces if trace is not None))
+    item_id = item_ids[0]
     _spotify_request(
         session_id,
         "PUT",
         "/me/player/play",
         params={"device_id": request.device_id},
-        json={"uris": [f"spotify:track:{item_id}"]},
+        json={"uris": [f"spotify:track:{candidate_item_id}" for candidate_item_id in item_ids]},
     )
     learning = spotify_feedback(
         SpotifyFeedbackRequest(
@@ -352,6 +359,7 @@ def play_recommendation(
         "decision_id": decision_id,
         "provider": "spotify",
         "item_id": item_id,
+        "sequence_item_ids": item_ids,
         "learning": learning,
     }
 
