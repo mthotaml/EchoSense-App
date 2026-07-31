@@ -107,6 +107,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
               factors: [
                 {name: 'Music DNA affinity', score: 95},
                 {name: 'Live context fit', score: 88},
+                {name: 'Learned preference', score: 76},
+                {name: 'Diversity guard', score: 91},
                 {name: 'Time pattern', score: 83},
               ],
               observations: ['sunny weather', 'Southern California', 'coastal drive matched to your Music DNA'],
@@ -144,6 +146,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             artist: 'Fifth Artist',
             reason: 'Keeps the queue diverse.',
           },
+          {
+            id: 'autopilot-6',
+            decision_id: 'decision-autopilot-6',
+            rank: 6,
+            title: 'Pacific Light',
+            artist: 'Sixth Artist',
+            reason: 'Completes this listening round.',
+          },
         ],
         insight: 'Your listening is becoming more focused.',
         timeline: ['Indie', 'Ambient'],
@@ -167,8 +177,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             is_playing: true,
             progress_ms: 30000,
             item: {
-              id: skippedToNext ? 'next-track' : 'working-track',
-              name: skippedToNext ? 'Next Motion' : 'Focused Motion',
+              id: skippedToNext ? 'distinct-track' : 'working-track',
+              name: skippedToNext ? 'Distinct Motion' : 'Focused Motion',
               duration_ms: 180000,
               artists: [{name: 'Echo Artist'}],
               album: {images: []},
@@ -257,19 +267,23 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     const request = await route.request().postDataJSON();
     const decisionId = new URL(route.request().url()).pathname.split('/').at(-2);
     recommendationPlays.push({...request, decision_id: decisionId});
+    const trackId = decisionId === 'decision-distinct' ? 'distinct-track' : 'working-track';
+    if (decisionId === 'decision-distinct' && feedback.some(item => item.signal === 'skipped')) {
+      controlEvents.push('dna-play');
+      skippedToNext = true;
+    }
     await route.fulfill({
       json: {
         status: 'playing',
         decision_id: decisionId,
         provider: 'spotify',
-        item_id: 'working-track',
+        item_id: trackId,
         learning: {
           signal: 'played',
           applied: recommendationPlays.length === 1,
         },
       },
     });
-    const trackId = decisionId === 'decision-distinct' ? 'distinct-track' : 'working-track';
     await page.evaluate(id => {
       const state = {
         paused: false,
@@ -403,6 +417,18 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#dna-queue-items thead')).toContainText(
     'Live context fit',
   );
+  await expect(
+    page.getByRole('button', {name: /Music DNA affinity: How closely/}),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', {name: /Live context fit: How well/}),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', {name: /Learned preference: An adjustment/}),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', {name: /Diversity guard: How well/}),
+  ).toBeVisible();
   await expect(page.locator('#dna-queue-items thead')).toContainText('Time pattern');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('95%');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('88%');
@@ -443,7 +469,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     'decision-distinct',
   );
   await expect.poll(() => new Set(queueCommands.map(item => item.item_id)).size).toBe(4);
-  await expect(page.locator('#autopilot-status')).toContainText('5 distinct tracks ready ahead');
+  await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
+  await expect(page.locator('#autopilot-status')).toContainText('6 distinct tracks ready ahead');
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
@@ -499,19 +526,31 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
-  await expect.poll(() => controlEvents.slice(-3)).toEqual([
+  await expect.poll(() => controlEvents.slice(-2)).toEqual([
     'feedback',
-    'next',
-    'distinct-play',
+    'dna-play',
   ]);
-  await expect(page.locator('#player-title')).toHaveText('Next Motion');
+  expect(controlEvents).not.toContain('next');
+  expect(recommendationPlays.at(-1)).toMatchObject({
+    decision_id: 'decision-distinct',
+    device_id: 'guardian-device',
+  });
+  await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
   await expect(page.locator('#pick-label')).toHaveText('Recommended next');
-  await expect(page.locator('#toast')).toContainText('verified Next Motion is playing');
+  await expect(page.locator('#toast')).toContainText(
+    'selected the next Music DNA track and verified Distinct Motion is playing',
+  );
+  await expect(page.locator('#dna-page-status')).toHaveText('Round 2 of 2');
+  await expect(page.locator('#dna-page-previous')).toBeEnabled();
+  await page.locator('#dna-page-previous').click();
+  await expect(page.locator('#dna-page-status')).toHaveText('Round 1 of 2');
+  await page.locator('#dna-page-next').click();
+  await expect(page.locator('#dna-page-status')).toHaveText('Round 2 of 2');
 
   restoreFromSnapshot = true;
   await page.reload();
-  await expect(page.locator('#player-title')).toHaveText('Next Motion');
+  await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
   await expect(page.locator('#player-status')).toContainText('Last session restored');
   await expect(page.locator('#toggle')).toHaveText('▶');
 
