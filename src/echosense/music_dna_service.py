@@ -32,6 +32,7 @@ class MusicDNAService:
         decision_id: str | None = None,
         moment: str = "general",
         decision_evidence: dict[str, object] | None = None,
+        match_score: int | None = None,
     ) -> dict[str, object]:
         artists = [artist for artist, _ in imported.top_artists]
         top_tracks = [item.track for item in imported.top_tracks]
@@ -76,7 +77,7 @@ class MusicDNAService:
                     **self._track_view(recommendation),
                     "decision_id": decision_id,
                     "reason": reason,
-                    "match_score": 96,
+                    "match_score": match_score if match_score is not None else 96,
                     "evidence": decision_evidence or {},
                 }
                 if recommendation
