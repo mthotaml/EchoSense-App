@@ -44,6 +44,7 @@ def _decision(
     *,
     decision_id: str = "decision-1",
     user_id: str = "spotify-user",
+    item_id: str = "recommended-track",
 ) -> None:
     repository.storage.save_decision_trace(
         decision_id=decision_id,
@@ -51,7 +52,7 @@ def _decision(
         context="working",
         context_confidence=0.91,
         provider="spotify",
-        item_id="recommended-track",
+        item_id=item_id,
         factors={"candidate_slate": []},
     )
 
@@ -324,6 +325,84 @@ def test_context_playback_resolves_owned_decision_and_records_after_success(
     assert duplicate.json()["learning"]["applied"] is False
     assert requests[0]["params"] == {"device_id": "browser-device"}
     assert requests[0]["json"] == {"uris": ["spotify:track:recommended-track"]}
+
+
+def test_context_playback_installs_owned_dna_sequence_in_order(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    _decision(connection_repository)
+    _decision(
+        connection_repository,
+        decision_id="decision-2",
+        item_id="second-dna-track",
+    )
+    _decision(
+        connection_repository,
+        decision_id="decision-3",
+        item_id="third-dna-track",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_request(method, url, **kwargs):
+        captured.update({"method": method, "url": url, **kwargs})
+        return httpx.Response(204, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(player_routes.httpx, "request", fake_request)
+    response = client.put(
+        "/v1/player/recommendations/decision-1/play",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "device_id": "browser-device",
+            "outcome_id": "sequence-outcome",
+            "continuation_decision_ids": ["decision-2", "decision-3"],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sequence_item_ids"] == [
+        "recommended-track",
+        "second-dna-track",
+        "third-dna-track",
+    ]
+    assert captured["json"] == {
+        "uris": [
+            "spotify:track:recommended-track",
+            "spotify:track:second-dna-track",
+            "spotify:track:third-dna-track",
+        ]
+    }
+
+
+def test_context_playback_rejects_unowned_dna_sequence(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    _decision(connection_repository)
+    _decision(
+        connection_repository,
+        decision_id="unowned-decision",
+        user_id="another-user",
+        item_id="unowned-track",
+    )
+    monkeypatch.setattr(
+        player_routes.httpx,
+        "request",
+        lambda *args, **kwargs: pytest.fail("Spotify must not receive a mixed-owner sequence"),
+    )
+
+    response = client.put(
+        "/v1/player/recommendations/decision-1/play",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "device_id": "browser-device",
+            "outcome_id": "unowned-sequence",
+            "continuation_decision_ids": ["unowned-decision"],
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "recommendation_decision_not_found"
 
 
 def test_context_playback_hides_cross_user_decisions(
