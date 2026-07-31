@@ -499,34 +499,26 @@ PAGE = r"""<!doctype html>
       if(!spotifyConnected||autopilotFilling||(!force&&playerState?.paused!==false))return;
       autopilotFilling=true;
       try {
-        let queue=await loadQueue();
-        rememberAutopilotTrack(queue.current?.id);
-        let queuedIds=new Set([queue.current,...queue.up_next].filter(Boolean).map(track=>track.id));
-        let distinctAhead=new Set(queue.up_next.filter(track=>track?.id&&track.id!==queue.current?.id).map(track=>track.id));
-        if(distinctAhead.size<AUTOPILOT_HORIZON) {
-          let available=recommendationSlate.filter(item=>item?.id&&!queuedIds.has(item.id)&&!autopilotHistory.includes(item.id));
-          if(available.length<AUTOPILOT_HORIZON-distinctAhead.size) {
-            await loadLiveSpotify($('#moment').value,[...autopilotHistory,...queuedIds],false);
-            available=recommendationSlate.filter(item=>item?.id&&!queuedIds.has(item.id));
-            if(!available.length) {
-              await loadLiveSpotify($('#moment').value,[...queuedIds],false);
-              available=recommendationSlate.filter(item=>item?.id&&!queuedIds.has(item.id));
-            }
-          }
-          for(const item of available) {
-            if(distinctAhead.size>=AUTOPILOT_HORIZON)break;
-            const result=await (await api('/v1/player/queue',{method:'POST',body:JSON.stringify({item_id:item.id,command_id:`autopilot_${item.decision_id}_${item.id}`,device_id:queue.current?.device_id||deviceId})})).json();
-            if(result.applied||result.status==='already_queued'){queuedIds.add(item.id);distinctAhead.add(item.id);}
-          }
-          queue=await loadQueue();
-          distinctAhead=new Set(queue.up_next.filter(track=>track?.id&&track.id!==queue.current?.id).map(track=>track.id));
-        }
-        setText('#autopilot-status',`Autopilot on · ${distinctAhead.size} distinct track${distinctAhead.size===1?'':'s'} ready ahead`);
+        const round=[...dnaRounds].reverse().find(items=>items.some(item=>item.id===activePlaybackTrackId))||dnaRounds.at(-1)||recommendationSlate.slice(0,DNA_ROUND_SIZE);
+        const currentIndex=round.findIndex(item=>item.id===activePlaybackTrackId);
+        const readyAhead=(currentIndex>=0?round.slice(currentIndex+1):round).filter(item=>item?.id&&item?.decision_id);
+        setText('#autopilot-status',`EchoSense controls playback · ${readyAhead.length} Music DNA track${readyAhead.length===1?'':'s'} ready ahead`);
       } catch(error) {
         setText('#autopilot-status',`Autopilot is retrying · ${error.message}`);
       } finally {
         autopilotFilling=false;
       }
+    }
+    function recommendationExplanation(item) {
+      const factors=(item.why_now?.factors||[])
+        .filter(factor=>Number.isFinite(factor.score))
+        .sort((left,right)=>right.score-left.score)
+        .slice(0,3)
+        .map(factor=>`${factor.name} ${factor.score}%`);
+      const observations=(item.why_now?.observations||[]).filter(Boolean).slice(0,2);
+      const scoreReason=factors.length?`Picked because ${factors.join(', ')}.`:'';
+      const contextReason=observations.length?` Current signals: ${observations.join(' · ')}.`:'';
+      return `${scoreReason}${contextReason}`.trim()||item.why_now?.summary||item.reason||'Ranked from your Music DNA.';
     }
     function renderDnaQueue() {
       const container=$('#dna-queue-items'); container.replaceChildren();
@@ -548,7 +540,7 @@ PAGE = r"""<!doctype html>
         const track=document.createElement('td');track.className='track-cell';const title=document.createElement('strong');title.textContent=`${item.rank||''}. ${item.title}`;const artist=document.createElement('span');artist.textContent=item.artist;track.append(title,artist);row.appendChild(track);
         const scores=new Map((item.why_now?.factors||[]).map(factor=>[factor.name,factor.score]));
         factorNames.forEach(name=>{const cell=document.createElement('td');cell.className='metric';const score=scores.get(name);cell.textContent=Number.isFinite(score)?`${score}%`:'—';row.appendChild(cell);});
-        const why=document.createElement('td');why.className='why-cell';why.textContent=item.why_now?.summary||item.reason||'Ranked from your Music DNA.';row.appendChild(why);
+        const why=document.createElement('td');why.className='why-cell';why.textContent=recommendationExplanation(item);row.appendChild(why);
         const actionCell=document.createElement('td');const play=document.createElement('button');play.type='button';play.className='secondary';play.textContent='Play now';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));actionCell.appendChild(play);row.appendChild(actionCell);body.appendChild(row);
       });
       table.appendChild(body);container.appendChild(table);
