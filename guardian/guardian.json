@@ -104,6 +104,10 @@
         {
           "source": "tests/test_product_ui.py",
           "pattern": "completionTransitionInFlight"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "sameTrackFinished"
         }
       ]
     },
