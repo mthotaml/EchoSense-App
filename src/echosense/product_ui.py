@@ -200,6 +200,7 @@ PAGE = r"""<!doctype html>
     let dnaPageIndex = 0;
     const completedDnaTrackIds = new Set();
     let roundGenerationInFlight = null;
+    let completionTransitionInFlight = null;
     let activePlaybackTrackId = null;
     let activePlaybackDecisionId = null;
     const decisionByTrackId = new Map();
@@ -356,7 +357,8 @@ PAGE = r"""<!doctype html>
       $('#progress').max=state?.duration||1000; $('#progress').value=state?.position||0; setText('#elapsed',formatTime(state?.position||0)); setText('#duration',formatTime(state?.duration||0));
       const shuffle=state?.shuffle_state??state?.shuffle??false; $('#shuffle').setAttribute('aria-pressed',String(shuffle)); $('#shuffle').textContent=shuffle?'Shuffle on':'Shuffle';
       const repeat=state?.repeat_state??({0:'off',1:'context',2:'track'}[state?.repeat_mode]||'off'); $('#repeat').value=repeat;
-      if(spotifyConnected && track?.id===currentTrackId && previous?.paused===false && state?.paused && state.duration && state.position/state.duration>=.95) {
+      const sameTrackFinished=track?.id&&track.id===previous?.track_window?.current_track?.id;
+      if(spotifyConnected && activePlaybackDecisionId && sameTrackFinished && previous?.paused===false && state?.paused && state.duration && state.position/state.duration>=.95) {
         feedback('completed',{completion_ratio:state.position/state.duration,playback_seconds:state.position/1000}).catch(()=>{});
       }
       const previousTrackId=previous?.track_window?.current_track?.id;
@@ -395,11 +397,25 @@ PAGE = r"""<!doctype html>
 
     async function markDnaTrackCompleted(trackId) {
       const activeRound=dnaRounds.at(-1)||[];
-      if(!activeRound.some(item=>item.id===trackId))return;
+      const completedIndex=activeRound.findIndex(item=>item.id===trackId);
+      if(completedIndex<0||completedDnaTrackIds.has(trackId))return;
       completedDnaTrackIds.add(trackId);
-      if(activeRound.length===DNA_ROUND_SIZE&&activeRound.every(item=>completedDnaTrackIds.has(item.id))) {
-        const next=await generateNextDnaRound('completed');
-        if(!skipInFlight)await playDnaTrack(next);
+      if(skipInFlight)return;
+      if(completionTransitionInFlight)return completionTransitionInFlight;
+      completionTransitionInFlight=(async()=>{
+        const nextInRound=activeRound
+          .slice(completedIndex+1)
+          .find(item=>item?.id&&item?.decision_id&&!completedDnaTrackIds.has(item.id));
+        const next=nextInRound||await generateNextDnaRound('completed');
+        if(!next)throw new Error('EchoSense could not select the next Music DNA track after completion.');
+        await playDnaTrack(next);
+        setText('#toast',`Completed. EchoSense continued with ${next.title} from your Music DNA.`);
+        return next;
+      })();
+      try {
+        return await completionTransitionInFlight;
+      } finally {
+        completionTransitionInFlight=null;
       }
     }
 
