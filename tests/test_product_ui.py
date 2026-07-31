@@ -108,12 +108,17 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="dna-queue-panel"' in response.text
     assert "playDnaTrack" in response.text
     assert "maintainAutopilot" in response.text
-    assert "AUTOPILOT_HORIZON = 5" in response.text
+    assert "DNA_ROUND_SIZE = 6" in response.text
+    assert "AUTOPILOT_HORIZON = DNA_ROUND_SIZE" in response.text
     assert "autopilotTimer=setInterval" in response.text
     assert "updateCurrentPick=true" in response.text
     assert "if(!updateCurrentPick){renderDnaQueue();return data;}" in response.text
     assert "Autopilot on" in response.text
-    assert "Up next, continuously" in response.text
+    assert "Six tracks for this listening round" in response.text
+    assert 'id="dna-pagination"' in response.text
+    assert "rememberDnaRound" in response.text
+    assert "generateNextDnaRound('completed')" in response.text
+    assert "skipAndPlayNext(true)" in response.text
     assert "Play recommendation" in response.text
     assert "Skip current song" in response.text
     assert 'id="pick-label"' in response.text
@@ -129,15 +134,29 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Skip &amp; play next" not in response.text
     assert "skipAndPlayNext" in response.text
     assert "skipInFlight" in response.text
-    assert "Spotify did not advance playback" in response.text
-    assert "Promise.allSettled([loadQueue(),loadLiveSpotify()])" in response.text
-    assert "verified ${title} is playing" in response.text
+    assert "Spotify did not start the selected Music DNA track" in response.text
+    assert "Promise.allSettled([loadQueue(),recommendationRefresh])" in response.text
+    assert "selected the next Music DNA track and verified ${title} is playing" in response.text
     assert "targetDeviceId=before?.device?.id||deviceId||''" in response.text
     assert "state?.continuity?.source!=='snapshot'" in response.text
-    assert "nextDistinct=(queue.up_next||[]).find" in response.text
-    assert "spotify_uri:`spotify:track:${nextDistinct.id}`" in response.text
+    assert "nextDna=orderedCandidates.find" in response.text
+    assert "/v1/player/recommendations/${encodeURIComponent(nextDna.decision_id)}/play" in response.text
+    assert "nextId===nextDna.id" in response.text
+    assert "api(`/v1/player/next?" not in response.text[
+        response.text.index("async function skipAndPlayNext(startNewRound=false)") :
+        response.text.index("async function load()")
+    ]
     assert "className='dna-table'" in response.text
     assert "factorNames" in response.text
+    assert "factorExplanations" in response.text
+    assert "How closely this track matches your long-term Spotify taste" in response.text
+    assert "How well this track fits your current time, weather" in response.text
+    assert "An adjustment learned from your plays, completions, saves, and skips" in response.text
+    assert "avoids repeating the same tracks or artists" in response.text
+    assert "className='factor-info'" in response.text
+    assert "info.setAttribute('aria-label'" in response.text
+    assert "Normalized from Music DNA rank, live-context fit" in response.text
+    assert "% normalized match" in response.text
     assert "Compare what shaped each pick." not in response.text
     assert 'id="queue-skip"' in response.text
     assert 'id="live-context-panel"' in response.text
