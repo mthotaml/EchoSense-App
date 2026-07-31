@@ -468,7 +468,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect.poll(() => recommendationPlays.map(item => item.decision_id)).toContain(
     'decision-distinct',
   );
-  await expect.poll(() => new Set(queueCommands.map(item => item.item_id)).size).toBe(4);
+  await expect.poll(() => new Set(queueCommands.map(item => item.item_id)).size).toBe(5);
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
   await expect(page.locator('#autopilot-status')).toContainText('6 distinct tracks ready ahead');
 
