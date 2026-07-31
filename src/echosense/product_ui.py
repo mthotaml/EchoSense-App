@@ -778,9 +778,15 @@ PAGE = r"""<!doctype html>
         activePlaybackTrackId=nextDna.id;
         activePlaybackDecisionId=nextDna.decision_id;
         rememberAutopilotTrack(previousId);
-        const recommendationRefresh=startNewRound
-          ? Promise.resolve()
-          : loadLiveSpotify($('#moment').value,[],true,false);
+        const refreshExclusions=startNewRound
+          ? [...autopilotHistory,...allGeneratedDnaIds()]
+          : [];
+        const recommendationRefresh=loadLiveSpotify(
+          $('#moment').value,
+          refreshExclusions,
+          true,
+          false
+        );
         await Promise.allSettled([loadQueue(),recommendationRefresh]);
         await maintainAutopilot(true);
         const title=changed.track_window.current_track?.name||'the next track';
