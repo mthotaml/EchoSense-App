@@ -140,12 +140,19 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "targetDeviceId=before?.device?.id||deviceId||''" in response.text
     assert "state?.continuity?.source!=='snapshot'" in response.text
     assert "nextDna=orderedCandidates.find" in response.text
-    assert "/v1/player/recommendations/${encodeURIComponent(nextDna.decision_id)}/play" in response.text
+    assert (
+        "/v1/player/recommendations/${encodeURIComponent(nextDna.decision_id)}/play"
+        in response.text
+    )
     assert "nextId===nextDna.id" in response.text
-    assert "api(`/v1/player/next?" not in response.text[
-        response.text.index("async function skipAndPlayNext(startNewRound=false)") :
-        response.text.index("async function load()")
-    ]
+    assert (
+        "api(`/v1/player/next?"
+        not in response.text[
+            response.text.index(
+                "async function skipAndPlayNext(startNewRound=false)"
+            ) : response.text.index("async function load()")
+        ]
+    )
     assert "className='dna-table'" in response.text
     assert "factorNames" in response.text
     assert "factorExplanations" in response.text
