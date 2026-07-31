@@ -323,8 +323,10 @@ def test_context_playback_resolves_owned_decision_and_records_after_success(
     assert first.json()["learning"]["signal"] == "played"
     assert first.json()["learning"]["applied"] is True
     assert duplicate.json()["learning"]["applied"] is False
-    assert requests[0]["params"] == {"device_id": "browser-device"}
-    assert requests[0]["json"] == {"uris": ["spotify:track:recommended-track"]}
+    assert requests[0]["params"] == {"state": "false", "device_id": "browser-device"}
+    assert requests[1]["params"] == {"state": "off", "device_id": "browser-device"}
+    assert requests[2]["params"] == {"device_id": "browser-device"}
+    assert requests[2]["json"] == {"uris": ["spotify:track:recommended-track"]}
 
 
 def test_context_playback_installs_owned_dna_sequence_in_order(
@@ -342,10 +344,10 @@ def test_context_playback_installs_owned_dna_sequence_in_order(
         decision_id="decision-3",
         item_id="third-dna-track",
     )
-    captured: dict[str, object] = {}
+    captured: list[dict[str, object]] = []
 
     def fake_request(method, url, **kwargs):
-        captured.update({"method": method, "url": url, **kwargs})
+        captured.append({"method": method, "url": url, **kwargs})
         return httpx.Response(204, request=httpx.Request(method, url))
 
     monkeypatch.setattr(player_routes.httpx, "request", fake_request)
@@ -365,13 +367,16 @@ def test_context_playback_installs_owned_dna_sequence_in_order(
         "second-dna-track",
         "third-dna-track",
     ]
-    assert captured["json"] == {
+    assert captured[0]["params"] == {"state": "false", "device_id": "browser-device"}
+    assert captured[1]["params"] == {"state": "off", "device_id": "browser-device"}
+    assert captured[2]["json"] == {
         "uris": [
             "spotify:track:recommended-track",
             "spotify:track:second-dna-track",
             "spotify:track:third-dna-track",
         ]
     }
+    assert response.json()["playback_mode"] == {"shuffle": False, "repeat": "off"}
 
 
 def test_context_playback_rejects_unowned_dna_sequence(
