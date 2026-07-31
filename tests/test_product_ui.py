@@ -120,6 +120,11 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "generateNextDnaRound('completed')" in response.text
     assert "if(roundGenerationInFlight)return roundGenerationInFlight" in response.text
     assert "if(!skipInFlight)await playDnaTrack(next)" in response.text
+    live_loader = response.text[
+        response.text.index("async function loadLiveSpotify(") :
+        response.text.index("async function loadDemo()")
+    ]
+    assert "return data;" in live_loader
     assert "skipAndPlayNext(true)" in response.text
     assert "Play recommendation" in response.text
     assert "Skip current song" in response.text
