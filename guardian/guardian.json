@@ -107,7 +107,7 @@
         },
         {
           "source": "tests/e2e/spotify-reference.spec.js",
-          "pattern": "Round 2 of 2"
+          "pattern": "roundsBeforeSkip + 1"
         },
         {
           "source": "tests/test_product_ui.py",
