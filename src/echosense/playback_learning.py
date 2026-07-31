@@ -8,6 +8,22 @@ from echosense.providers.models import Track
 from echosense.storage import Storage
 
 PlaybackSignal = Literal["played", "completed", "skipped", "saved", "liked", "disliked", "rated"]
+PREFERENCE_COEFFICIENT = 0.25
+
+
+def normalize_ranking_score(ranking_score: float, *, context_weight: float) -> int:
+    """Map the current ranking utility to a stable 0–100 scale.
+
+    The raw formula has a theoretical minimum of -0.25 (zero base/context and
+    maximum negative preference) and a maximum of 1 + context_weight + 0.25.
+    This affine transform is monotonic, so normalization never changes rank.
+    """
+    if not 0.0 <= context_weight <= 0.5:
+        raise ValueError("context_weight must be between 0 and 0.5")
+    minimum = -PREFERENCE_COEFFICIENT
+    maximum = 1.0 + context_weight + PREFERENCE_COEFFICIENT
+    normalized = (ranking_score - minimum) / (maximum - minimum)
+    return round(max(0.0, min(1.0, normalized)) * 100)
 
 
 @dataclass(frozen=True)
@@ -55,7 +71,9 @@ class PlaybackLearningService:
             preference_weight = weights.get(track.provider_id, 0.0)
             context_fit = (context_scores or {}).get(track.provider_id, 0.0)
             ranking_score = round(
-                base_score + context_weight * context_fit + 0.25 * preference_weight,
+                base_score
+                + context_weight * context_fit
+                + PREFERENCE_COEFFICIENT * preference_weight,
                 6,
             )
             slate.append(
@@ -68,6 +86,10 @@ class PlaybackLearningService:
                     "context_fit": context_fit,
                     "context_weight": context_weight,
                     "ranking_score": ranking_score,
+                    "normalized_score": normalize_ranking_score(
+                        ranking_score,
+                        context_weight=context_weight,
+                    ),
                 }
             )
         slate.sort(key=lambda item: (-float(item["ranking_score"]), int(item["rank"])))
