@@ -92,6 +92,22 @@
       ]
     },
     {
+      "id": "verified-completion-transition",
+      "severity": "severity-1",
+      "description": "Natural track completion explicitly starts the next ranked Music DNA decision; Spotify's provider queue must not choose the next track.",
+      "covers": ["completion-transition-verified", "completion-next-dna-decision-bound", "completion-provider-next-bypassed"],
+      "evidence": [
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "dna-completion-play"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "completionTransitionInFlight"
+        }
+      ]
+    },
+    {
       "id": "continuous-diverse-autopilot",
       "severity": "severity-2",
       "description": "Autopilot presents paginated rounds of six distinct tracks and generates a fresh excluded round after a hero skip or completion of all six tracks.",
@@ -182,6 +198,9 @@
         "skip-active-device-targeted",
         "skip-next-dna-decision-bound",
         "skip-provider-next-bypassed",
+        "completion-transition-verified",
+        "completion-next-dna-decision-bound",
+        "completion-provider-next-bypassed",
         "autopilot-single-start",
         "autopilot-six-track-round",
         "autopilot-hero-skip-new-round",
