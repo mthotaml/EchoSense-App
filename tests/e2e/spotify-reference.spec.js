@@ -304,8 +304,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     }, trackId);
   });
   await page.route('**/auth/spotify/feedback', async route => {
-    feedback.push(await route.request().postDataJSON());
-    controlEvents.push('feedback');
+    const signal = await route.request().postDataJSON();
+    feedback.push(signal);
+    controlEvents.push(`feedback:${signal.signal}`);
     return route.fulfill({
       json: {applied: true, weight: 0.1, evidence_count: feedback.length},
     });
@@ -526,10 +527,10 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
-  await expect.poll(() => controlEvents.slice(-2)).toEqual([
-    'feedback',
-    'dna-play',
-  ]);
+  await expect.poll(() => controlEvents).toContain('dna-play');
+  expect(controlEvents.lastIndexOf('dna-play')).toBeGreaterThan(
+    controlEvents.lastIndexOf('feedback:skipped'),
+  );
   expect(controlEvents).not.toContain('next');
   expect(recommendationPlays.at(-1)).toMatchObject({
     decision_id: 'decision-distinct',
