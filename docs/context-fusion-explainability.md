@@ -39,6 +39,13 @@ Southern California uses a `California Los Angeles` catalog query while preservi
 `Southern California` as the user-facing evidence label. Driving uses a driving query;
 faster-than-usual driving uses an upbeat-driving query.
 
+The displayed match score is derived from the same utility used for ranking. The raw utility
+is `Music DNA base + context weight × context fit + 0.25 × learned preference`. Its
+theoretical range (`-0.25` through `1 + context weight + 0.25`) is mapped monotonically to
+`0–100`. Normalization therefore makes the value readable without changing candidate order.
+The score is never hard-coded, values outside the theoretical range are clamped, and
+diversity remains a post-ranking eligibility guard rather than an additive percentage.
+
 The initial road-setting classifier uses Open-Meteo elevation for mountain detection and a
 bounded Southern California coastal corridor for coastal detection. A coastal drive adds
 beach/coastal candidates; a mountain drive adds scenic mountain candidates. Both retain
@@ -51,6 +58,9 @@ Each visible Music DNA candidate carries a `why_now` object containing:
 - a concise summary;
 - scored factors for Music DNA affinity, live context fit, learned preference, and
   diversity; and
+- accessible information controls in the table headers explain long-term taste,
+  current situation, learned behavioral feedback, and repetition protection without
+  repeating those definitions in every track row; and
 - observable evidence such as sunny weather, afternoon timing, Southern California, or
   a coastal or mountain drive.
 
