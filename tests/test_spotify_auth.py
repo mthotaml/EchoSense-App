@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
+import httpx
 import pytest
 from cryptography.fernet import Fernet
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from echosense import spotify_auth
@@ -88,6 +90,46 @@ def test_spotify_callback_rejects_invalid_state() -> None:
 
     assert response.status_code == 400
     assert response.json()["detail"]["code"] == "invalid_oauth_state"
+
+
+def test_spotify_profile_retries_once_after_retry_after() -> None:
+    responses = iter(
+        [
+            httpx.Response(429, headers={"Retry-After": "2"}),
+            httpx.Response(200, json={"id": "spotify-user", "display_name": "Mohan"}),
+        ]
+    )
+    delays: list[float] = []
+    client = httpx.Client(transport=httpx.MockTransport(lambda request: next(responses)))
+
+    profile = spotify_auth._spotify_profile_with_backoff(
+        client,
+        "access-token",
+        sleep=delays.append,
+    )
+
+    assert profile["id"] == "spotify-user"
+    assert delays == [2]
+
+
+def test_spotify_profile_returns_bounded_rate_limit_error_after_retry() -> None:
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(429, headers={"Retry-After": "3"})
+        )
+    )
+
+    with pytest.raises(HTTPException) as error:
+        spotify_auth._spotify_profile_with_backoff(
+            client,
+            "access-token",
+            sleep=lambda _: None,
+        )
+
+    assert error.value.status_code == 429
+    assert error.value.detail["code"] == "spotify_rate_limited"
+    assert error.value.detail["retry_after_seconds"] == 3
+    assert error.value.headers == {"Retry-After": "3"}
 
 
 def test_spotify_data_builds_live_music_profile(

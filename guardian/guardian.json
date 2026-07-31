@@ -28,6 +28,22 @@
       ]
     },
     {
+      "id": "oauth-rate-limit-backoff",
+      "severity": "severity-1",
+      "description": "Spotify connection profile loading respects Retry-After, retries once without a tight loop, and returns a bounded rate-limit response if Spotify remains unavailable.",
+      "covers": ["oauth-profile-rate-limit-retried", "oauth-rate-limit-bounded", "oauth-tight-retry-prohibited"],
+      "evidence": [
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "test_spotify_profile_retries_once_after_retry_after"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "test_spotify_profile_returns_bounded_rate_limit_error_after_retry"
+        }
+      ]
+    },
+    {
       "id": "audible-browser-playback",
       "severity": "severity-1",
       "description": "Playback success requires an activated browser player and observed unpaused SDK state.",
@@ -217,6 +233,9 @@
         "player-ready",
         "context-selected",
         "spotify-data-failure-rendered",
+        "oauth-profile-rate-limit-retried",
+        "oauth-rate-limit-bounded",
+        "oauth-tight-retry-prohibited",
         "recommendation-ranked",
         "dna-slate-diversified",
         "already-queued-track-skipped",
