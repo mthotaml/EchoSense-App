@@ -5,6 +5,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let playbackStarted = false;
   let skippedToNext = false;
   let restoreFromSnapshot = false;
+  let providerTrack = {id: 'working-track', name: 'Focused Motion'};
   const playRequests = [];
   const recommendationPlays = [];
   const transfers = [];
@@ -177,8 +178,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             is_playing: true,
             progress_ms: 30000,
             item: {
-              id: skippedToNext ? 'distinct-track' : 'working-track',
-              name: skippedToNext ? 'Distinct Motion' : 'Focused Motion',
+              id: providerTrack.id,
+              name: providerTrack.name,
               duration_ms: 180000,
               artists: [{name: 'Echo Artist'}],
               album: {images: []},
@@ -267,10 +268,19 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     const request = await route.request().postDataJSON();
     const decisionId = new URL(route.request().url()).pathname.split('/').at(-2);
     recommendationPlays.push({...request, decision_id: decisionId});
-    const trackId = decisionId === 'decision-distinct' ? 'distinct-track' : 'working-track';
+    const tracksByDecision = {
+      'decision-distinct': {id: 'distinct-track', name: 'Distinct Motion'},
+      'decision-autopilot-3': {id: 'autopilot-3', name: 'Open Current'},
+      'decision-post-skip': {id: 'post-skip-track', name: 'Fresh Horizon'},
+    };
+    providerTrack = tracksByDecision[decisionId] || {id: 'working-track', name: 'Focused Motion'};
+    const trackId = providerTrack.id;
     if (decisionId === 'decision-distinct' && feedback.some(item => item.signal === 'skipped')) {
       controlEvents.push('dna-play');
       skippedToNext = true;
+    }
+    if (decisionId === 'decision-autopilot-3') {
+      controlEvents.push('dna-completion-play');
     }
     await route.fulfill({
       json: {
@@ -284,15 +294,15 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         },
       },
     });
-    await page.evaluate(id => {
+    await page.evaluate(track => {
       const state = {
         paused: false,
         position: 0,
         duration: 180000,
         track_window: {
           current_track: {
-            id,
-            name: id === 'distinct-track' ? 'Distinct Motion' : 'Focused Motion',
+            id: track.id,
+            name: track.name,
             duration_ms: 180000,
             artists: [{name: 'Echo Artist'}],
             album: {images: []},
@@ -301,7 +311,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       };
       window.__sdkPlaybackState = state;
       window.__mockPlayer.emit(state);
-    }, trackId);
+    }, providerTrack);
   });
   await page.route('**/auth/spotify/feedback', async route => {
     const signal = await route.request().postDataJSON();
@@ -499,32 +509,6 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect.poll(() => recommendationPlays).toHaveLength(3);
   expect(recommendationPlays[2].outcome_id).toBe(recommendationPlays[1].outcome_id);
 
-  await page.evaluate(() => {
-    const track = {
-      id: 'working-track',
-      name: 'Focused Motion',
-      duration_ms: 180000,
-      artists: [{name: 'Echo Artist'}],
-      album: {images: []},
-    };
-    window.__mockPlayer.emit({
-      paused: false,
-      position: 170000,
-      duration: 180000,
-      track_window: {current_track: track},
-    });
-    window.__mockPlayer.emit({
-      paused: true,
-      position: 178000,
-      duration: 180000,
-      track_window: {current_track: track},
-    });
-  });
-  await expect.poll(() => feedback.map(item => item.signal)).toContain('completed');
-  expect(feedback.find(item => item.signal === 'completed').decision_id).toBe(
-    'decision-working',
-  );
-
   const roundsBeforeSkip = Number(
     (await page.locator('#dna-page-status').textContent()).match(/of (\d+)/)?.[1],
   );
@@ -558,9 +542,45 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     `Round ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
   );
 
+  await page.evaluate(() => {
+    const track = {
+      id: 'distinct-track',
+      name: 'Distinct Motion',
+      duration_ms: 180000,
+      artists: [{name: 'Echo Artist'}],
+      album: {images: []},
+    };
+    window.__mockPlayer.emit({
+      paused: false,
+      position: 175000,
+      duration: 180000,
+      track_window: {current_track: track},
+    });
+    window.__mockPlayer.emit({
+      paused: true,
+      position: 178000,
+      duration: 180000,
+      track_window: {current_track: track},
+    });
+  });
+  await expect.poll(() => feedback.map(item => item.signal)).toContain('completed');
+  expect(feedback.find(item => item.signal === 'completed').decision_id).toBe(
+    'decision-distinct',
+  );
+  await expect.poll(() => controlEvents).toContain('dna-completion-play');
+  expect(controlEvents).not.toContain('next');
+  expect(recommendationPlays.at(-1)).toMatchObject({
+    decision_id: 'decision-autopilot-3',
+    device_id: 'guardian-device',
+  });
+  await expect(page.locator('#player-title')).toHaveText('Open Current');
+  await expect(page.locator('#toast')).toContainText(
+    'continued with Open Current from your Music DNA',
+  );
+
   restoreFromSnapshot = true;
   await page.reload();
-  await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
+  await expect(page.locator('#player-title')).toHaveText('Open Current');
   await expect(page.locator('#player-status')).toContainText('Last session restored');
   await expect(page.locator('#toggle')).toHaveText('▶');
 
