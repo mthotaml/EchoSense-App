@@ -4,9 +4,10 @@ import base64
 import hashlib
 import os
 import secrets
+import time
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Callable, Literal
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -56,10 +57,44 @@ DEFAULT_SCOPES = (
 SESSION_COOKIE = "echosense_spotify_session"
 STATE_COOKIE = "echosense_spotify_oauth_state"
 VERIFIER_COOKIE = "echosense_spotify_pkce_verifier"
+SPOTIFY_PROFILE_RETRY_LIMIT_SECONDS = 30
 
 
 SpotifySession = ProviderConnection
 _connection_repository: ProviderConnectionRepository | None = None
+
+
+def _spotify_profile_with_backoff(
+    client: httpx.Client,
+    access_token: str,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> dict[str, object]:
+    headers = {"Authorization": f"Bearer {access_token}"}
+    for attempt in range(2):
+        response = client.get(SPOTIFY_PROFILE_URL, headers=headers)
+        if response.status_code != 429:
+            response.raise_for_status()
+            profile = response.json()
+            if not isinstance(profile, dict):
+                raise ValueError("Spotify profile response must be an object")
+            return profile
+        retry_header = response.headers.get("Retry-After", "1")
+        retry_after = int(retry_header) if retry_header.isdigit() else 1
+        retry_after = max(1, retry_after)
+        if attempt == 0 and retry_after <= SPOTIFY_PROFILE_RETRY_LIMIT_SECONDS:
+            sleep(retry_after)
+            continue
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "spotify_rate_limited",
+                "message": "Spotify is temporarily limiting connection requests. Wait before reconnecting.",
+                "retry_after_seconds": retry_after,
+            },
+            headers={"Retry-After": str(retry_after)},
+        )
+    raise RuntimeError("Spotify profile retry loop ended unexpectedly")
 
 
 class SpotifyFeedbackRequest(BaseModel):
@@ -299,12 +334,7 @@ def spotify_callback(
             token_response.raise_for_status()
             token_payload = token_response.json()
             access_token = str(token_payload["access_token"])
-            profile_response = client.get(
-                SPOTIFY_PROFILE_URL,
-                headers={"Authorization": f"Bearer {access_token}"},
-            )
-            profile_response.raise_for_status()
-            profile = profile_response.json()
+            profile = _spotify_profile_with_backoff(client, access_token)
     except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
