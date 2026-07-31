@@ -199,7 +199,7 @@ PAGE = r"""<!doctype html>
     const dnaRounds = [];
     let dnaPageIndex = 0;
     const completedDnaTrackIds = new Set();
-    let roundGenerationInFlight = false;
+    let roundGenerationInFlight = null;
     let activePlaybackTrackId = null;
     let activePlaybackDecisionId = null;
     const decisionByTrackId = new Map();
@@ -374,9 +374,8 @@ PAGE = r"""<!doctype html>
     }
 
     async function generateNextDnaRound(reason='skip') {
-      if(roundGenerationInFlight)return null;
-      roundGenerationInFlight=true;
-      try {
+      if(roundGenerationInFlight)return roundGenerationInFlight;
+      roundGenerationInFlight=(async()=>{
         const exclusions=[...autopilotHistory,...allGeneratedDnaIds()];
         const data=await loadLiveSpotify($('#moment').value,exclusions,true,true);
         const next=(data.recommendations||[]).find(
@@ -384,10 +383,12 @@ PAGE = r"""<!doctype html>
         );
         if(!next)throw new Error('EchoSense needs more distinct Spotify candidates before starting another Music DNA round.');
         setText('#autopilot-status',`Round ${dnaRounds.length} ready · ${Math.min(DNA_ROUND_SIZE,data.recommendations.length)} new Music DNA tracks`);
-        if(reason==='completed')await playDnaTrack(next);
         return next;
+      })();
+      try {
+        return await roundGenerationInFlight;
       } finally {
-        roundGenerationInFlight=false;
+        roundGenerationInFlight=null;
       }
     }
 
@@ -396,7 +397,8 @@ PAGE = r"""<!doctype html>
       if(!activeRound.some(item=>item.id===trackId))return;
       completedDnaTrackIds.add(trackId);
       if(activeRound.length===DNA_ROUND_SIZE&&activeRound.every(item=>completedDnaTrackIds.has(item.id))) {
-        await generateNextDnaRound('completed');
+        const next=await generateNextDnaRound('completed');
+        if(!skipInFlight)await playDnaTrack(next);
       }
     }
 
