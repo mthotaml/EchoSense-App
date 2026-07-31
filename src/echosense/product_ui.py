@@ -376,6 +376,15 @@ PAGE = r"""<!doctype html>
       return [...new Set(dnaRounds.flat().map(item=>item.id).filter(Boolean))];
     }
 
+    function dnaContinuationDecisionIds(item) {
+      const round=[...dnaRounds].reverse().find(
+        candidateRound=>candidateRound.some(candidate=>candidate.id===item?.id)
+      )||[];
+      const index=round.findIndex(candidate=>candidate.id===item?.id);
+      if(index<0)return [];
+      return round.slice(index+1).map(candidate=>candidate.decision_id).filter(Boolean);
+    }
+
     async function generateNextDnaRound(reason='skip') {
       if(roundGenerationInFlight)return roundGenerationInFlight;
       roundGenerationInFlight=(async()=>{
@@ -624,7 +633,7 @@ PAGE = r"""<!doctype html>
       if(!deviceId)throw new Error('Player is not ready yet.');
       activePlaybackTrackId=item.id; activePlaybackDecisionId=item.decision_id;
       await activateBrowser(false);
-      await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`})});
+      await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,continuation_decision_ids:dnaContinuationDecisionIds(item)})});
       await restorePlaybackState();
       await waitForAudibleBrowserPlayback(item.id);
       await maintainAutopilot(true);
@@ -652,7 +661,7 @@ PAGE = r"""<!doctype html>
       if(!currentRecommendationId||!currentPlayOutcomeId) throw new Error('Recommendation is not ready yet.');
       activePlaybackTrackId=currentTrackId; activePlaybackDecisionId=currentRecommendationId;
       await activateBrowser(false);
-      await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId})});
+      await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId,continuation_decision_ids:dnaContinuationDecisionIds({id:currentTrackId})})});
       await restorePlaybackState();
       await waitForAudibleBrowserPlayback(currentTrackId);
       await maintainAutopilot(true);
@@ -780,7 +789,8 @@ PAGE = r"""<!doctype html>
           method:'PUT',
           body:JSON.stringify({
             device_id:targetDeviceId,
-            outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`
+            outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,
+            continuation_decision_ids:dnaContinuationDecisionIds(nextDna)
           })
         });
         let changed=null;
