@@ -487,9 +487,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       'decision-autopilot-6',
     ],
   });
-  await expect.poll(() => new Set(queueCommands.map(item => item.item_id)).size).toBe(5);
+  expect(queueCommands).toHaveLength(0);
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
-  await expect(page.locator('#autopilot-status')).toContainText('6 distinct tracks ready ahead');
+  await expect(page.locator('#autopilot-status')).toContainText('4 Music DNA tracks ready ahead');
+  await expect(page.locator('#dna-queue-items tbody tr').first().locator('.why-cell')).toContainText(
+    'Picked because Music DNA affinity 95%, Diversity guard 91%, Live context fit 88%',
+  );
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
