@@ -154,6 +154,8 @@ def test_spotify_data_builds_live_music_profile(
         "/me/top/tracks",
     ]
     assert payload["recommendation"]["title"] == "A Real Track"
+    assert payload["recommendation"]["match_score"] == 80
+    assert payload["recommendations"][0]["why_now"]["overall_score"] == 80
     assert payload["recommendation"]["decision_id"].startswith("dec_")
     assert payload["recommendation"]["evidence"]["noticed"] == "You selected working."
     assert payload["recommendation"]["evidence"]["matched_genres"] == ["ambient"]

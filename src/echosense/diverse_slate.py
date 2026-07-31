@@ -22,7 +22,7 @@ class DiverseSlateService:
         tracks: list[Track],
         ranked: list[dict[str, object]],
         *,
-        limit: int = 5,
+        limit: int = 6,
         excluded_ids: set[str] | None = None,
     ) -> list[SlateItem]:
         by_id = {track.provider_id: track for track in tracks}

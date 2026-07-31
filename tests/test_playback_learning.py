@@ -1,4 +1,9 @@
-from echosense.playback_learning import PlaybackLearningService
+import pytest
+
+from echosense.playback_learning import (
+    PlaybackLearningService,
+    normalize_ranking_score,
+)
 from echosense.providers.models import Track
 from echosense.storage import Storage
 
@@ -109,3 +114,40 @@ def test_explicit_context_fit_can_change_candidate_order(tmp_path) -> None:
     assert selected == tracks[1]
     assert slate[0]["item_id"] == "track-b"
     assert slate[0]["context_fit"] == 1.0
+
+
+def test_normalized_score_is_bounded_monotonic_and_preserves_rank(tmp_path) -> None:
+    service = PlaybackLearningService(Storage(f"sqlite:///{tmp_path / 'normalized.db'}"))
+    tracks = [
+        Track("spotify", "track-a", "A", ("Artist A",)),
+        Track("spotify", "track-b", "B", ("Artist B",)),
+        Track("spotify", "track-c", "C", ("Artist C",)),
+    ]
+
+    _, slate = service.rank(
+        user_id="user-1",
+        provider="spotify",
+        context="driving",
+        tracks=tracks,
+        context_scores={"track-a": 1.0, "track-b": 0.5, "track-c": 0.0},
+        context_weight=0.35,
+    )
+
+    assert [item["normalized_score"] for item in slate] == sorted(
+        [item["normalized_score"] for item in slate],
+        reverse=True,
+    )
+    assert all(0 <= item["normalized_score"] <= 100 for item in slate)
+    assert slate[0]["normalized_score"] == 86
+
+
+def test_normalized_score_maps_theoretical_bounds_to_zero_and_one_hundred() -> None:
+    assert normalize_ranking_score(-0.25, context_weight=0.35) == 0
+    assert normalize_ranking_score(1.60, context_weight=0.35) == 100
+    assert normalize_ranking_score(10.0, context_weight=0.35) == 100
+    assert normalize_ranking_score(-10.0, context_weight=0.35) == 0
+
+
+def test_normalized_score_rejects_invalid_context_weight() -> None:
+    with pytest.raises(ValueError, match="context_weight"):
+        normalize_ranking_score(1.0, context_weight=0.75)
