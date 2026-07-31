@@ -138,6 +138,13 @@ PAGE = r"""<!doctype html>
     .dna-table .track-cell span,.dna-table .why-cell { color:var(--muted); }
     .dna-table .why-cell { min-width:210px; line-height:1.35; }
     .dna-table .track-actions { white-space:nowrap; }
+    .dna-pagination { display:flex; justify-content:center; align-items:center; gap:10px; margin-top:18px; }
+    .dna-pagination span { min-width:110px; color:var(--muted); text-align:center; font-size:.86rem; }
+    .factor-heading { display:inline-flex; align-items:center; gap:6px; }
+    .factor-info { position:relative; display:inline-grid; place-items:center; width:18px; height:18px; padding:0; border:1px solid var(--line); border-radius:50%; background:transparent; color:var(--muted); font:700 11px/1 system-ui,sans-serif; text-transform:none; cursor:help; }
+    .factor-info:hover,.factor-info:focus-visible { color:var(--text); border-color:var(--accent); outline:none; }
+    .factor-info::after { content:attr(data-tooltip); position:absolute; z-index:20; left:50%; bottom:calc(100% + 9px); width:240px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#171d27; color:var(--text); box-shadow:0 12px 28px rgba(0,0,0,.35); font-size:.78rem; font-weight:500; line-height:1.4; letter-spacing:0; text-align:left; text-transform:none; white-space:normal; opacity:0; pointer-events:none; transform:translate(-50%,4px); transition:opacity .15s ease,transform .15s ease; }
+    .factor-info:hover::after,.factor-info:focus-visible::after { opacity:1; transform:translate(-50%,0); }
     .arrow { color:#667186; }
     #toast { min-height:22px; margin-top:14px; color:var(--accent); }
     .player { position:fixed; left:0; right:0; bottom:0; z-index:20; min-height:96px; border-top:1px solid #30394a; background:rgba(8,11,16,.96); backdrop-filter:blur(18px); display:grid; grid-template-columns:minmax(220px,1fr) minmax(280px,1.3fr) minmax(180px,1fr); align-items:center; gap:24px; padding:14px 24px; }
@@ -166,7 +173,7 @@ PAGE = r"""<!doctype html>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
       <section class="panel"><div class="pick-top"><div><div id="pick-label" class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play recommendation</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip current song</button></div><div id="toast" aria-live="polite"></div></section>
-      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA Autopilot</div><h2>Up next, continuously</h2><p class="copy">EchoSense keeps a rolling queue ready while you listen.</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="context-chip">Autopilot on</span></div><div id="dna-queue-items" class="table-wrap"></div></section>
+      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA Autopilot</div><h2>Six tracks for this listening round</h2><p class="copy">EchoSense generates the next round when you skip from the hero or finish these six songs.</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="context-chip">Autopilot on</span></div><div id="dna-queue-items" class="table-wrap"></div><nav id="dna-pagination" class="dna-pagination" aria-label="Music DNA rounds" hidden><button id="dna-page-previous" class="secondary" type="button">Previous</button><span id="dna-page-status">Round 1 of 1</span><button id="dna-page-next" class="secondary" type="button">Next</button></nav></section>
       <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Spotify playback queue</div><h2>Now and next</h2></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next</button><button id="queue-refresh" class="secondary" type="button">Refresh</button></div></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
@@ -189,6 +196,10 @@ PAGE = r"""<!doctype html>
     let currentQueueCommandId = null;
     let currentTrackSaved = false;
     let recommendationSlate = [];
+    const dnaRounds = [];
+    let dnaPageIndex = 0;
+    const completedDnaTrackIds = new Set();
+    let roundGenerationInFlight = false;
     let activePlaybackTrackId = null;
     let activePlaybackDecisionId = null;
     const decisionByTrackId = new Map();
@@ -208,7 +219,8 @@ PAGE = r"""<!doctype html>
     let autopilotFilling = false;
     let autopilotTimer = null;
     const autopilotHistory = [];
-    const AUTOPILOT_HORIZON = 5;
+    const DNA_ROUND_SIZE = 6;
+    const AUTOPILOT_HORIZON = DNA_ROUND_SIZE;
     const reportedSignals = new Set();
     const lifecycle = new EchoSensePlayerLifecycle.PlayerLifecycle({
       createPlayer: SpotifyApi => new SpotifyApi.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}}),
@@ -267,7 +279,15 @@ PAGE = r"""<!doctype html>
       location.reload();
     }
 
-    async function loadLiveSpotify(moment=$('#moment').value, exclusions=[], updateCurrentPick=true) {
+    function rememberDnaRound(items) {
+      const round=(items||[]).filter(item=>item?.id&&item?.decision_id).slice(0,DNA_ROUND_SIZE);
+      if(!round.length)return;
+      dnaRounds.push(round);
+      dnaPageIndex=dnaRounds.length-1;
+      completedDnaTrackIds.clear();
+    }
+
+    async function loadLiveSpotify(moment=$('#moment').value, exclusions=[], updateCurrentPick=true, recordRound=updateCurrentPick) {
       const hour=new Date().getHours(); const automaticDaypart=hour<6?'late_night':hour<12?'morning':hour<17?'afternoon':hour<21?'evening':'night';
       const params=new URLSearchParams({moment,daypart:liveContext?.daypart||automaticDaypart});
       if(liveContext){['weather','region','road_setting','activity'].forEach(key=>liveContext[key]&&params.set(key,liveContext[key]));}
@@ -276,10 +296,11 @@ PAGE = r"""<!doctype html>
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
       recommendationSlate.forEach(item=>item?.id&&item?.decision_id&&decisionByTrackId.set(item.id,item.decision_id));
+      if(recordRound)rememberDnaRound(recommendationSlate);
       if(!updateCurrentPick){renderDnaQueue();return data;}
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
+      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`);$('#match').title='Normalized from Music DNA rank, live-context fit, and your learned preference. Diversity rules are applied after scoring.';$('#match').setAttribute('aria-label',`${pick.match_score}% normalized match. ${$('#match').title}`);setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderDnaQueue();
@@ -338,9 +359,44 @@ PAGE = r"""<!doctype html>
         feedback('completed',{completion_ratio:state.position/state.duration,playback_seconds:state.position/1000}).catch(()=>{});
       }
       const previousTrackId=previous?.track_window?.current_track?.id;
+      const previousFinished=previousTrackId&&previous?.duration&&previous.position/previous.duration>=.95&&(track?.id!==previousTrackId||state?.paused);
+      if(spotifyConnected&&previousFinished) {
+        markDnaTrackCompleted(previousTrackId).catch(error=>setText('#toast',error.message));
+      }
       if(spotifyConnected&&track?.id&&track.id!==previousTrackId) {
         rememberAutopilotTrack(previousTrackId);
         maintainAutopilot().catch(()=>{});
+      }
+    }
+
+    function allGeneratedDnaIds() {
+      return [...new Set(dnaRounds.flat().map(item=>item.id).filter(Boolean))];
+    }
+
+    async function generateNextDnaRound(reason='skip') {
+      if(roundGenerationInFlight)return null;
+      roundGenerationInFlight=true;
+      try {
+        const exclusions=[...autopilotHistory,...allGeneratedDnaIds()];
+        const data=await loadLiveSpotify($('#moment').value,exclusions,true,true);
+        const next=(data.recommendations||[]).find(
+          item=>item?.id&&item?.decision_id&&item.id!==activePlaybackTrackId
+        );
+        if(!next)throw new Error('EchoSense needs more distinct Spotify candidates before starting another Music DNA round.');
+        setText('#autopilot-status',`Round ${dnaRounds.length} ready · ${Math.min(DNA_ROUND_SIZE,data.recommendations.length)} new Music DNA tracks`);
+        if(reason==='completed')await playDnaTrack(next);
+        return next;
+      } finally {
+        roundGenerationInFlight=false;
+      }
+    }
+
+    async function markDnaTrackCompleted(trackId) {
+      const activeRound=dnaRounds.at(-1)||[];
+      if(!activeRound.some(item=>item.id===trackId))return;
+      completedDnaTrackIds.add(trackId);
+      if(activeRound.length===DNA_ROUND_SIZE&&activeRound.every(item=>completedDnaTrackIds.has(item.id))) {
+        await generateNextDnaRound('completed');
       }
     }
 
@@ -446,13 +502,20 @@ PAGE = r"""<!doctype html>
     }
     function renderDnaQueue() {
       const container=$('#dna-queue-items'); container.replaceChildren();
-      const factorNames=[...new Set(recommendationSlate.flatMap(item=>(item.why_now?.factors||[]).map(factor=>factor.name)))];
+      const displayedRound=dnaRounds[dnaPageIndex]||recommendationSlate.slice(0,DNA_ROUND_SIZE);
+      const factorNames=[...new Set(displayedRound.flatMap(item=>(item.why_now?.factors||[]).map(factor=>factor.name)))];
+      const factorExplanations={
+        'Music DNA affinity':'How closely this track matches your long-term Spotify taste, including artists, tracks, genres, and listening history.',
+        'Live context fit':'How well this track fits your current time, weather, coarse location, road setting, and activity when live context is enabled.',
+        'Learned preference':'An adjustment learned from your plays, completions, saves, and skips in similar situations. A negative score means weaker evidence.',
+        'Diversity guard':'How well this pick avoids repeating the same tracks or artists and keeps the listening session varied.'
+      };
       const table=document.createElement('table'); table.className='dna-table';
       const head=document.createElement('thead'); const header=document.createElement('tr');
-      ['Track',...factorNames,'Why now','Override'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';cell.textContent=label;header.appendChild(cell);});
+      ['Track',...factorNames,'Why now','Override'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';const explanation=factorExplanations[label];if(explanation){const heading=document.createElement('span');heading.className='factor-heading';heading.append(document.createTextNode(label));const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=explanation;info.setAttribute('aria-label',`${label}: ${explanation}`);heading.appendChild(info);cell.appendChild(heading);}else{cell.textContent=label;}header.appendChild(cell);});
       head.appendChild(header); table.appendChild(head);
       const body=document.createElement('tbody');
-      recommendationSlate.forEach(item=>{
+      displayedRound.forEach(item=>{
         const row=document.createElement('tr');
         const track=document.createElement('td');track.className='track-cell';const title=document.createElement('strong');title.textContent=`${item.rank||''}. ${item.title}`;const artist=document.createElement('span');artist.textContent=item.artist;track.append(title,artist);row.appendChild(track);
         const scores=new Map((item.why_now?.factors||[]).map(factor=>[factor.name,factor.score]));
@@ -461,7 +524,16 @@ PAGE = r"""<!doctype html>
         const actionCell=document.createElement('td');const play=document.createElement('button');play.type='button';play.className='secondary';play.textContent='Play now';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));actionCell.appendChild(play);row.appendChild(actionCell);body.appendChild(row);
       });
       table.appendChild(body);container.appendChild(table);
-      $('#dna-queue-panel').hidden=recommendationSlate.length<2;
+      $('#dna-queue-panel').hidden=displayedRound.length<2;
+      const pagination=$('#dna-pagination'); pagination.hidden=dnaRounds.length<2;
+      setText('#dna-page-status',`Round ${dnaPageIndex+1} of ${dnaRounds.length}`);
+      $('#dna-page-previous').disabled=dnaPageIndex===0;
+      $('#dna-page-next').disabled=dnaPageIndex>=dnaRounds.length-1;
+    }
+
+    function changeDnaPage(offset) {
+      dnaPageIndex=Math.max(0,Math.min(dnaRounds.length-1,dnaPageIndex+offset));
+      renderDnaQueue();
     }
     function renderLiveContext() {
       const chips=$('#context-chips'); chips.replaceChildren();
@@ -663,7 +735,7 @@ PAGE = r"""<!doctype html>
       }
       setText('#toast','Understood. EchoSense will adjust your next pick.');
     }
-    async function skipAndPlayNext() {
+    async function skipAndPlayNext(startNewRound=false) {
       if(skipInFlight)return;
       if(!spotifyConnected)throw new Error('Connect Spotify before skipping playback.');
       skipInFlight=true; $('#skip').disabled=true; $('#queue-skip').disabled=true;
@@ -671,32 +743,45 @@ PAGE = r"""<!doctype html>
         const before=await restorePlaybackState();
         const previousId=before?.track_window?.current_track?.id||null;
         if(!previousId)throw new Error('No active Spotify track is available to skip.');
-        const queue=await (await api('/v1/player/queue')).json();
-        const nextDistinct=(queue.up_next||[]).find(track=>track?.id&&track.id!==previousId);
         await feedback('skipped');
+        let nextDna=null;
+        if(startNewRound) {
+          nextDna=await generateNextDnaRound('skip');
+        } else {
+          const currentIndex=recommendationSlate.findIndex(item=>item?.id===previousId);
+          const orderedCandidates=currentIndex>=0
+            ? [...recommendationSlate.slice(currentIndex+1),...recommendationSlate.slice(0,currentIndex)]
+            : recommendationSlate;
+          nextDna=orderedCandidates.find(item=>item?.id&&item?.decision_id&&item.id!==previousId);
+        }
+        if(!nextDna)throw new Error('EchoSense could not find another Music DNA track. Refresh recommendations and try again.');
         const targetDeviceId=before?.device?.id||deviceId||'';
-        await api(`/v1/player/next?device_id=${encodeURIComponent(targetDeviceId)}`,{method:'POST'});
+        await activateBrowser(false);
+        await api(`/v1/player/recommendations/${encodeURIComponent(nextDna.decision_id)}/play`,{
+          method:'PUT',
+          body:JSON.stringify({
+            device_id:targetDeviceId,
+            outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`
+          })
+        });
         let changed=null;
-        for(let attempt=0;attempt<3&&!changed;attempt+=1) {
+        for(let attempt=0;attempt<10&&!changed;attempt+=1) {
           await new Promise(resolve=>setTimeout(resolve,400));
           const state=await restorePlaybackState();
           const nextId=state?.track_window?.current_track?.id||null;
-          if(state?.continuity?.source!=='snapshot'&&nextId&&nextId!==previousId)changed=state;
+          if(state?.continuity?.source!=='snapshot'&&nextId===nextDna.id)changed=state;
         }
-        if(!changed&&nextDistinct) {
-          await api('/v1/player/play',{method:'PUT',body:JSON.stringify({device_id:targetDeviceId,spotify_uri:`spotify:track:${nextDistinct.id}`})});
-          for(let attempt=0;attempt<10&&!changed;attempt+=1) {
-            await new Promise(resolve=>setTimeout(resolve,400));
-            const state=await restorePlaybackState();
-            const nextId=state?.track_window?.current_track?.id||null;
-            if(state?.continuity?.source!=='snapshot'&&nextId===nextDistinct.id)changed=state;
-          }
-        }
-        if(!changed)throw new Error('Spotify did not advance playback. Make sure an active device is playing, then try again.');
-        await Promise.allSettled([loadQueue(),loadLiveSpotify()]);
+        if(!changed)throw new Error(`Spotify did not start the selected Music DNA track (${nextDna.title}). Make sure the EchoSense browser player is active, then try again.`);
+        activePlaybackTrackId=nextDna.id;
+        activePlaybackDecisionId=nextDna.decision_id;
+        rememberAutopilotTrack(previousId);
+        const recommendationRefresh=startNewRound
+          ? Promise.resolve()
+          : loadLiveSpotify($('#moment').value,[],true,false);
+        await Promise.allSettled([loadQueue(),recommendationRefresh]);
         await maintainAutopilot(true);
         const title=changed.track_window.current_track?.name||'the next track';
-        setText('#toast',`Skipped. EchoSense learned from it, verified ${title} is playing, and refreshed your recommendations.`);
+        setText('#toast',`Skipped. EchoSense selected the next Music DNA track and verified ${title} is playing.`);
       } finally {
         skipInFlight=false; $('#skip').disabled=false; $('#queue-skip').disabled=false;
       }
@@ -710,8 +795,10 @@ PAGE = r"""<!doctype html>
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
       $('#more-playlists').addEventListener('click',()=>loadPlaylistsSafely(playlistsNextOffset||0));
       $('#more-tracks').addEventListener('click',()=>loadPlaylistTracks(selectedPlaylistId,$('#playlist-title').textContent,tracksNextOffset).catch(e=>setText('#toast',e.message)));
-      $('#skip').addEventListener('click',()=>skipAndPlayNext().catch(e=>setText('#toast',e.message)));
-      $('#queue-skip').addEventListener('click',()=>skipAndPlayNext().catch(e=>setText('#toast',e.message)));
+      $('#skip').addEventListener('click',()=>skipAndPlayNext(true).catch(e=>setText('#toast',e.message)));
+      $('#queue-skip').addEventListener('click',()=>skipAndPlayNext(false).catch(e=>setText('#toast',e.message)));
+      $('#dna-page-previous').addEventListener('click',()=>changeDnaPage(-1));
+      $('#dna-page-next').addEventListener('click',()=>changeDnaPage(1));
       $('#context-toggle').addEventListener('click',toggleLiveContext);
       $('#temporal-mood-correct').addEventListener('click',()=>correctTemporalMood().catch(e=>setText('#toast',e.message)));
       $('#temporal-mood-toggle').addEventListener('click',()=>toggleTemporalMood().catch(e=>setText('#toast',e.message)));
