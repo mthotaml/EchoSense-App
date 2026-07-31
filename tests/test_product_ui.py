@@ -118,6 +118,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert 'id="dna-pagination"' in response.text
     assert "rememberDnaRound" in response.text
     assert "generateNextDnaRound('completed')" in response.text
+    assert "if(roundGenerationInFlight)return roundGenerationInFlight" in response.text
+    assert "if(!skipInFlight)await playDnaTrack(next)" in response.text
     assert "skipAndPlayNext(true)" in response.text
     assert "Play recommendation" in response.text
     assert "Skip current song" in response.text
