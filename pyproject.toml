@@ -34,7 +34,7 @@ echosense-dlq-replay = "echosense.dlq_replay:main"
 echosense-deletion-retry = "echosense.deletion_retry:main"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = [".", "src"]
 testpaths = ["tests"]
 markers = [
   "postgres: requires a running PostgreSQL instance",
