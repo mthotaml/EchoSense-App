@@ -138,6 +138,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Recommended next" in response.text
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
+    assert "const sameTrackFinished=track?.id&&track.id===previous?.track_window?.current_track?.id" in response.text
+    assert "activePlaybackDecisionId && sameTrackFinished" in response.text
     assert (
         "const decisionId=activePlaybackTrackId?activePlaybackDecisionId:currentRecommendationId"
         in response.text
