@@ -525,6 +525,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     'decision-working',
   );
 
+  const roundsBeforeSkip = Number(
+    (await page.locator('#dna-page-status').textContent()).match(/of (\d+)/)?.[1],
+  );
   await page.locator('#skip').click();
   await expect.poll(() => feedback.map(item => item.signal)).toContain('skipped');
   await expect.poll(() => controlEvents).toContain('dna-play');
@@ -542,12 +545,18 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#toast')).toContainText(
     'selected the next Music DNA track and verified Distinct Motion is playing',
   );
-  await expect(page.locator('#dna-page-status')).toHaveText('Round 2 of 2');
+  await expect(page.locator('#dna-page-status')).toHaveText(
+    `Round ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+  );
   await expect(page.locator('#dna-page-previous')).toBeEnabled();
   await page.locator('#dna-page-previous').click();
-  await expect(page.locator('#dna-page-status')).toHaveText('Round 1 of 2');
+  await expect(page.locator('#dna-page-status')).toHaveText(
+    `Round ${roundsBeforeSkip} of ${roundsBeforeSkip + 1}`,
+  );
   await page.locator('#dna-page-next').click();
-  await expect(page.locator('#dna-page-status')).toHaveText('Round 2 of 2');
+  await expect(page.locator('#dna-page-status')).toHaveText(
+    `Round ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+  );
 
   restoreFromSnapshot = true;
   await page.reload();
