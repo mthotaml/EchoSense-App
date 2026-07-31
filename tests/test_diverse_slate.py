@@ -44,3 +44,19 @@ def test_slate_excludes_live_queue_items() -> None:
     slate = DiverseSlateService().build(tracks, ranked, excluded_ids={"queued"})
 
     assert [item.track.provider_id for item in slate] == ["fresh"]
+
+
+def test_default_music_dna_round_contains_six_tracks() -> None:
+    tracks = [
+        _track(f"track-{index}", f"Track {index}", f"Artist {index}")
+        for index in range(1, 8)
+    ]
+    ranked = [
+        {"item_id": track.provider_id, "ranking_score": 1 - index * 0.05}
+        for index, track in enumerate(tracks)
+    ]
+
+    slate = DiverseSlateService().build(tracks, ranked)
+
+    assert len(slate) == 6
+    assert [item.rank for item in slate] == [1, 2, 3, 4, 5, 6]
