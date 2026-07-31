@@ -337,9 +337,7 @@ def play_recommendation(
             status_code=404,
             detail={"code": "recommendation_decision_not_found"},
         )
-    item_ids = list(
-        dict.fromkeys(str(trace["item_id"]) for trace in traces if trace is not None)
-    )
+    item_ids = list(dict.fromkeys(str(trace["item_id"]) for trace in traces if trace is not None))
     item_id = item_ids[0]
     _spotify_request(
         session_id,
