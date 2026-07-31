@@ -357,7 +357,8 @@ PAGE = r"""<!doctype html>
       $('#progress').max=state?.duration||1000; $('#progress').value=state?.position||0; setText('#elapsed',formatTime(state?.position||0)); setText('#duration',formatTime(state?.duration||0));
       const shuffle=state?.shuffle_state??state?.shuffle??false; $('#shuffle').setAttribute('aria-pressed',String(shuffle)); $('#shuffle').textContent=shuffle?'Shuffle on':'Shuffle';
       const repeat=state?.repeat_state??({0:'off',1:'context',2:'track'}[state?.repeat_mode]||'off'); $('#repeat').value=repeat;
-      if(spotifyConnected && track?.id===currentTrackId && previous?.paused===false && state?.paused && state.duration && state.position/state.duration>=.95) {
+      const sameTrackFinished=track?.id&&track.id===previous?.track_window?.current_track?.id;
+      if(spotifyConnected && activePlaybackDecisionId && sameTrackFinished && previous?.paused===false && state?.paused && state.duration && state.position/state.duration>=.95) {
         feedback('completed',{completion_ratio:state.position/state.duration,playback_seconds:state.position/1000}).catch(()=>{});
       }
       const previousTrackId=previous?.track_window?.current_track?.id;
