@@ -143,7 +143,7 @@ def _why_now(
         if value and not any(value.replace("_", " ") in item for item in observations):
             observations.append(f"{label}: {value.replace('_', ' ')}")
     return {
-        "overall_score": round(min(1.0, float(candidate["ranking_score"])) * 100),
+        "overall_score": int(candidate["normalized_score"]),
         "factors": [
             {
                 "name": "Music DNA affinity",
@@ -428,7 +428,7 @@ def spotify_data(
         diverse_slate = DiverseSlateService().build(
             candidate_tracks,
             candidate_slate,
-            limit=5,
+            limit=6,
             excluded_ids=excluded_ids,
         )
         recommendation = diverse_slate[0].track if diverse_slate else None
@@ -544,6 +544,17 @@ def spotify_data(
                     0.0,
                 ),
             }
+            if recommendation
+            else None
+        ),
+        match_score=(
+            int(
+                next(
+                    item["normalized_score"]
+                    for item in candidate_slate
+                    if item["item_id"] == recommendation.provider_id
+                )
+            )
             if recommendation
             else None
         ),
