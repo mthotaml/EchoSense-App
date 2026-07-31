@@ -124,6 +124,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "const completedIndex=activeRound.findIndex" in response.text
     assert ".slice(completedIndex+1)" in response.text
     assert "await playDnaTrack(next)" in response.text
+    assert "dnaContinuationDecisionIds" in response.text
+    assert "continuation_decision_ids:dnaContinuationDecisionIds(item)" in response.text
+    assert "continuation_decision_ids:dnaContinuationDecisionIds(nextDna)" in response.text
     assert "continued with ${next.title} from your Music DNA" in response.text
     live_loader = response.text[
         response.text.index("async function loadLiveSpotify(") : response.text.index(
