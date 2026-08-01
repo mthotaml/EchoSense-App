@@ -10,7 +10,7 @@ def test_landing_page_is_available() -> None:
     assert response.status_code == 200
     assert "EchoSense" in response.text
     assert "EchoSense listens to you" in response.text
-    assert "Today's pick" in response.text
+    assert "Current recommendation" in response.text
     assert "Your Music DNA" in response.text
 
 
@@ -144,10 +144,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     ]
     assert "return data;" in live_loader
     assert "skipAndPlayNext(true)" in response.text
-    assert "Play recommendation" in response.text
+    assert ">▶ Play</button>" in response.text
     assert "Skip current song" in response.text
     assert 'id="pick-label"' in response.text
-    assert "Recommended next" in response.text
+    assert "Current recommendation" in response.text
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
     assert (
@@ -251,5 +251,10 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
         in page
     )
     assert "Server-side enforcement requires the governance API." in page
+    assert "Any moment is selected" in page
+    assert "Choose Driving, Working, Exercising, Relaxing, or Social" in page
+    assert "factor.name==='Diversity guard'" in page
+    assert "?'Passed':'Limited'" in page
+    assert "You selected general" not in page
     assert 'id="dna-load-more"' in page
     assert "Page ${dnaPageIndex+1} of ${dnaRounds.length}" in page
