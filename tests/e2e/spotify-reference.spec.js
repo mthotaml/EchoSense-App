@@ -536,7 +536,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
-  await expect(page.locator('#pick-label')).toHaveText('Recommended next');
+  await expect(page.locator('#pick-label')).toHaveText('Current recommendation');
   await expect(page.locator('#toast')).toContainText(
     'selected the next Music DNA track and verified Distinct Motion is playing',
   );
