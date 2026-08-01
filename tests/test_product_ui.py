@@ -222,3 +222,34 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "class PlayerLifecycle" in lifecycle.text
     assert "activateElement()" in lifecycle.text
     assert lifecycle.headers["cache-control"] == "no-store, max-age=0"
+
+
+def test_explainable_product_surface_is_complete_and_governance_is_honest() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    page = response.text
+
+    assert 'id="hero-cover"' in page
+    assert 'id="why-pill"' in page
+    assert 'id="hero-factors"' in page
+    assert "renderHeroFactors" in page
+    assert 'id="factor-modal"' in page
+    assert "factorFormulas" in page
+    assert "DNA affinity = (0.60 × artist/track affinity) + (0.40 × category fit)" in page
+
+    assert 'id="episodic-memory"' in page
+    assert 'id="semantic-memory"' in page
+    assert 'id="working-memory"' in page
+    assert "renderMemory" in page
+
+    assert 'id="consent-context"' in page
+    assert 'id="consent-retention"' in page
+    assert 'id="delete-data"' in page
+    assert 'delete-data" class="danger" type="button" disabled' in page
+    assert (
+        "Deletion remains locked until the receipt-generating governance endpoint is implemented."
+        in page
+    )
+    assert "Server-side enforcement requires the governance API." in page
+    assert 'id="dna-load-more"' in page
+    assert "Page ${dnaPageIndex+1} of ${dnaRounds.length}" in page

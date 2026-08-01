@@ -222,6 +222,27 @@
           "pattern": "why_now"
         }
       ]
+    },
+    {
+      "id": "explainable-product-surface",
+      "severity": "severity-2",
+      "description": "The product surface keeps recommendation evidence, memory provenance, and governance controls visible while never claiming unsupported deletion or retention enforcement.",
+      "covers": [
+        "hero-factor-breakdown",
+        "memory-inspector-visible",
+        "governance-deletion-locked-without-receipt-api",
+        "single-player-persistent"
+      ],
+      "evidence": [
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "test_explainable_product_surface_is_complete_and_governance_is_honest"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "receipt-generating governance endpoint"
+        }
+      ]
     }
   ],
   "journeys": [
@@ -276,6 +297,10 @@
         "dna-factor-comparison-table",
         "dna-factor-definitions-accessible",
         "normalized-match-score-derived",
+        "hero-factor-breakdown",
+        "memory-inspector-visible",
+        "governance-deletion-locked-without-receipt-api",
+        "single-player-persistent",
         "context-permission-explicit",
         "raw-location-not-retained",
         "weather-fallback-preserves-ranking",

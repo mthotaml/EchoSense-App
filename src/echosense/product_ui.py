@@ -161,25 +161,81 @@ PAGE = r"""<!doctype html>
     input[type=range] { width:100%; accent-color:#f5f7fb; }
     .player-side { display:flex; justify-content:flex-end; align-items:center; gap:10px; }
     .volume { width:110px; }
-    @media (max-width:760px) { .small-grid { grid-template-columns:1fr; } .pick-top,.connection { display:block; } .player { grid-template-columns:1fr auto; padding:12px; } .transport { justify-items:end; } .progress-row,.player-side { display:none; } .cover { width:52px; height:52px; } .account span { display:none; } }
+    /* EchoSense explainable product surface */
+    :root { --bg:#0a0a0c; --surface:rgba(24,24,28,.75); --soft:rgba(11,15,22,.78); --text:#fff; --muted:#a0a0a0; --line:rgba(255,255,255,.08); --accent:#1ed760; --blue:#64b5f6; --amber:#ffb74d; --purple:#b388ff; --danger:#ff5252; }
+    body { background:radial-gradient(circle at 14% -8%,rgba(30,215,96,.10),transparent 28%),radial-gradient(circle at 90% 4%,rgba(100,181,246,.10),transparent 26%),var(--bg); }
+    nav,main { max-width:1180px; }
+    nav { position:sticky; top:0; z-index:18; padding-block:16px; background:rgba(10,10,12,.76); backdrop-filter:blur(22px); border-bottom:1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:10px; font-size:1.15rem; }
+    .brand-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; color:#07110a; background:linear-gradient(135deg,var(--accent),var(--blue)); font-size:1.35rem; }
+    .status-dot { width:8px; height:8px; border-radius:50%; background:#666; box-shadow:0 0 0 0 rgba(30,215,96,.4); }
+    .account.connected .status-dot { background:var(--accent); animation:pulse 2s infinite; }
+    @keyframes pulse { 60% { box-shadow:0 0 0 7px rgba(30,215,96,0); } }
+    main { padding-top:38px; }
+    h1 { font-size:clamp(2.8rem,6vw,5rem); }
+    h2 { font-size:1.35rem; line-height:1.3; }
+    .panel { background:var(--surface); border-color:var(--line); border-radius:20px; backdrop-filter:blur(18px); box-shadow:0 18px 60px rgba(0,0,0,.18); }
+    .eyebrow { color:var(--accent); }
+    .eyebrow.blue { color:var(--blue); }
+    button,select,.button-link { border-color:rgba(255,255,255,.14); }
+    .primary { background:var(--accent); color:#061109; border-color:var(--accent); }
+    .secondary { background:rgba(255,255,255,.035); }
+    .hero-content { display:grid; grid-template-columns:160px 1fr; gap:28px; align-items:start; }
+    .hero-art { width:160px; height:160px; border-radius:12px; object-fit:cover; background:linear-gradient(135deg,#18221b,#161b27); box-shadow:0 14px 40px rgba(0,0,0,.35); }
+    .hero-art:not([src]) { visibility:hidden; }
+    .track { margin-top:10px; font-size:clamp(2.2rem,5vw,4rem); }
+    .reason { margin:18px 0 14px; }
+    .reason-pill,.genre-pill { display:inline-flex; width:max-content; max-width:100%; padding:8px 11px; border:1px solid rgba(30,215,96,.24); border-radius:999px; color:#cffff0; background:rgba(30,215,96,.07); font-size:.78rem; font-weight:650; }
+    .genre-pill { border-color:rgba(100,181,246,.25); color:#cbe8ff; background:rgba(100,181,246,.08); margin-top:10px; }
+    .factor-bars { display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:12px 18px; margin:22px 0; }
+    .factor-label { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:.78rem; }
+    .bar-track { height:6px; margin-top:7px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.07); }
+    .bar-fill { height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--accent),var(--blue)); }
+    .table-wrap { border-color:var(--line); }
+    .dna-table { min-width:980px; }
+    .dna-table th { background:rgba(7,10,15,.76); }
+    .track-identity { display:flex; gap:10px; align-items:center; }
+    .queue-cover { width:44px; height:44px; border-radius:8px; object-fit:cover; background:#151b24; }
+    .category-pill { display:inline-flex; padding:5px 8px; border-radius:999px; color:#cbe8ff; background:rgba(100,181,246,.09); border:1px solid rgba(100,181,246,.18); font-size:.72rem; }
+    .memory-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .memory-card { min-height:180px; padding:20px; border:1px solid var(--line); border-radius:16px; background:rgba(7,10,15,.46); }
+    .memory-card ul { padding-left:18px; color:var(--muted); line-height:1.55; font-size:.86rem; }
+    .governance-grid { display:grid; grid-template-columns:1fr auto; gap:28px; align-items:center; }
+    .toggle-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:14px 0; border-bottom:1px solid var(--line); }
+    .switch { width:48px; height:26px; padding:3px; border-radius:99px; background:#292d35; }
+    .switch::after { content:''; display:block; width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
+    .switch[aria-pressed=true] { background:var(--accent); }
+    .switch[aria-pressed=true]::after { transform:translateX(20px); }
+    .danger { color:#ffd5d5; background:rgba(255,82,82,.10); border-color:rgba(255,82,82,.35); }
+    .modal { position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:24px; background:rgba(0,0,0,.72); }
+    .modal[hidden] { display:none; }
+    .modal-card { width:min(560px,100%); padding:28px; border:1px solid var(--line); border-radius:20px; background:#15161b; box-shadow:0 30px 90px #000; }
+    .formula { margin:18px 0; padding:15px; border-radius:12px; color:#cbe8ff; background:rgba(100,181,246,.08); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .player { border-top-color:var(--line); background:rgba(10,10,12,.92); }
+    @media (max-width:1024px) { .memory-grid { grid-template-columns:1fr; } }
+    @media (max-width:760px) { .small-grid,.hero-content,.governance-grid { grid-template-columns:1fr; } .hero-art { width:112px; height:112px; } .factor-bars { grid-template-columns:1fr; } .pick-top,.connection { display:block; } .player { grid-template-columns:1fr auto; padding:12px; } .transport { justify-items:end; } .progress-row,.player-side { display:none; } .cover { width:52px; height:52px; } .account span { display:none; } }
   </style>
 </head>
 <body>
-  <nav><div class="brand">EchoSense</div><div class="account"><span id="account-status">Spotify not connected</span><a id="account-action" class="button-link secondary" href="/auth/spotify/login">Connect Spotify</a></div></nav>
+  <nav><div class="brand"><span class="brand-mark">≋</span>EchoSense</div><div id="account" class="account"><span class="status-dot" aria-hidden="true"></span><span id="account-status">Spotify not connected</span><button id="settings-trigger" class="secondary" type="button">Settings</button><a id="account-action" class="button-link secondary" href="/auth/spotify/login">Connect Spotify</a></div></nav>
   <main>
-    <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. A persistent listening surface powered by your Music DNA.</p></section>
+    <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. Music selected from your DNA, your context, and what it learns—with every decision explained.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
     <section id="live-context-panel" class="panel connection context-compact"><div><div class="eyebrow">Live context</div><h2>Why this music now</h2><p id="context-status" class="connection-copy">Time is automatic. Add weather and location when useful.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location is used only to resolve current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
-      <section class="panel"><div class="pick-top"><div><div id="pick-label" class="eyebrow">Today's pick</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">Play recommendation</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>Save</button><button id="skip" class="secondary" type="button">Skip current song</button></div><div id="toast" aria-live="polite"></div></section>
-      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Music DNA Autopilot</div><h2>Six tracks for this listening round</h2><p class="copy">EchoSense generates the next round when you skip from the hero or finish these six songs.</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="context-chip">Autopilot on</span></div><div id="dna-queue-items" class="table-wrap"></div><nav id="dna-pagination" class="dna-pagination" aria-label="Music DNA rounds" hidden><button id="dna-page-previous" class="secondary" type="button">Previous</button><span id="dna-page-status">Round 1 of 1</span><button id="dna-page-next" class="secondary" type="button">Next</button></nav></section>
+      <section class="panel"><div class="hero-content"><img id="hero-cover" class="hero-art" alt="Recommendation album art"><div><div class="pick-top"><div><div id="pick-label" class="eyebrow">Today's pick · contextual</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div><span id="hero-genre" class="genre-pill" hidden></span></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><div id="why-pill" class="reason-pill">✨ Building an explainable recommendation…</div><div id="hero-factors" class="factor-bars"></div><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">▶ Play recommendation</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>♥ Save</button><button id="skip" class="secondary" type="button">⏭ Skip current song</button></div><div id="toast" aria-live="polite"></div></div></div></section>
+      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Continuous Autopilot queue</div><h2>Six tracks for this listening round</h2><p class="copy">Every track is explained. EchoSense owns the sequence, learns from outcomes, and prepares the next round automatically.</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="reason-pill">● Autopilot on</span></div><div id="dna-queue-items" class="table-wrap"></div><nav id="dna-pagination" class="dna-pagination" aria-label="Music DNA rounds" hidden><button id="dna-page-previous" class="secondary" type="button">Previous</button><span id="dna-page-status">Page 1 of 1</span><button id="dna-page-next" class="secondary" type="button">Next</button></nav><div class="actions" style="justify-content:center;margin-top:16px"><button id="dna-load-more" class="secondary" type="button">＋ Load more DNA tracks</button></div></section>
       <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Spotify playback queue</div><h2>Now and next</h2></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next</button><button id="queue-refresh" class="secondary" type="button">Refresh</button></div></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
       <section class="panel"><div class="eyebrow">Your journey</div><h2>Your taste, told as a story</h2><div id="timeline" class="journey"></div></section>
+      <section id="memory-panel" class="panel"><div class="eyebrow blue">Cognitive memory</div><h2>What EchoSense remembers—and why</h2><p class="copy">Inspectable evidence behind personalization. No hidden mood or medical inference.</p><div class="memory-grid"><article class="memory-card"><div class="eyebrow blue">Episodic memory</div><h3>Recent experiences</h3><ul id="episodic-memory"></ul></article><article class="memory-card"><div class="eyebrow blue">Semantic propositions</div><h3>Learned preferences</h3><ul id="semantic-memory"></ul></article><article class="memory-card"><div class="eyebrow" style="color:var(--amber)">Working memory · expiring</div><h3>Current reasoning context</h3><ul id="working-memory"></ul></article></div></section>
+      <section id="governance-panel" class="panel"><div class="governance-grid"><div><div class="eyebrow blue">Privacy & governance</div><h2>Your data, your controls</h2><div class="toggle-row"><span><strong>Contextual recommendations</strong><br><small class="copy">Use consented live context in ranking.</small></span><button id="consent-context" class="switch" type="button" aria-pressed="false" aria-label="Contextual recommendations"></button></div><div class="toggle-row"><span><strong>Data retention</strong><br><small class="copy">Retain learning signals for future sessions.</small></span><button id="consent-retention" class="switch" type="button" aria-pressed="true" aria-label="Data retention"></button></div></div><div><button id="delete-data" class="danger" type="button" disabled title="Requires the governed deletion API before activation">Delete all my data</button><p class="privacy-note">Deletion remains locked until the receipt-generating governance endpoint is implemented.</p></div></div></section>
     </div>
   </main>
+
+  <div id="factor-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="factor-modal-title" hidden><div class="modal-card"><div class="pick-top"><div><div class="eyebrow blue">Factor explanation</div><h2 id="factor-modal-title">Music DNA affinity</h2></div><button id="factor-modal-close" class="secondary" type="button">Close</button></div><div id="factor-formula" class="formula"></div><p id="factor-detail" class="copy"></p></div></div>
 
   <section class="player" aria-label="EchoSense player">
     <div class="now"><img id="player-cover" class="cover" alt=""><div class="meta"><strong id="player-title">Nothing playing</strong><span id="player-artist">Connect Spotify to listen here</span><span id="player-status" class="player-status">EchoSense Browser</span></div></div>
@@ -223,6 +279,20 @@ PAGE = r"""<!doctype html>
     const DNA_ROUND_SIZE = 6;
     const AUTOPILOT_HORIZON = DNA_ROUND_SIZE;
     const reportedSignals = new Set();
+    const factorExplanations={
+      'Music DNA affinity':'How closely this track matches your long-term Spotify taste, including artists, tracks, genres, and listening history.',
+      'Live context fit':'How well this track fits your current time, weather, coarse location, road setting, and activity when live context is enabled.',
+      'Learned preference':'An adjustment learned from your plays, completions, saves, and skips in similar situations. It is bounded from −20% to +20%.',
+      'Diversity guard':'How well this pick avoids repeating the same tracks or artists and keeps the listening session varied.',
+      'Time pattern':'Evidence that you repeatedly choose similar music around this time or daypart.'
+    };
+    const factorFormulas={
+      'Music DNA affinity':'DNA affinity = (0.60 × artist/track affinity) + (0.40 × category fit)',
+      'Live context fit':'Context fit = bounded(daypart + weather + location + activity), capped at 35%',
+      'Learned preference':'Preference adjustment = clamp(feedback evidence, −0.20, +0.20)',
+      'Diversity guard':'Diversity = artist cap + duplicate prevention + recent-history exclusion',
+      'Time pattern':'Time pattern = confidence × recency decay × repeated-evidence strength'
+    };
     const lifecycle = new EchoSensePlayerLifecycle.PlayerLifecycle({
       createPlayer: SpotifyApi => new SpotifyApi.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}}),
       onReady: async ({device_id}) => {
@@ -253,6 +323,24 @@ PAGE = r"""<!doctype html>
 
     function dnaLine(label, value) { const row=document.createElement('div'); row.className='dna-line'; const key=document.createElement('span'); key.textContent=label; const strong=document.createElement('strong'); strong.textContent=value; row.append(key,strong); return row; }
     function renderTimeline(items) { const c=$('#timeline'); c.replaceChildren(); items.forEach((label,index)=>{ if(index){const a=document.createElement('span');a.className='arrow';a.textContent='→';c.appendChild(a);} const s=document.createElement('span');s.className='journey-step';s.textContent=label;c.appendChild(s); }); }
+    function openFactorModal(name) { setText('#factor-modal-title',name);setText('#factor-formula',factorFormulas[name]||'Score = normalized evidence contribution to the final rank');setText('#factor-detail',factorExplanations[name]||'This factor contributes bounded evidence to the recommendation decision.');$('#factor-modal').hidden=false; }
+    function closeFactorModal() { $('#factor-modal').hidden=true; }
+    function renderHeroFactors(item) {
+      const container=$('#hero-factors');container.replaceChildren();
+      const factors=(item?.why_now?.factors||[]).filter(factor=>factorExplanations[factor.name]).slice(0,4);
+      factors.forEach(factor=>{const wrapper=document.createElement('div');wrapper.className='factor-bar';const label=document.createElement('div');label.className='factor-label';const title=document.createElement('span');title.textContent=factor.name+' ';const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=factorExplanations[factor.name];info.setAttribute('aria-label',`${factor.name}: ${factorExplanations[factor.name]}`);info.addEventListener('click',()=>openFactorModal(factor.name));title.appendChild(info);const score=document.createElement('strong');score.textContent=`${factor.score}%`;label.append(title,score);const track=document.createElement('div');track.className='bar-track';const fill=document.createElement('div');fill.className='bar-fill';fill.style.width=`${Math.max(0,Math.min(100,factor.score))}%`;track.appendChild(fill);wrapper.append(label,track);container.appendChild(wrapper);});
+    }
+    function renderMemory(profile,data={}) {
+      const episodic=$('#episodic-memory');episodic.replaceChildren();
+      (profile.recent_tracks||[]).slice(0,3).forEach(track=>{const item=document.createElement('li');item.textContent=`Played ${track.title} · ${track.artist}`;episodic.appendChild(item);});
+      if(!episodic.children.length){const item=document.createElement('li');item.textContent=`${profile.evidence_count||0} qualified listening signals observed`;episodic.appendChild(item);}
+      const semantic=$('#semantic-memory');semantic.replaceChildren();
+      (profile.top_artists||[]).slice(0,3).forEach(artist=>{const item=document.createElement('li');item.textContent=`Listener → prefers ${artist.name}`;semantic.appendChild(item);});
+      if(!semantic.children.length){const item=document.createElement('li');item.textContent='Still collecting stable preference evidence';semantic.appendChild(item);}
+      const working=$('#working-memory');working.replaceChildren();
+      const signals=[`Moment: ${$('#moment').selectedOptions[0]?.textContent||'Any moment'}`,liveContext?.weather?`Weather: ${liveContext.weather.replace('_',' ')}`:'Weather: not shared',liveContext?.road_setting?`Road: ${liveContext.road_setting.replace('_',' ')}`:'Road setting: unknown'];
+      signals.forEach(signal=>{const item=document.createElement('li');item.textContent=signal;working.appendChild(item);});
+    }
 
     async function api(path, options={}) {
       const response = await fetch(path, {headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options});
@@ -266,7 +354,7 @@ PAGE = r"""<!doctype html>
       const session = await response.json(); spotifyConnected = session.connected;
       if (!session.connected) return null;
       const name = session.profile.display_name || 'Spotify listener';
-      setText('#account-status', `Connected as ${name}`); setText('#account-action','Disconnect'); $('#account-action').href='#';
+      setText('#account-status', `Connected as ${name}`); setText('#account-action','Disconnect'); $('#account-action').href='#'; $('#account').classList.add('connected');
       setText('#connection-title', `Spotify connected as ${name}`); setText('#connection-copy','Your Spotify history and browser player are powering EchoSense.');
       setText('#connect-button','Reconnect for player permissions'); $('#connect-button').href='/auth/spotify/login';
       return session;
@@ -301,18 +389,18 @@ PAGE = r"""<!doctype html>
       if(!updateCurrentPick){renderDnaQueue();return data;}
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`);$('#match').title='Normalized from Music DNA rank, live-context fit, and your learned preference. Diversity rules are applied after scoring.';$('#match').setAttribute('aria-label',`${pick.match_score}% normalized match. ${$('#match').title}`);setText('#reason',pick.reason); const genres=pick.evidence?.matched_genres||[]; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
+      if (pick) { const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`);$('#match').title='Normalized from Music DNA rank, live-context fit, and your learned preference. Diversity rules are applied after scoring.';$('#match').setAttribute('aria-label',`${pick.match_score}% normalized match. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected from your Music DNA'}`);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; setText('#evidence',`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
-      renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderDnaQueue();
+      renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderMemory(profile,data); renderDnaQueue();
       return data;
     }
 
     async function loadDemo() {
       const [p,i,r,t]=await Promise.all(['/v1/demo/taste-profile','/v1/demo/insights','/v1/demo/recommendations','/v1/demo/timeline'].map(x=>fetch(x).then(y=>y.json()))); const pick=r.items[0];
-      setText('#greeting',`${greetingForHour(new Date().getHours())}, ${p.display_name}.`); setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · ${pick.context}`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason); setText('#insight',i.items[0].detail); currentRecommendationId=pick.recommendation_id;
+      setText('#greeting',`${greetingForHour(new Date().getHours())}, ${p.display_name}.`); setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · ${pick.context}`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason);setText('#why-pill',`✨ ${pick.reason}`);setText('#hero-genre',p.genres[0]?.name||'Music DNA');$('#hero-genre').hidden=false; setText('#insight',i.items[0].detail); currentRecommendationId=pick.recommendation_id;
       setText('#evidence','Demo evidence · Connect Spotify for your real listening context.');
-      const dna=$('#dna'); dna.replaceChildren(); dna.appendChild(dnaLine('Mostly',p.genres[0].name)); dna.appendChild(dnaLine('Recently exploring',p.genres[2].name)); dna.appendChild(dnaLine('Listening rhythm','After 8 PM')); renderTimeline(t.items.map(x=>x.label));
+      const dna=$('#dna'); dna.replaceChildren(); dna.appendChild(dnaLine('Mostly',p.genres[0].name)); dna.appendChild(dnaLine('Recently exploring',p.genres[2].name)); dna.appendChild(dnaLine('Listening rhythm','After 8 PM')); renderTimeline(t.items.map(x=>x.label));renderMemory(p,{});
     }
 
     function normalizePlayerState(state) {
@@ -524,31 +612,36 @@ PAGE = r"""<!doctype html>
       const container=$('#dna-queue-items'); container.replaceChildren();
       const displayedRound=dnaRounds[dnaPageIndex]||recommendationSlate.slice(0,DNA_ROUND_SIZE);
       const factorNames=[...new Set(displayedRound.flatMap(item=>(item.why_now?.factors||[]).map(factor=>factor.name)))];
-      const factorExplanations={
-        'Music DNA affinity':'How closely this track matches your long-term Spotify taste, including artists, tracks, genres, and listening history.',
-        'Live context fit':'How well this track fits your current time, weather, coarse location, road setting, and activity when live context is enabled.',
-        'Learned preference':'An adjustment learned from your plays, completions, saves, and skips in similar situations. A negative score means weaker evidence.',
-        'Diversity guard':'How well this pick avoids repeating the same tracks or artists and keeps the listening session varied.'
-      };
       const table=document.createElement('table'); table.className='dna-table';
       const head=document.createElement('thead'); const header=document.createElement('tr');
-      ['Track',...factorNames,'Why now','Override'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';const explanation=factorExplanations[label];if(explanation){const heading=document.createElement('span');heading.className='factor-heading';heading.append(document.createTextNode(label));const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=explanation;info.setAttribute('aria-label',`${label}: ${explanation}`);heading.appendChild(info);cell.appendChild(heading);}else{cell.textContent=label;}header.appendChild(cell);});
+      ['#','Track & Artist','Category / Genre',...factorNames,'Why in queue','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';const explanation=factorExplanations[label];if(explanation){const heading=document.createElement('span');heading.className='factor-heading';heading.append(document.createTextNode(label));const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=explanation;info.setAttribute('aria-label',`${label}: ${explanation}`);info.addEventListener('click',()=>openFactorModal(label));heading.appendChild(info);cell.appendChild(heading);}else{cell.textContent=label;}header.appendChild(cell);});
       head.appendChild(header); table.appendChild(head);
       const body=document.createElement('tbody');
       displayedRound.forEach(item=>{
         const row=document.createElement('tr');
-        const track=document.createElement('td');track.className='track-cell';const title=document.createElement('strong');title.textContent=`${item.rank||''}. ${item.title}`;const artist=document.createElement('span');artist.textContent=item.artist;track.append(title,artist);row.appendChild(track);
+        const rank=document.createElement('td');rank.className='metric';rank.textContent=item.rank||displayedRound.indexOf(item)+1;row.appendChild(rank);
+        const track=document.createElement('td');track.className='track-cell';const identity=document.createElement('div');identity.className='track-identity';const image=document.createElement('img');image.className='queue-cover';image.alt='';image.src=item.image_url||'';const copy=document.createElement('div');const title=document.createElement('strong');title.textContent=item.title;const artist=document.createElement('span');artist.textContent=item.artist;copy.append(title,artist);identity.append(image,copy);track.appendChild(identity);row.appendChild(track);
+        const category=document.createElement('td');const categoryPill=document.createElement('span');categoryPill.className='category-pill';categoryPill.textContent=item.genre||item.category||(item.evidence?.matched_genres||[])[0]||'Music DNA';category.appendChild(categoryPill);row.appendChild(category);
         const scores=new Map((item.why_now?.factors||[]).map(factor=>[factor.name,factor.score]));
         factorNames.forEach(name=>{const cell=document.createElement('td');cell.className='metric';const score=scores.get(name);cell.textContent=Number.isFinite(score)?`${score}%`:'—';row.appendChild(cell);});
         const why=document.createElement('td');why.className='why-cell';why.textContent=recommendationExplanation(item);row.appendChild(why);
-        const actionCell=document.createElement('td');const play=document.createElement('button');play.type='button';play.className='secondary';play.textContent='Play now';play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));actionCell.appendChild(play);row.appendChild(actionCell);body.appendChild(row);
+        const actionCell=document.createElement('td');actionCell.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='▶';play.setAttribute('aria-label',`Play ${item.title}`);play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const like=document.createElement('button');like.type='button';like.className='secondary';like.textContent='♥';like.setAttribute('aria-label',`Like ${item.title}`);like.addEventListener('click',()=>feedbackForDecision(item,'love'));const dislike=document.createElement('button');dislike.type='button';dislike.className='secondary';dislike.textContent='×';dislike.setAttribute('aria-label',`Not for me: ${item.title}`);dislike.addEventListener('click',()=>feedbackForDecision(item,'not_for_me'));actionCell.append(play,like,dislike);row.appendChild(actionCell);body.appendChild(row);
       });
       table.appendChild(body);container.appendChild(table);
       $('#dna-queue-panel').hidden=displayedRound.length<2;
       const pagination=$('#dna-pagination'); pagination.hidden=dnaRounds.length<2;
-      setText('#dna-page-status',`Round ${dnaPageIndex+1} of ${dnaRounds.length}`);
+      setText('#dna-page-status',`Page ${dnaPageIndex+1} of ${dnaRounds.length}`);
       $('#dna-page-previous').disabled=dnaPageIndex===0;
       $('#dna-page-next').disabled=dnaPageIndex>=dnaRounds.length-1;
+    }
+
+    async function feedbackForDecision(item,reaction) {
+      if(!item?.decision_id)return;
+      try {
+        if(!spotifyConnected)await api('/v1/demo/feedback',{method:'POST',body:JSON.stringify({recommendation_id:item.decision_id,reaction})});
+        else await api('/auth/spotify/feedback',{method:'POST',body:JSON.stringify({outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,decision_id:item.decision_id,signal:reaction})});
+        setText('#toast',reaction==='love'?`Liked ${item.title}. EchoSense will learn from it.`:`Marked ${item.title} as not for me.`);
+      } catch(error) { setText('#toast',error.message); }
     }
 
     function changeDnaPage(offset) {
@@ -826,7 +919,13 @@ PAGE = r"""<!doctype html>
       $('#queue-skip').addEventListener('click',()=>skipAndPlayNext(false).catch(e=>setText('#toast',e.message)));
       $('#dna-page-previous').addEventListener('click',()=>changeDnaPage(-1));
       $('#dna-page-next').addEventListener('click',()=>changeDnaPage(1));
+      $('#dna-load-more').addEventListener('click',()=>generateNextDnaRound('manual').catch(e=>setText('#toast',e.message)));
       $('#context-toggle').addEventListener('click',toggleLiveContext);
+      $('#settings-trigger').addEventListener('click',()=>$('#governance-panel').scrollIntoView({behavior:'smooth',block:'center'}));
+      $('#factor-modal-close').addEventListener('click',closeFactorModal);
+      $('#factor-modal').addEventListener('click',event=>{if(event.target===$('#factor-modal'))closeFactorModal();});
+      $('#consent-context').addEventListener('click',()=>{const enabled=$('#consent-context').getAttribute('aria-pressed')!=='true';$('#consent-context').setAttribute('aria-pressed',String(enabled));if(enabled)enableLiveContext();else disableLiveContext();});
+      $('#consent-retention').addEventListener('click',()=>{const enabled=$('#consent-retention').getAttribute('aria-pressed')!=='true';$('#consent-retention').setAttribute('aria-pressed',String(enabled));localStorage.setItem('echosenseRetentionConsent',String(enabled));setText('#toast','Retention preference saved locally. Server-side enforcement requires the governance API.');});
       $('#temporal-mood-correct').addEventListener('click',()=>correctTemporalMood().catch(e=>setText('#toast',e.message)));
       $('#temporal-mood-toggle').addEventListener('click',()=>toggleTemporalMood().catch(e=>setText('#toast',e.message)));
       $('#temporal-mood-reset').addEventListener('click',()=>resetTemporalMood().catch(e=>setText('#toast',e.message)));
@@ -845,7 +944,7 @@ PAGE = r"""<!doctype html>
       document.addEventListener('visibilitychange',()=>{if(!document.hidden) restorePlaybackState();});
       window.addEventListener('focus',restorePlaybackState);
       if(session) { await restorePlaybackState(); await maintainAutopilot(); }
-      if(localStorage.getItem('echosenseContextConsent')==='granted')enableLiveContext();
+      if(localStorage.getItem('echosenseContextConsent')==='granted'){$('#consent-context').setAttribute('aria-pressed','true');enableLiveContext();}
     }
     load().catch(e=>setText('#toast',e.message||'EchoSense could not load.'));
   </script>
