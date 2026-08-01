@@ -258,5 +258,6 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "`${factor.name}: ${factorExplanations[factor.name]}`" in page
     assert "`Queue factor: ${label}. ${explanation}`" in page
     assert "You selected general" not in page
+    assert "A repetition safeguard, not a recommendation-match score" in page
     assert 'id="dna-load-more"' in page
     assert "Page ${dnaPageIndex+1} of ${dnaRounds.length}" in page
