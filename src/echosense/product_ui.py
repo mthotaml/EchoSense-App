@@ -231,9 +231,9 @@ PAGE = r"""<!doctype html>
     <section id="boost-panel" class="panel"><div class="eyebrow blue">Recommendation boosts</div><h2>Tell EchoSense what matters more right now</h2><p class="copy">Boosts rebalance the next Music DNA ranking. Every factor remains bounded, and the effective weights always total 100%.</p><div id="boost-controls" class="boost-grid"></div><p id="context-statement" class="context-statement" aria-live="polite">Building the context statement used for your next track…</p></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
-      <section class="panel"><div class="hero-content"><img id="hero-cover" class="hero-art" alt="Recommendation album art"><div><div class="pick-top"><div><div id="pick-label" class="eyebrow">Current recommendation</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div><span id="hero-genre" class="genre-pill" hidden></span></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><div id="why-pill" class="reason-pill">✨ Building an explainable recommendation…</div><div id="hero-factors" class="factor-bars"></div><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">▶ Play</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>♥ Save</button><button id="skip" class="secondary" type="button">⏭ Skip current song</button></div><div id="toast" aria-live="polite"></div></div></div></section>
-      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Continuous Autopilot queue</div><h2>Six tracks for this listening round</h2><p class="copy">Every track is explained. EchoSense owns the sequence, learns from outcomes, and prepares the next round automatically.</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="reason-pill">● Autopilot on</span></div><div id="dna-queue-items" class="table-wrap"></div><nav id="dna-pagination" class="dna-pagination" aria-label="Music DNA rounds" hidden><button id="dna-page-previous" class="secondary" type="button">Previous</button><span id="dna-page-status">Page 1 of 1</span><button id="dna-page-next" class="secondary" type="button">Next</button></nav><div class="actions" style="justify-content:center;margin-top:16px"><button id="dna-load-more" class="secondary" type="button">＋ Load more DNA tracks</button></div></section>
-      <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Spotify playback queue</div><h2>Now and next</h2></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next</button><button id="queue-refresh" class="secondary" type="button">Refresh</button></div></div><div id="queue-items" class="track-list"></div></section>
+      <section class="panel"><div class="hero-content"><img id="hero-cover" class="hero-art" alt="Recommendation album art"><div><div class="pick-top"><div><div id="pick-label" class="eyebrow">Current EchoSense recommendation</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div><span id="hero-genre" class="genre-pill" hidden></span></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><div id="why-pill" class="reason-pill">✨ Building an explainable recommendation…</div><div id="hero-factors" class="factor-bars"></div><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">▶ Play</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>♥ Save</button><button id="skip" class="secondary" type="button">⏭ Skip current song</button></div><div id="toast" aria-live="polite"></div></div></div></section>
+      <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Final EchoSense playback plan</div><h2>Tracks EchoSense plans to play—in this exact order</h2><p class="copy">This is the final sequence after Music DNA affinity, live context, learned preference, diversity protection, and your boosts are applied.</p><p id="dna-plan-statement" class="context-statement">Building the decision context for this playback plan…</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="reason-pill">● Decision-owned sequence</span></div><div id="dna-queue-items" class="table-wrap"></div><nav id="dna-pagination" class="dna-pagination" aria-label="Music DNA playback-plan rounds" hidden><button id="dna-page-previous" class="secondary" type="button">Previous plan</button><span id="dna-page-status">Plan 1 of 1</span><button id="dna-page-next" class="secondary" type="button">Next plan</button></nav><div class="actions" style="justify-content:center;margin-top:16px"><button id="dna-load-more" class="secondary" type="button">＋ Prepare another six-track plan</button></div></section>
+      <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Playback verification</div><h2>Now and next · EchoSense controlled</h2><p id="queue-status" class="copy" aria-live="polite">Checking Spotify against the active EchoSense Playback Plan.</p></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next planned track</button><button id="queue-refresh" class="secondary" type="button">Verify</button></div></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
       <section class="panel"><div class="eyebrow">Your journey</div><h2>Your taste, told as a story</h2><div id="timeline" class="journey"></div></section>
@@ -264,6 +264,8 @@ PAGE = r"""<!doctype html>
     const completedDnaTrackIds = new Set();
     let roundGenerationInFlight = null;
     let completionTransitionInFlight = null;
+    let playbackPlanReconciliationInFlight = null;
+    let playbackCommandInFlight = 0;
     let activePlaybackTrackId = null;
     let activePlaybackDecisionId = null;
     const decisionByTrackId = new Map();
@@ -366,7 +368,7 @@ PAGE = r"""<!doctype html>
       (profile.top_artists||[]).slice(0,3).forEach(artist=>{const item=document.createElement('li');item.textContent=`Listener → prefers ${artist.name}`;semantic.appendChild(item);});
       if(!semantic.children.length){const item=document.createElement('li');item.textContent='Still collecting stable preference evidence';semantic.appendChild(item);}
       const working=$('#working-memory');working.replaceChildren();
-      const signals=[`Moment: ${$('#moment').selectedOptions[0]?.textContent||'Any moment'}`,liveContext?.weather?`Weather: ${liveContext.weather.replace('_',' ')}`:'Weather: not shared',liveContext?.road_setting?`Road: ${liveContext.road_setting.replace('_',' ')}`:'Road setting: unknown'];
+      const signals=[`Moment: ${$('#moment').selectedOptions[0]?.textContent||'Any moment'}`,liveContext?.weather?`Weather: ${liveContext.weather.replace('_',' ')}`:'Weather: not shared',liveContext?.road_setting?`Road: ${liveContext.road_setting.replace('_',' ')}`:'Road setting unavailable'];
       signals.forEach(signal=>{const item=document.createElement('li');item.textContent=signal;working.appendChild(item);});
     }
 
@@ -417,9 +419,9 @@ PAGE = r"""<!doctype html>
       if(recordRound)rememberDnaRound(recommendationSlate);
       if(!updateCurrentPick){renderDnaQueue();return data;}
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
-      renderBoostControls(data.effective_weights||{});setText('#context-statement',data.context_statement||'Music DNA and the current listening moment are shaping the next track.');
+      renderBoostControls(data.effective_weights||{});setText('#context-statement',data.context_statement||'Music DNA and the current listening moment are shaping the next track.');setText('#dna-plan-statement',data.context_statement||'Music DNA and the current listening moment shaped this final playback order.');
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`);$('#match').title='Normalized from Music DNA rank, live-context fit, and your learned preference. Diversity rules are applied after scoring.';$('#match').setAttribute('aria-label',`${pick.match_score}% normalized match. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected from your Music DNA'}`);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your Music DNA. Choose Driving, Working, Exercising, Relaxing, or Social for recommendations tailored to that moment and your taste.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
+      if (pick) { const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · EchoSense recommendation based on your Spotify taste`); setText('#match',`${pick.match_score}% EchoSense score`);$('#match').title='EchoSense Recommendation Score: the final normalized result after Music DNA affinity, live context, learned preference, diversity, and boosts are applied.';$('#match').setAttribute('aria-label',`${pick.match_score}% EchoSense Recommendation Score. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected as an EchoSense recommendation'}`);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your Music DNA. Choose Driving, Working, Exercising, Relaxing, or Social for recommendations tailored to that moment and your taste.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderMemory(profile,data); renderDnaQueue();
@@ -428,7 +430,7 @@ PAGE = r"""<!doctype html>
 
     async function loadDemo() {
       const [p,i,r,t]=await Promise.all(['/v1/demo/taste-profile','/v1/demo/insights','/v1/demo/recommendations','/v1/demo/timeline'].map(x=>fetch(x).then(y=>y.json()))); const pick=r.items[0];
-      setText('#greeting',`${greetingForHour(new Date().getHours())}, ${p.display_name}.`); setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · ${pick.context}`); setText('#match',`${pick.match_score}% match`); setText('#reason',pick.reason);setText('#why-pill',`✨ ${pick.reason}`);setText('#hero-genre',p.genres[0]?.name||'Music DNA');$('#hero-genre').hidden=false; setText('#insight',i.items[0].detail); currentRecommendationId=pick.recommendation_id;
+      setText('#greeting',`${greetingForHour(new Date().getHours())}, ${p.display_name}.`); setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · ${pick.context}`); setText('#match',`${pick.match_score}% EchoSense score`); setText('#reason',pick.reason);setText('#why-pill',`✨ ${pick.reason}`);setText('#hero-genre',p.genres[0]?.name||'Music DNA');$('#hero-genre').hidden=false; setText('#insight',i.items[0].detail); currentRecommendationId=pick.recommendation_id;
       setText('#evidence','Demo evidence · Connect Spotify for your real listening context.');
       const dna=$('#dna'); dna.replaceChildren(); dna.appendChild(dnaLine('Mostly',p.genres[0].name)); dna.appendChild(dnaLine('Recently exploring',p.genres[2].name)); dna.appendChild(dnaLine('Listening rhythm','After 8 PM')); renderTimeline(t.items.map(x=>x.label));renderMemory(p,{});
     }
@@ -454,7 +456,37 @@ PAGE = r"""<!doctype html>
     }
 
     function syncPickLabel() {
-      setText('#pick-label','Current recommendation');
+      setText('#pick-label','Current EchoSense recommendation');
+    }
+
+    function playbackPlanSuccessor(trackId) {
+      if(!trackId)return null;
+      const round=[...dnaRounds].reverse().find(items=>items.some(item=>item.id===trackId))||[];
+      const index=round.findIndex(item=>item.id===trackId);
+      if(index<0)return null;
+      return round.slice(index+1).find(item=>item?.id&&item?.decision_id&&!completedDnaTrackIds.has(item.id))||null;
+    }
+
+    async function reconcilePlaybackPlan(previousTrackId,observedTrackId) {
+      if(!spotifyConnected||!previousTrackId||!observedTrackId||previousTrackId===observedTrackId)return;
+      const expected=playbackPlanSuccessor(previousTrackId);
+      if(!expected)return;
+      if(observedTrackId===expected.id) {
+        activePlaybackTrackId=expected.id;
+        activePlaybackDecisionId=expected.decision_id;
+        return;
+      }
+      if(playbackPlanReconciliationInFlight||playbackCommandInFlight||skipInFlight||completionTransitionInFlight)return;
+      playbackPlanReconciliationInFlight=(async()=>{
+        setText('#toast',`Spotify advanced outside the EchoSense Playback Plan. Restoring ${expected.title}.`);
+        await playDnaTrack(expected);
+        setText('#toast',`Playback restored. ${expected.title} is playing from your EchoSense Playback Plan.`);
+      })();
+      try {
+        await playbackPlanReconciliationInFlight;
+      } finally {
+        playbackPlanReconciliationInFlight=null;
+      }
     }
 
     function renderPlayer(rawState) {
@@ -463,8 +495,11 @@ PAGE = r"""<!doctype html>
       playerState=state;
       const track=state?.track_window?.current_track; const image=track?.album?.images?.[0]?.url;
       if(track?.id) {
-        activePlaybackTrackId=track.id;
-        activePlaybackDecisionId=decisionByTrackId.get(track.id)||(track.id===currentTrackId?currentRecommendationId:null);
+        const observedDecisionId=decisionByTrackId.get(track.id)||(track.id===currentTrackId?currentRecommendationId:null);
+        if(observedDecisionId) {
+          activePlaybackTrackId=track.id;
+          activePlaybackDecisionId=observedDecisionId;
+        }
       } else {
         activePlaybackTrackId=null;
         activePlaybackDecisionId=null;
@@ -481,7 +516,11 @@ PAGE = r"""<!doctype html>
       }
       const previousTrackId=previous?.track_window?.current_track?.id;
       const previousFinished=previousTrackId&&previous?.duration&&previous.position/previous.duration>=.95&&(track?.id!==previousTrackId||state?.paused);
-      if(spotifyConnected&&previousFinished) {
+      const changedTrack=track?.id&&previousTrackId&&track.id!==previousTrackId;
+      const plannedSuccessor=changedTrack?playbackPlanSuccessor(previousTrackId):null;
+      if(spotifyConnected&&changedTrack&&plannedSuccessor) {
+        reconcilePlaybackPlan(previousTrackId,track.id).catch(error=>setText('#toast',error.message));
+      } else if(spotifyConnected&&previousFinished) {
         markDnaTrackCompleted(previousTrackId).catch(error=>setText('#toast',error.message));
       }
       if(spotifyConnected&&track?.id&&track.id!==previousTrackId) {
@@ -511,8 +550,8 @@ PAGE = r"""<!doctype html>
         const next=(data.recommendations||[]).find(
           item=>item?.id&&item?.decision_id&&item.id!==activePlaybackTrackId
         );
-        if(!next)throw new Error('EchoSense needs more distinct Spotify candidates before starting another Music DNA round.');
-        setText('#autopilot-status',`Round ${dnaRounds.length} ready · ${Math.min(DNA_ROUND_SIZE,data.recommendations.length)} new Music DNA tracks`);
+        if(!next)throw new Error('EchoSense needs more distinct Spotify candidates before preparing another playback plan.');
+        setText('#autopilot-status',`Plan ${dnaRounds.length} ready · ${Math.min(DNA_ROUND_SIZE,data.recommendations.length)} EchoSense recommendations`);
         return next;
       })();
       try {
@@ -534,9 +573,9 @@ PAGE = r"""<!doctype html>
           .slice(completedIndex+1)
           .find(item=>item?.id&&item?.decision_id&&!completedDnaTrackIds.has(item.id));
         const next=nextInRound||await generateNextDnaRound('completed');
-        if(!next)throw new Error('EchoSense could not select the next Music DNA track after completion.');
+        if(!next)throw new Error('EchoSense could not select the next planned track after completion.');
         await playDnaTrack(next);
-        setText('#toast',`Completed. EchoSense continued with ${next.title} from your Music DNA.`);
+        setText('#toast',`Completed. EchoSense continued with ${next.title} from your Playback Plan.`);
         return next;
       })();
       try {
@@ -598,7 +637,23 @@ PAGE = r"""<!doctype html>
     }
     function renderPlaybackQueue(queue) {
       const container=$('#queue-items'); container.replaceChildren();
-      [queue.current,...queue.up_next].filter(Boolean).forEach((track,index)=>{const row=document.createElement('div');row.className='playlist-track';const title=document.createElement('strong');title.textContent=`${index===0?'Now':'Next'} · ${track.title}`;const artist=document.createElement('span');artist.textContent=track.artists.join(', ');row.append(title,artist);container.appendChild(row);});
+      const providerTracks=[queue.current,...queue.up_next].filter(track=>track?.id);
+      const providerUnique=[...new Map(providerTracks.map(track=>[track.id,track])).values()];
+      const duplicateCount=providerTracks.length-providerUnique.length;
+      const currentId=queue.current?.id||activePlaybackTrackId;
+      const ownedRound=[...dnaRounds].reverse().find(items=>items.some(item=>item.id===currentId));
+      const currentIndex=ownedRound?.findIndex(item=>item.id===currentId)??-1;
+      const ownedTracks=currentIndex>=0
+        ? ownedRound.slice(currentIndex).map(item=>({id:item.id,title:item.title,artists:[item.artist],source:'EchoSense Playback Plan'}))
+        : [];
+      const displayed=ownedTracks.length?ownedTracks:providerUnique.map(track=>({...track,source:'Spotify diagnostic view'}));
+      if(ownedTracks.length) {
+        const duplicateNote=duplicateCount?` ${duplicateCount} repeated Spotify queue entr${duplicateCount===1?'y was':'ies were'} ignored.`:'';
+        setText('#queue-status',`Verified: the EchoSense Playback Plan is authoritative.${duplicateNote}`);
+      } else {
+        setText('#queue-status','Spotify is not playing an active EchoSense recommendation. Showing its deduplicated queue for diagnosis; it is not the EchoSense Playback Plan.');
+      }
+      displayed.forEach((track,index)=>{const row=document.createElement('div');row.className='playlist-track';const title=document.createElement('strong');title.textContent=`${index===0?'Now':'Next'} · ${track.title}`;const artist=document.createElement('span');artist.textContent=`${(track.artists||[]).join(', ')} · ${track.source}`;row.append(title,artist);container.appendChild(row);});
       $('#queue-panel').hidden=false;
     }
     async function loadQueue() {
@@ -620,7 +675,7 @@ PAGE = r"""<!doctype html>
         const round=[...dnaRounds].reverse().find(items=>items.some(item=>item.id===activePlaybackTrackId))||dnaRounds.at(-1)||recommendationSlate.slice(0,DNA_ROUND_SIZE);
         const currentIndex=round.findIndex(item=>item.id===activePlaybackTrackId);
         const readyAhead=(currentIndex>=0?round.slice(currentIndex+1):round).filter(item=>item?.id&&item?.decision_id);
-        setText('#autopilot-status',`EchoSense controls playback · ${readyAhead.length} Music DNA track${readyAhead.length===1?'':'s'} ready ahead`);
+        setText('#autopilot-status',`EchoSense controls playback · ${readyAhead.length} planned track${readyAhead.length===1?'':'s'} ready ahead`);
       } catch(error) {
         setText('#autopilot-status',`Autopilot is retrying · ${error.message}`);
       } finally {
@@ -644,13 +699,14 @@ PAGE = r"""<!doctype html>
       const factorNames=[...new Set(displayedRound.flatMap(item=>(item.why_now?.factors||[]).map(factor=>factor.name)))];
       const table=document.createElement('table'); table.className='dna-table';
       const head=document.createElement('thead'); const header=document.createElement('tr');
-      ['#','Track & Artist','Category / Genre',...factorNames,'Why in queue','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';const explanation=factorExplanations[label];if(explanation){const heading=document.createElement('span');heading.className='factor-heading';heading.append(document.createTextNode(label));const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=explanation;info.setAttribute('aria-label',`Queue factor: ${label}. ${explanation}`);info.addEventListener('click',()=>openFactorModal(label));heading.appendChild(info);cell.appendChild(heading);}else{cell.textContent=label;}header.appendChild(cell);});
+      ['#','EchoSense recommendation','EchoSense recommendation score','Category / Genre',...factorNames,'Why recommended','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';const explanation=factorExplanations[label];if(explanation){const heading=document.createElement('span');heading.className='factor-heading';heading.append(document.createTextNode(label));const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=explanation;info.setAttribute('aria-label',`Queue factor: ${label}. ${explanation}`);info.addEventListener('click',()=>openFactorModal(label));heading.appendChild(info);cell.appendChild(heading);}else{cell.textContent=label;}header.appendChild(cell);});
       head.appendChild(header); table.appendChild(head);
       const body=document.createElement('tbody');
       displayedRound.forEach(item=>{
         const row=document.createElement('tr');
         const rank=document.createElement('td');rank.className='metric';rank.textContent=item.rank||displayedRound.indexOf(item)+1;row.appendChild(rank);
         const track=document.createElement('td');track.className='track-cell';const identity=document.createElement('div');identity.className='track-identity';const image=document.createElement('img');image.className='queue-cover';image.alt='';image.src=item.image_url||'';const copy=document.createElement('div');const title=document.createElement('strong');title.textContent=item.title;const artist=document.createElement('span');artist.textContent=item.artist;copy.append(title,artist);identity.append(image,copy);track.appendChild(identity);row.appendChild(track);
+        const recommendationScore=document.createElement('td');recommendationScore.className='metric';const finalScore=item.why_now?.overall_score;recommendationScore.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'—';recommendationScore.title='Final EchoSense Recommendation Score after all factors and boosts';row.appendChild(recommendationScore);
         const category=document.createElement('td');const categoryPill=document.createElement('span');categoryPill.className='category-pill';categoryPill.textContent=item.genre||item.category||(item.evidence?.matched_genres||[])[0]||'Music DNA';category.appendChild(categoryPill);row.appendChild(category);
         const scores=new Map((item.why_now?.factors||[]).map(factor=>[factor.name,factor.score]));
         factorNames.forEach(name=>{const cell=document.createElement('td');cell.className='metric';const score=scores.get(name);cell.textContent=Number.isFinite(score)?(name==='Diversity guard'?(score>=100?'Passed':'Limited'):`${score}%`):'—';row.appendChild(cell);});
@@ -660,7 +716,7 @@ PAGE = r"""<!doctype html>
       table.appendChild(body);container.appendChild(table);
       $('#dna-queue-panel').hidden=displayedRound.length<2;
       const pagination=$('#dna-pagination'); pagination.hidden=dnaRounds.length<2;
-      setText('#dna-page-status',`Page ${dnaPageIndex+1} of ${dnaRounds.length}`);
+      setText('#dna-page-status',`Plan ${dnaPageIndex+1} of ${dnaRounds.length}`);
       $('#dna-page-previous').disabled=dnaPageIndex===0;
       $('#dna-page-next').disabled=dnaPageIndex>=dnaRounds.length-1;
     }
@@ -686,7 +742,7 @@ PAGE = r"""<!doctype html>
         liveContext.weather==='unknown'?'Weather unavailable':`${liveContext.weather?.replace('_',' ')}${liveContext.temperature_f!==null?` · ${liveContext.temperature_f}°F`:''}`,
         liveContext.region,
         liveContext.road_setting!=='general'?`${liveContext.road_setting?.replace('_',' ')} drive`:null,
-        liveContext.activity?.replace('_',' '),
+        !liveContext.activity||liveContext.activity==='unknown'?'Movement unavailable':liveContext.activity.replace('_',' '),
         liveContext.speed_mph!==null?`${liveContext.speed_mph} mph`:null,
       ].filter(Boolean);
       values.forEach(value=>{const chip=document.createElement('span');chip.className='context-chip';chip.textContent=value;chips.appendChild(chip);});
@@ -746,13 +802,18 @@ PAGE = r"""<!doctype html>
     }
     async function playDnaTrack(item) {
       if(!deviceId)throw new Error('Player is not ready yet.');
-      activePlaybackTrackId=item.id; activePlaybackDecisionId=item.decision_id;
-      await activateBrowser(false);
-      await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,continuation_decision_ids:dnaContinuationDecisionIds(item)})});
-      await restorePlaybackState();
-      await waitForAudibleBrowserPlayback(item.id);
-      await maintainAutopilot(true);
-      setText('#toast',`Playing ${item.title}. Autopilot will keep the Music DNA queue moving.`);
+      playbackCommandInFlight+=1;
+      try {
+        activePlaybackTrackId=item.id; activePlaybackDecisionId=item.decision_id;
+        await activateBrowser(false);
+        await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,continuation_decision_ids:dnaContinuationDecisionIds(item)})});
+        await restorePlaybackState();
+        await waitForAudibleBrowserPlayback(item.id);
+        await maintainAutopilot(true);
+        setText('#toast',`Playing ${item.title}. Autopilot will keep the EchoSense Playback Plan moving.`);
+      } finally {
+        playbackCommandInFlight-=1;
+      }
     }
     async function toggleShuffle() {
       const enabled=$('#shuffle').getAttribute('aria-pressed')!=='true';
@@ -774,13 +835,18 @@ PAGE = r"""<!doctype html>
       if(!spotifyConnected){location.href='/auth/spotify/login';return;}
       if(!deviceId) throw new Error('Player is not ready yet.');
       if(!currentRecommendationId||!currentPlayOutcomeId) throw new Error('Recommendation is not ready yet.');
-      activePlaybackTrackId=currentTrackId; activePlaybackDecisionId=currentRecommendationId;
-      await activateBrowser(false);
-      await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId,continuation_decision_ids:dnaContinuationDecisionIds({id:currentTrackId})})});
-      await restorePlaybackState();
-      await waitForAudibleBrowserPlayback(currentTrackId);
-      await maintainAutopilot(true);
-      setText('#toast','EchoSense Autopilot started. Your Music DNA queue will replenish continuously.');
+      playbackCommandInFlight+=1;
+      try {
+        activePlaybackTrackId=currentTrackId; activePlaybackDecisionId=currentRecommendationId;
+        await activateBrowser(false);
+        await api(`/v1/player/recommendations/${encodeURIComponent(currentRecommendationId)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:currentPlayOutcomeId,continuation_decision_ids:dnaContinuationDecisionIds({id:currentTrackId})})});
+        await restorePlaybackState();
+        await waitForAudibleBrowserPlayback(currentTrackId);
+        await maintainAutopilot(true);
+        setText('#toast','EchoSense Autopilot started. Your Playback Plan will replenish continuously.');
+      } finally {
+        playbackCommandInFlight-=1;
+      }
     }
     function renderSavedState(saved) {
       currentTrackSaved=saved;
@@ -897,7 +963,7 @@ PAGE = r"""<!doctype html>
             : recommendationSlate;
           nextDna=orderedCandidates.find(item=>item?.id&&item?.decision_id&&item.id!==previousId);
         }
-        if(!nextDna)throw new Error('EchoSense could not find another Music DNA track. Refresh recommendations and try again.');
+        if(!nextDna)throw new Error('EchoSense could not find another planned track. Refresh recommendations and try again.');
         const targetDeviceId=before?.device?.id||deviceId||'';
         await activateBrowser(false);
         await api(`/v1/player/recommendations/${encodeURIComponent(nextDna.decision_id)}/play`,{
@@ -915,7 +981,7 @@ PAGE = r"""<!doctype html>
           const nextId=state?.track_window?.current_track?.id||null;
           if(state?.continuity?.source!=='snapshot'&&nextId===nextDna.id)changed=state;
         }
-        if(!changed)throw new Error(`Spotify did not start the selected Music DNA track (${nextDna.title}). Make sure the EchoSense browser player is active, then try again.`);
+        if(!changed)throw new Error(`Spotify did not start the selected EchoSense recommendation (${nextDna.title}). Make sure the EchoSense browser player is active, then try again.`);
         activePlaybackTrackId=nextDna.id;
         activePlaybackDecisionId=nextDna.decision_id;
         rememberAutopilotTrack(previousId);
@@ -931,7 +997,7 @@ PAGE = r"""<!doctype html>
         await Promise.allSettled([loadQueue(),recommendationRefresh]);
         await maintainAutopilot(true);
         const title=changed.track_window.current_track?.name||'the next track';
-        setText('#toast',`Skipped. EchoSense selected the next Music DNA track and verified ${title} is playing.`);
+        setText('#toast',`Skipped. EchoSense selected the next planned recommendation and verified ${title} is playing.`);
       } finally {
         skipInFlight=false; $('#skip').disabled=false; $('#queue-skip').disabled=false;
       }

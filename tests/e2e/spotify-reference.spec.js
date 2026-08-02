@@ -271,6 +271,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     const tracksByDecision = {
       'decision-distinct': {id: 'distinct-track', name: 'Distinct Motion'},
       'decision-autopilot-3': {id: 'autopilot-3', name: 'Open Current'},
+      'decision-autopilot-4': {id: 'autopilot-4', name: 'Night Lines'},
       'decision-post-skip': {id: 'post-skip-track', name: 'Fresh Horizon'},
     };
     providerTrack = tracksByDecision[decisionId] || {id: 'working-track', name: 'Focused Motion'};
@@ -281,6 +282,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     }
     if (decisionId === 'decision-autopilot-3') {
       controlEvents.push('dna-completion-play');
+    }
+    if (decisionId === 'decision-autopilot-4') {
+      controlEvents.push('provider-autoplay-overridden');
     }
     await route.fulfill({
       json: {
@@ -489,7 +493,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   expect(queueCommands).toHaveLength(0);
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
-  await expect(page.locator('#autopilot-status')).toContainText('4 Music DNA tracks ready ahead');
+  await expect(page.locator('#autopilot-status')).toContainText('4 planned tracks ready ahead');
   await expect(page.locator('#dna-queue-items tbody tr').first().locator('.why-cell')).toContainText(
     'Picked because Music DNA affinity 95%, Diversity guard 91%, Live context fit 88%',
   );
@@ -536,21 +540,21 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
-  await expect(page.locator('#pick-label')).toHaveText('Current recommendation');
+  await expect(page.locator('#pick-label')).toHaveText('Current EchoSense recommendation');
   await expect(page.locator('#toast')).toContainText(
-    'selected the next Music DNA track and verified Distinct Motion is playing',
+    'selected the next planned recommendation and verified Distinct Motion is playing',
   );
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Page ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+    `Plan ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
   );
   await expect(page.locator('#dna-page-previous')).toBeEnabled();
   await page.locator('#dna-page-previous').click();
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Page ${roundsBeforeSkip} of ${roundsBeforeSkip + 1}`,
+    `Plan ${roundsBeforeSkip} of ${roundsBeforeSkip + 1}`,
   );
   await page.locator('#dna-page-next').click();
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Page ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+    `Plan ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
   );
 
   await page.evaluate(() => {
@@ -586,12 +590,37 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await expect(page.locator('#player-title')).toHaveText('Open Current');
   await expect(page.locator('#toast')).toContainText(
-    'continued with Open Current from your Music DNA',
+    'continued with Open Current from your Playback Plan',
+  );
+
+  await page.evaluate(() => {
+    const rogueTrack = {
+      id: 'spotify-autoplay-track',
+      name: 'Provider Autoplay Track',
+      duration_ms: 180000,
+      artists: [{name: 'Provider Artist'}],
+      album: {images: []},
+    };
+    window.__mockPlayer.emit({
+      paused: false,
+      position: 1000,
+      duration: 180000,
+      track_window: {current_track: rogueTrack},
+    });
+  });
+  await expect.poll(() => controlEvents).toContain('provider-autoplay-overridden');
+  expect(recommendationPlays.at(-1)).toMatchObject({
+    decision_id: 'decision-autopilot-4',
+    device_id: 'guardian-device',
+  });
+  await expect(page.locator('#player-title')).toHaveText('Night Lines');
+  await expect(page.locator('#toast')).toContainText(
+    'Playback restored. Night Lines is playing from your EchoSense Playback Plan.',
   );
 
   restoreFromSnapshot = true;
   await page.reload();
-  await expect(page.locator('#player-title')).toHaveText('Open Current');
+  await expect(page.locator('#player-title')).toHaveText('Night Lines');
   await expect(page.locator('#player-status')).toContainText('Last session restored');
   await expect(page.locator('#toggle')).toHaveText('▶');
 

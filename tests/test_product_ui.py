@@ -10,7 +10,7 @@ def test_landing_page_is_available() -> None:
     assert response.status_code == 200
     assert "EchoSense" in response.text
     assert "EchoSense listens to you" in response.text
-    assert "Current recommendation" in response.text
+    assert "Current EchoSense recommendation" in response.text
     assert "Your Music DNA" in response.text
 
 
@@ -122,21 +122,28 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "autopilotTimer=setInterval" in response.text
     assert "updateCurrentPick=true" in response.text
     assert "if(!updateCurrentPick){renderDnaQueue();return data;}" in response.text
-    assert "Autopilot on" in response.text
-    assert "Six tracks for this listening round" in response.text
+    assert "Decision-owned sequence" in response.text
+    assert "Tracks EchoSense plans to play—in this exact order" in response.text
     assert 'id="dna-pagination"' in response.text
     assert "rememberDnaRound" in response.text
     assert "generateNextDnaRound('completed')" in response.text
     assert "if(roundGenerationInFlight)return roundGenerationInFlight" in response.text
     assert "if(skipInFlight)return" in response.text
     assert "completionTransitionInFlight" in response.text
+    assert "playbackPlanReconciliationInFlight" in response.text
+    assert "playbackCommandInFlight" in response.text
+    assert "function playbackPlanSuccessor(trackId)" in response.text
+    assert "async function reconcilePlaybackPlan(previousTrackId,observedTrackId)" in response.text
+    assert "await playDnaTrack(expected)" in response.text
+    assert "Spotify advanced outside the EchoSense Playback Plan" in response.text
+    assert "if(observedDecisionId)" in response.text
     assert "const completedIndex=activeRound.findIndex" in response.text
     assert ".slice(completedIndex+1)" in response.text
     assert "await playDnaTrack(next)" in response.text
     assert "dnaContinuationDecisionIds" in response.text
     assert "continuation_decision_ids:dnaContinuationDecisionIds(item)" in response.text
     assert "continuation_decision_ids:dnaContinuationDecisionIds(nextDna)" in response.text
-    assert "continued with ${next.title} from your Music DNA" in response.text
+    assert "continued with ${next.title} from your Playback Plan" in response.text
     live_loader = response.text[
         response.text.index("async function loadLiveSpotify(") : response.text.index(
             "async function loadDemo()"
@@ -147,7 +154,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert ">▶ Play</button>" in response.text
     assert "Skip current song" in response.text
     assert 'id="pick-label"' in response.text
-    assert "Current recommendation" in response.text
+    assert "Current EchoSense recommendation" in response.text
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
     assert (
@@ -164,11 +171,13 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Skip &amp; play next" not in response.text
     assert "skipAndPlayNext" in response.text
     assert "skipInFlight" in response.text
-    assert "Spotify did not start the selected Music DNA track" in response.text
+    assert "Spotify did not start the selected EchoSense recommendation" in response.text
     assert "Promise.allSettled([loadQueue(),recommendationRefresh])" in response.text
     assert "const refreshExclusions=startNewRound" in response.text
     assert "refreshExclusions," in response.text
-    assert "selected the next Music DNA track and verified ${title} is playing" in response.text
+    assert (
+        "selected the next planned recommendation and verified ${title} is playing" in response.text
+    )
     assert "targetDeviceId=before?.device?.id||deviceId||''" in response.text
     assert "state?.continuity?.source!=='snapshot'" in response.text
     assert "nextDna=orderedCandidates.find" in response.text
@@ -194,8 +203,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "avoids repeating the same tracks or artists" in response.text
     assert "className='factor-info'" in response.text
     assert "info.setAttribute('aria-label'" in response.text
-    assert "Normalized from Music DNA rank, live-context fit" in response.text
-    assert "% normalized match" in response.text
+    assert "EchoSense Recommendation Score: the final normalized result" in response.text
+    assert "% EchoSense score" in response.text
     assert "Compare what shaped each pick." not in response.text
     assert 'id="queue-skip"' in response.text
     assert 'id="live-context-panel"' in response.text
@@ -260,7 +269,7 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "You selected general" not in page
     assert "A repetition safeguard, not a recommendation-match score" in page
     assert 'id="dna-load-more"' in page
-    assert "Page ${dnaPageIndex+1} of ${dnaRounds.length}" in page
+    assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
 
 
 def test_recommendation_boosters_drive_every_spotify_recommendation_request() -> None:
@@ -271,3 +280,39 @@ def test_recommendation_boosters_drive_every_spotify_recommendation_request() ->
     assert "boostDefinitions.forEach(([key])=>params.set(`boost_${key}`" in page
     assert "echosenseRecommendationBoosts" in page
     assert "data.context_statement" in page
+
+
+def test_live_context_names_unavailable_movement_instead_of_showing_unknown() -> None:
+    page = client.get("/").text
+
+    assert "?'Movement unavailable':liveContext.activity.replace" in page
+    assert "Road setting unavailable" in page
+    assert "liveContext.activity?.replace('_',' ')" not in page
+
+
+def test_playback_verification_prefers_owned_dna_and_collapses_provider_duplicates() -> None:
+    page = client.get("/").text
+
+    assert "Now and next · EchoSense controlled" in page
+    assert 'id="queue-status"' in page
+    assert "const providerUnique=[...new Map" in page
+    assert "const ownedRound=[...dnaRounds].reverse().find" in page
+    assert "ownedTracks.length?ownedTracks:providerUnique" in page
+    assert "repeated Spotify queue entr" in page
+    assert "EchoSense Playback Plan" in page
+    assert "Spotify diagnostic view" in page
+
+
+def test_final_playback_plan_names_the_exact_ranked_dna_sequence() -> None:
+    page = client.get("/").text
+
+    assert "Final EchoSense playback plan" in page
+    assert "Tracks EchoSense plans to play—in this exact order" in page
+    assert "after Music DNA affinity, live context, learned preference" in page
+    assert 'id="dna-plan-statement"' in page
+    assert "Decision-owned sequence" in page
+    assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
+    assert "Prepare another six-track plan" in page
+    assert "EchoSense recommendation score" in page
+    assert "item.why_now?.overall_score" in page
+    assert "Final EchoSense Recommendation Score after all factors and boosts" in page
