@@ -30,6 +30,7 @@ from echosense.providers.spotify import (
     SpotifyProvider,
     SpotifyRateLimited,
 )
+from echosense.ranking_boosts import RecommendationBoosts, build_context_statement
 from echosense.repositories.music_dna import MusicDNARepository
 from echosense.repositories.provider_connections import (
     ProviderConnection,
@@ -164,9 +165,11 @@ def _why_now(
     activity: str | None,
     daypart: str | None,
     temporal_mood: TemporalMoodProfile | None = None,
+    context_statement: str | None = None,
 ) -> dict[str, object]:
     preference = float(candidate.get("preference_weight", 0.0))
     context_fit = float(candidate.get("context_fit", 0.0))
+    effective_weights = dict(candidate.get("effective_weights", {}))
     observations = list(context_labels)
     for value, label in (
         (weather, "weather"),
@@ -183,8 +186,13 @@ def _why_now(
             {
                 "name": "Music DNA affinity",
                 "score": round(float(candidate["provider_base_score"]) * 100),
+                "effective_weight": round(float(effective_weights.get("music_dna", 0)) * 100),
             },
-            {"name": "Live context fit", "score": round(context_fit * 100)},
+            {
+                "name": "Live context fit",
+                "score": round(context_fit * 100),
+                "effective_weight": round(float(effective_weights.get("live_context", 0)) * 100),
+            },
             *(
                 [
                     {
@@ -202,11 +210,19 @@ def _why_now(
             {
                 "name": "Learned preference",
                 "score": round(max(-1.0, min(1.0, preference)) * 100),
+                "effective_weight": round(
+                    float(effective_weights.get("learned_preference", 0)) * 100
+                ),
             },
-            {"name": "Diversity guard", "score": 100},
+            {
+                "name": "Diversity guard",
+                "score": round(float(candidate.get("diversity_fit", 1.0)) * 100),
+                "effective_weight": round(float(effective_weights.get("diversity", 0)) * 100),
+            },
         ],
         "observations": observations or ["Music DNA and recent listening"],
-        "summary": (
+        "summary": context_statement
+        or (
             temporal_mood.explanation
             if temporal_mood and temporal_mood.mood
             else f"Selected from your Music DNA with {round(context_fit * 100)}% live-context fit."
@@ -397,6 +413,10 @@ def spotify_data(
     road_setting: str | None = Query(default=None, max_length=32),
     activity: str | None = Query(default=None, max_length=32),
     daypart: str | None = Query(default=None, max_length=32),
+    boost_music_dna: int = Query(default=0, ge=0, le=100),
+    boost_live_context: int = Query(default=0, ge=0, le=100),
+    boost_learned_preference: int = Query(default=0, ge=0, le=100),
+    boost_diversity: int = Query(default=0, ge=0, le=100),
     exclude: list[str] = Query(default=[]),
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
@@ -446,6 +466,36 @@ def spotify_data(
                 score,
             )
         live_context = any((weather, region, road_setting, activity, daypart))
+        boosts = RecommendationBoosts(
+            music_dna=boost_music_dna,
+            live_context=boost_live_context,
+            learned_preference=boost_learned_preference,
+            diversity=boost_diversity,
+        )
+        effective_weights = boosts.effective_weights(live_context_available=live_context)
+        recent_artist_positions: dict[str, int] = {}
+        for position, observation in enumerate(imported.recent_tracks[:20]):
+            recent_artist_positions.setdefault(
+                observation.track.primary_artist.casefold(), position
+            )
+        diversity_scores = {
+            track.provider_id: (
+                min(1.0, 0.25 + recent_artist_positions[track.primary_artist.casefold()] / 20)
+                if track.primary_artist.casefold() in recent_artist_positions
+                else 1.0
+            )
+            for track in candidate_tracks
+        }
+        context_statement = build_context_statement(
+            moment=moment,
+            weather=weather,
+            region=region,
+            road_setting=road_setting,
+            activity=activity,
+            daypart=daypart,
+            boosts=boosts,
+            effective_weights=effective_weights,
+        )
         recommendation, candidate_slate = learning.rank(
             user_id=session.provider_user_id,
             provider="spotify",
@@ -453,6 +503,9 @@ def spotify_data(
             tracks=candidate_tracks,
             context_scores=combined_context_scores,
             context_weight=0.35 if live_context else 0.15,
+            diversity_scores=diversity_scores,
+            boosts=boosts,
+            live_context_available=live_context,
         )
         excluded_ids = {item_id for item_id in exclude[:50] if item_id}
         diverse_slate = DiverseSlateService().build(
@@ -502,6 +555,9 @@ def spotify_data(
                         "activity": activity,
                         "daypart": daypart,
                     },
+                    "recommendation_boosts": boosts.as_dict(),
+                    "effective_weights": effective_weights,
+                    "context_statement": context_statement,
                     "context_evidence": list(context_evidence),
                     "temporal_mood": (
                         {
@@ -611,11 +667,15 @@ def spotify_data(
                 activity=activity,
                 daypart=daypart,
                 temporal_mood=temporal_profile,
+                context_statement=context_statement,
             ),
         }
         for item in diverse_slate
     ]
     result["temporal_mood"] = temporal_profile.as_dict()
+    result["context_statement"] = context_statement
+    result["recommendation_boosts"] = boosts.as_dict()
+    result["effective_weights"] = effective_weights
     return result
 
 

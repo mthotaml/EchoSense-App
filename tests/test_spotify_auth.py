@@ -196,8 +196,26 @@ def test_spotify_data_builds_live_music_profile(
         "/me/top/tracks",
     ]
     assert payload["recommendation"]["title"] == "A Real Track"
-    assert payload["recommendation"]["match_score"] == 80
-    assert payload["recommendations"][0]["why_now"]["overall_score"] == 80
+    assert payload["recommendation"]["match_score"] == 78
+    assert payload["recommendations"][0]["why_now"]["overall_score"] == 78
+    assert payload["context_statement"].startswith("EchoSense is tailoring")
+    assert sum(payload["effective_weights"].values()) == pytest.approx(1.0)
+    assert payload["recommendation_boosts"] == {
+        "music_dna": 0,
+        "live_context": 0,
+        "learned_preference": 0,
+        "diversity": 0,
+    }
+    boosted = client.get(
+        "/auth/spotify/data?moment=working&boost_live_context=80&boost_diversity=100",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    assert boosted.status_code == 200
+    boosted_payload = boosted.json()
+    assert boosted_payload["recommendation_boosts"]["live_context"] == 80
+    assert boosted_payload["recommendation_boosts"]["diversity"] == 100
+    assert "live context" in boosted_payload["context_statement"]
+    assert "artist diversity" in boosted_payload["context_statement"]
     assert payload["recommendation"]["decision_id"].startswith("dec_")
     assert payload["recommendation"]["evidence"]["noticed"] == "You selected working."
     assert payload["recommendation"]["evidence"]["matched_genres"] == ["ambient"]

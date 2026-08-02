@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import Literal
 
 from echosense.providers.models import Track
+from echosense.ranking_boosts import RecommendationBoosts
 from echosense.storage import Storage
 
 PlaybackSignal = Literal["played", "completed", "skipped", "saved", "liked", "disliked", "rated"]
@@ -61,19 +62,28 @@ class PlaybackLearningService:
         tracks: list[Track],
         context_scores: dict[str, float] | None = None,
         context_weight: float = 0.15,
+        diversity_scores: dict[str, float] | None = None,
+        boosts: RecommendationBoosts | None = None,
+        live_context_available: bool = False,
     ) -> tuple[Track | None, list[dict[str, object]]]:
         if not 0.0 <= context_weight <= 0.5:
             raise ValueError("context_weight must be between 0 and 0.5")
         weights = self._weights(user_id, provider, context, [track.provider_id for track in tracks])
+        boost_settings = boosts or RecommendationBoosts()
+        effective_weights = boost_settings.effective_weights(
+            live_context_available=live_context_available
+        )
         slate = []
         for rank, track in enumerate(tracks, start=1):
             base_score = round(1.0 - (rank - 1) * 0.05, 3)
             preference_weight = weights.get(track.provider_id, 0.0)
             context_fit = (context_scores or {}).get(track.provider_id, 0.0)
+            diversity_fit = max(0.0, min(1.0, (diversity_scores or {}).get(track.provider_id, 1.0)))
             ranking_score = round(
-                base_score
-                + context_weight * context_fit
-                + PREFERENCE_COEFFICIENT * preference_weight,
+                effective_weights["music_dna"] * base_score
+                + effective_weights["live_context"] * context_fit
+                + effective_weights["learned_preference"] * preference_weight
+                + effective_weights["diversity"] * diversity_fit,
                 6,
             )
             slate.append(
@@ -85,11 +95,11 @@ class PlaybackLearningService:
                     "preference_weight": preference_weight,
                     "context_fit": context_fit,
                     "context_weight": context_weight,
+                    "diversity_fit": diversity_fit,
+                    "boosts": boost_settings.as_dict(),
+                    "effective_weights": effective_weights,
                     "ranking_score": ranking_score,
-                    "normalized_score": normalize_ranking_score(
-                        ranking_score,
-                        context_weight=context_weight,
-                    ),
+                    "normalized_score": round(max(0.0, min(1.0, ranking_score)) * 100),
                 }
             )
         slate.sort(key=lambda item: (-float(item["ranking_score"]), int(item["rank"])))
