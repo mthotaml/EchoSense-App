@@ -416,6 +416,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
+  const listeningControls = page.locator('#listening-controls');
+  await expect(listeningControls).toBeVisible();
+  await expect(listeningControls.locator('#moment-panel')).toBeVisible();
+  await expect(listeningControls.locator('#boost-panel')).toBeVisible();
+  await expect(listeningControls.locator('#live-context-panel')).toBeVisible();
+  await expect(page.locator('.hero-content #moment')).toHaveCount(0);
   await page.locator('#context-toggle').click();
   await expect(page.locator('#context-chips')).toContainText('Southern California');
   await expect(page.locator('#context-chips')).toContainText('sunny · 78°F');
