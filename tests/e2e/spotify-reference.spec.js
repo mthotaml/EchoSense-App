@@ -429,16 +429,16 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     'Live context fit',
   );
   await expect(
-    page.getByRole('button', {name: /Music DNA affinity: How closely/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Music DNA affinity: How closely/}),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', {name: /Live context fit: How well/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Live context fit: How well/}),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', {name: /Learned preference: An adjustment/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Learned preference: An adjustment/}),
   ).toBeVisible();
   await expect(
-    page.getByRole('button', {name: /Diversity guard: How well/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Diversity guard: A repetition safeguard/}),
   ).toBeVisible();
   await expect(page.locator('#dna-queue-items thead')).toContainText('Time pattern');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('95%');
@@ -536,21 +536,21 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
   await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
-  await expect(page.locator('#pick-label')).toHaveText('Recommended next');
+  await expect(page.locator('#pick-label')).toHaveText('Current recommendation');
   await expect(page.locator('#toast')).toContainText(
     'selected the next Music DNA track and verified Distinct Motion is playing',
   );
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Round ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+    `Page ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
   );
   await expect(page.locator('#dna-page-previous')).toBeEnabled();
   await page.locator('#dna-page-previous').click();
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Round ${roundsBeforeSkip} of ${roundsBeforeSkip + 1}`,
+    `Page ${roundsBeforeSkip} of ${roundsBeforeSkip + 1}`,
   );
   await page.locator('#dna-page-next').click();
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Round ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+    `Page ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
   );
 
   await page.evaluate(() => {
