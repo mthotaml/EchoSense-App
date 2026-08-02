@@ -16,7 +16,7 @@ def test_profiles_own_distinct_root_routes() -> None:
     assert "Today's pick" not in legacy.text
 
     assert product.status_code == 200
-    assert "Current recommendation" in product.text
+    assert "Current EchoSense recommendation" in product.text
     assert "Connect Apple Music" not in product.text
 
 
