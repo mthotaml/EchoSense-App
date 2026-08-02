@@ -87,6 +87,13 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "loadPlaylistTracks" in response.text
     assert "playPlaylistTrack" in response.text
     assert 'id="moment"' in response.text
+    assert 'id="listening-controls"' in response.text
+    assert "Personalize what EchoSense plays next" in response.text
+    assert 'id="moment-panel"' in response.text
+    assert "What are you doing right now?" in response.text
+    assert "What should matter more?" in response.text
+    assert response.text.index('id="moment-panel"') < response.text.index('id="boost-panel"')
+    assert response.text.index('id="boost-panel"') < response.text.index('id="live-context-panel"')
     assert "/auth/spotify/data?" in response.text
     assert "Context evidence:" in response.text
     assert "disconnectSpotify" in response.text

@@ -277,6 +277,22 @@
       ]
     },
     {
+      "id": "user-configuration-navigation",
+      "severity": "severity-2",
+      "description": "Listening moment, recommendation priorities, and live-context controls are grouped in one discoverable control center and are not duplicated inside the recommendation hero.",
+      "covers": ["user-config-center-visible"],
+      "evidence": [
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "const listeningControls = page.locator('#listening-controls')"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "Personalize what EchoSense plays next"
+        }
+      ]
+    },
+    {
       "id": "recommendation-boost-truthfulness",
       "severity": "severity-1",
       "description": "User boosts are bounded and normalized, alter the same ranking decision that drives Autopilot, and the displayed context statement reports those exact inputs and effective weights.",
@@ -320,6 +336,7 @@
         "diversity-boost-reranks",
         "boosts-propagate-to-autopilot",
         "context-statement-decision-bound",
+        "user-config-center-visible",
         "spotify-data-failure-rendered",
         "oauth-profile-rate-limit-retried",
         "oauth-rate-limit-bounded",
