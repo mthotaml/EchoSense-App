@@ -126,6 +126,12 @@ PAGE = r"""<!doctype html>
     .context-compact h2 { margin-bottom:5px; }
     .context-compact .connection-copy { margin:0; }
     .context-compact .context-chips { margin-top:10px; }
+    .boost-grid { display:grid; grid-template-columns:repeat(4,minmax(150px,1fr)); gap:14px; margin-top:20px; }
+    .boost-control { padding:14px; border:1px solid var(--line); border-radius:14px; background:rgba(7,10,15,.46); }
+    .boost-control label,.boost-value { display:flex; justify-content:space-between; gap:8px; font-size:.82rem; font-weight:650; }
+    .boost-control input { margin-top:14px; }
+    .boost-value { margin-top:7px; color:var(--muted); font-size:.72rem; font-weight:500; }
+    .context-statement { margin:18px 0 0; padding:13px 15px; border-left:3px solid var(--blue); border-radius:0 10px 10px 0; color:#d9ecff; background:rgba(100,181,246,.07); line-height:1.5; }
     .privacy-note { color:var(--muted); font-size:.78rem; margin-top:10px; }
     .privacy-note summary { cursor:pointer; width:max-content; }
     .table-wrap { overflow-x:auto; margin-top:20px; border:1px solid var(--line); border-radius:16px; }
@@ -212,8 +218,8 @@ PAGE = r"""<!doctype html>
     .modal-card { width:min(560px,100%); padding:28px; border:1px solid var(--line); border-radius:20px; background:#15161b; box-shadow:0 30px 90px #000; }
     .formula { margin:18px 0; padding:15px; border-radius:12px; color:#cbe8ff; background:rgba(100,181,246,.08); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
     .player { border-top-color:var(--line); background:rgba(10,10,12,.92); }
-    @media (max-width:1024px) { .memory-grid { grid-template-columns:1fr; } }
-    @media (max-width:760px) { .small-grid,.hero-content,.governance-grid { grid-template-columns:1fr; } .hero-art { width:112px; height:112px; } .factor-bars { grid-template-columns:1fr; } .pick-top,.connection { display:block; } .player { grid-template-columns:1fr auto; padding:12px; } .transport { justify-items:end; } .progress-row,.player-side { display:none; } .cover { width:52px; height:52px; } .account span { display:none; } }
+    @media (max-width:1024px) { .memory-grid { grid-template-columns:1fr; } .boost-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:760px) { .small-grid,.hero-content,.governance-grid,.boost-grid { grid-template-columns:1fr; } .hero-art { width:112px; height:112px; } .factor-bars { grid-template-columns:1fr; } .pick-top,.connection { display:block; } .player { grid-template-columns:1fr auto; padding:12px; } .transport { justify-items:end; } .progress-row,.player-side { display:none; } .cover { width:52px; height:52px; } .account span { display:none; } }
   </style>
 </head>
 <body>
@@ -222,6 +228,7 @@ PAGE = r"""<!doctype html>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. Music selected from your DNA, your context, and what it learns—with every decision explained.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
     <section id="live-context-panel" class="panel connection context-compact"><div><div class="eyebrow">Live context</div><h2>Why this music now</h2><p id="context-status" class="connection-copy">Time is automatic. Add weather and location when useful.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location is used only to resolve current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section>
+    <section id="boost-panel" class="panel"><div class="eyebrow blue">Recommendation boosts</div><h2>Tell EchoSense what matters more right now</h2><p class="copy">Boosts rebalance the next Music DNA ranking. Every factor remains bounded, and the effective weights always total 100%.</p><div id="boost-controls" class="boost-grid"></div><p id="context-statement" class="context-statement" aria-live="polite">Building the context statement used for your next track…</p></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
       <section class="panel"><div class="hero-content"><img id="hero-cover" class="hero-art" alt="Recommendation album art"><div><div class="pick-top"><div><div id="pick-label" class="eyebrow">Current recommendation</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div><span id="hero-genre" class="genre-pill" hidden></span></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><div id="why-pill" class="reason-pill">✨ Building an explainable recommendation…</div><div id="hero-factors" class="factor-bars"></div><p id="evidence" class="evidence"></p><div class="actions"><select id="moment" class="secondary" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><button id="play" class="primary" type="button">▶ Play</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>♥ Save</button><button id="skip" class="secondary" type="button">⏭ Skip current song</button></div><div id="toast" aria-live="polite"></div></div></div></section>
@@ -279,6 +286,14 @@ PAGE = r"""<!doctype html>
     const DNA_ROUND_SIZE = 6;
     const AUTOPILOT_HORIZON = DNA_ROUND_SIZE;
     const reportedSignals = new Set();
+    const boostDefinitions=[
+      ['music_dna','Music DNA affinity'],
+      ['live_context','Live context fit'],
+      ['learned_preference','Learned preference'],
+      ['diversity','Diversity guard'],
+    ];
+    const recommendationBoosts=JSON.parse(localStorage.getItem('echosenseRecommendationBoosts')||'{}');
+    let boostRefreshTimer=null;
     const factorExplanations={
       'Music DNA affinity':'How closely this track matches your long-term Spotify taste, including artists, tracks, genres, and listening history.',
       'Live context fit':'How well this track fits your current time, weather, coarse location, road setting, and activity when live context is enabled.',
@@ -320,6 +335,19 @@ PAGE = r"""<!doctype html>
     const setText = (selector, value) => { $(selector).textContent = value || ''; };
     const greetingForHour = (h) => h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
     const formatTime = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2,'0')}`;
+
+    function renderBoostControls(effectiveWeights={}) {
+      const container=$('#boost-controls');container.replaceChildren();
+      boostDefinitions.forEach(([key,label])=>{
+        const card=document.createElement('div');card.className='boost-control';
+        const heading=document.createElement('label');heading.htmlFor=`boost-${key}`;heading.append(document.createTextNode(label));
+        const amount=document.createElement('strong');amount.textContent=`+${Number(recommendationBoosts[key]||0)}%`;heading.appendChild(amount);
+        const slider=document.createElement('input');slider.id=`boost-${key}`;slider.type='range';slider.min='0';slider.max='100';slider.step='10';slider.value=String(recommendationBoosts[key]||0);slider.setAttribute('aria-label',`Boost ${label}`);
+        const weight=document.createElement('div');weight.className='boost-value';weight.textContent=Number.isFinite(effectiveWeights[key])?`Effective weight ${Math.round(effectiveWeights[key]*100)}%`:'Balanced baseline';
+        slider.addEventListener('input',()=>{recommendationBoosts[key]=Number(slider.value);amount.textContent=`+${slider.value}%`;localStorage.setItem('echosenseRecommendationBoosts',JSON.stringify(recommendationBoosts));clearTimeout(boostRefreshTimer);boostRefreshTimer=setTimeout(()=>{if(spotifyConnected)loadLiveSpotify().then(()=>maintainAutopilot(true)).catch(e=>setText('#toast',e.message));},350);});
+        card.append(heading,slider,weight);container.appendChild(card);
+      });
+    }
 
     function dnaLine(label, value) { const row=document.createElement('div'); row.className='dna-line'; const key=document.createElement('span'); key.textContent=label; const strong=document.createElement('strong'); strong.textContent=value; row.append(key,strong); return row; }
     function renderTimeline(items) { const c=$('#timeline'); c.replaceChildren(); items.forEach((label,index)=>{ if(index){const a=document.createElement('span');a.className='arrow';a.textContent='→';c.appendChild(a);} const s=document.createElement('span');s.className='journey-step';s.textContent=label;c.appendChild(s); }); }
@@ -379,6 +407,7 @@ PAGE = r"""<!doctype html>
     async function loadLiveSpotify(moment=$('#moment').value, exclusions=[], updateCurrentPick=true, recordRound=updateCurrentPick) {
       const hour=new Date().getHours(); const automaticDaypart=hour<6?'late_night':hour<12?'morning':hour<17?'afternoon':hour<21?'evening':'night';
       const params=new URLSearchParams({moment,daypart:liveContext?.daypart||automaticDaypart});
+      boostDefinitions.forEach(([key])=>params.set(`boost_${key}`,String(recommendationBoosts[key]||0)));
       if(liveContext){['weather','region','road_setting','activity'].forEach(key=>liveContext[key]&&params.set(key,liveContext[key]));}
       exclusions.slice(-50).forEach(itemId=>params.append('exclude',itemId));
       const response=await api(`/auth/spotify/data?${params}`); const data=await response.json();
@@ -388,6 +417,7 @@ PAGE = r"""<!doctype html>
       if(recordRound)rememberDnaRound(recommendationSlate);
       if(!updateCurrentPick){renderDnaQueue();return data;}
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
+      renderBoostControls(data.effective_weights||{});setText('#context-statement',data.context_statement||'Music DNA and the current listening moment are shaping the next track.');
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
       if (pick) { const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · Recommended from your Spotify taste`); setText('#match',`${pick.match_score}% match`);$('#match').title='Normalized from Music DNA rank, live-context fit, and your learned preference. Diversity rules are applied after scoring.';$('#match').setAttribute('aria-label',`${pick.match_score}% normalized match. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected from your Music DNA'}`);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your Music DNA. Choose Driving, Working, Exercising, Relaxing, or Social for recommendations tailored to that moment and your taste.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense is using your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
@@ -908,6 +938,7 @@ PAGE = r"""<!doctype html>
     }
 
     async function load() {
+      renderBoostControls();
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
       const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.allSettled([loadPlaylistsSafely(),loadDevices()]); } else await loadDemo();
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));

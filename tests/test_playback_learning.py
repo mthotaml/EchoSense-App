@@ -138,7 +138,7 @@ def test_normalized_score_is_bounded_monotonic_and_preserves_rank(tmp_path) -> N
         reverse=True,
     )
     assert all(0 <= item["normalized_score"] <= 100 for item in slate)
-    assert slate[0]["normalized_score"] == 86
+    assert slate[0]["normalized_score"] == 83
 
 
 def test_normalized_score_maps_theoretical_bounds_to_zero_and_one_hundred() -> None:

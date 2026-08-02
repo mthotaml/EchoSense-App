@@ -261,3 +261,13 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "A repetition safeguard, not a recommendation-match score" in page
     assert 'id="dna-load-more"' in page
     assert "Page ${dnaPageIndex+1} of ${dnaRounds.length}" in page
+
+
+def test_recommendation_boosters_drive_every_spotify_recommendation_request() -> None:
+    page = client.get("/").text
+
+    assert 'id="boost-controls"' in page
+    assert 'id="context-statement"' in page
+    assert "boostDefinitions.forEach(([key])=>params.set(`boost_${key}`" in page
+    assert "echosenseRecommendationBoosts" in page
+    assert "data.context_statement" in page

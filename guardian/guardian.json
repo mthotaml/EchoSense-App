@@ -243,6 +243,36 @@
           "pattern": "receipt-generating governance endpoint"
         }
       ]
+    },
+    {
+      "id": "recommendation-boost-truthfulness",
+      "severity": "severity-1",
+      "description": "User boosts are bounded and normalized, alter the same ranking decision that drives Autopilot, and the displayed context statement reports those exact inputs and effective weights.",
+      "covers": [
+        "recommendation-boosts-bounded",
+        "recommendation-boosts-normalized",
+        "diversity-boost-reranks",
+        "boosts-propagate-to-autopilot",
+        "context-statement-decision-bound"
+      ],
+      "evidence": [
+        {
+          "source": "tests/test_ranking_boosts.py",
+          "pattern": "test_diversity_boost_can_promote_less_fatigued_artist"
+        },
+        {
+          "source": "tests/test_ranking_boosts.py",
+          "pattern": "test_context_statement_reports_observations_and_requested_emphasis"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "test_recommendation_boosters_drive_every_spotify_recommendation_request"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "boost_live_context=80&boost_diversity=100"
+        }
+      ]
     }
   ],
   "journeys": [
@@ -253,6 +283,11 @@
         "connected",
         "player-ready",
         "context-selected",
+        "recommendation-boosts-bounded",
+        "recommendation-boosts-normalized",
+        "diversity-boost-reranks",
+        "boosts-propagate-to-autopilot",
+        "context-statement-decision-bound",
         "spotify-data-failure-rendered",
         "oauth-profile-rate-limit-retried",
         "oauth-rate-limit-bounded",
