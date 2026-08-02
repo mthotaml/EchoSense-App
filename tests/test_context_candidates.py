@@ -82,3 +82,38 @@ def test_optional_mood_candidate_outage_is_isolated() -> None:
     assert result.tracks == ()
     assert result.scores == {}
     assert result.evidence == {}
+
+
+def test_every_selected_listening_moment_generates_explainable_catalog_candidates() -> None:
+    expected = {
+        "driving": "driving road trip music",
+        "working": "focus instrumental work music",
+        "exercising": "energetic workout music",
+        "relaxing": "relaxing calm music",
+        "social": "party social music",
+    }
+
+    for moment, query in expected.items():
+        generated = ContextCandidateService.queries(
+            weather=None,
+            region=None,
+            road_setting=None,
+            activity=None,
+            daypart=None,
+            moment=moment,
+        )
+        assert generated[0] == (query, f"selected {moment} moment", 1.0)
+
+
+def test_selected_driving_moment_does_not_duplicate_detected_driving_query() -> None:
+    generated = ContextCandidateService.queries(
+        weather=None,
+        region=None,
+        road_setting=None,
+        activity="driving",
+        daypart=None,
+        moment="driving",
+    )
+
+    assert [label for _, label, _ in generated].count("selected driving moment") == 1
+    assert all(label != "driving context" for _, label, _ in generated)

@@ -196,8 +196,13 @@ def test_spotify_data_builds_live_music_profile(
         "/me/top/tracks",
     ]
     assert payload["recommendation"]["title"] == "A Real Track"
-    assert payload["recommendation"]["match_score"] == 78
-    assert payload["recommendations"][0]["why_now"]["overall_score"] == 78
+    assert payload["recommendation"]["match_score"] == 75
+    assert payload["recommendations"][0]["why_now"]["overall_score"] == 75
+    assert payload["moment_impact"]["moment"] == "working"
+    assert payload["moment_impact"]["source"] == "selected"
+    assert payload["moment_impact"]["applied"] is True
+    assert payload["moment_impact"]["compared_candidates"] == 1
+    assert payload["recommendations"][0]["why_now"]["moment_impact"]["context_fit"] == 50
     assert payload["context_statement"].startswith("EchoSense is tailoring")
     assert sum(payload["effective_weights"].values()) == pytest.approx(1.0)
     assert payload["recommendation_boosts"] == {
@@ -234,6 +239,8 @@ def test_spotify_data_builds_live_music_profile(
     assert trace is not None
     assert trace["context"] == "working"
     assert trace["factors"]["listening_moment"] == "working"
+    assert trace["factors"]["requested_listening_moment"] == "working"
+    assert trace["factors"]["listening_moment_source"] == "selected"
     snapshot = connection_repository.storage._execute
     with connection_repository.storage.connect() as database:
         row = snapshot(
