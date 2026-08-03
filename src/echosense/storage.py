@@ -143,6 +143,27 @@ class Storage:
             )
             """,
             """
+            CREATE TABLE IF NOT EXISTS provider_resilience_state (
+                provider TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                cooldown_until TEXT,
+                error_code TEXT,
+                error_message TEXT,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (provider, user_id)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS provider_response_snapshots (
+                provider TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                resource_key TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                captured_at TEXT NOT NULL,
+                PRIMARY KEY (provider, user_id, resource_key)
+            )
+            """,
+            """
             CREATE TABLE IF NOT EXISTS music_item_preferences (
                 user_id TEXT NOT NULL,
                 provider TEXT NOT NULL,
@@ -192,6 +213,10 @@ class Storage:
             )
             """,
             "CREATE INDEX IF NOT EXISTS idx_outbox_pending ON event_outbox (published_at, claim_until, occurred_at)",
+            """
+            CREATE INDEX IF NOT EXISTS idx_provider_snapshots_latest
+            ON provider_response_snapshots (provider, user_id, captured_at)
+            """,
             """
             CREATE INDEX IF NOT EXISTS idx_provider_connections_account
             ON provider_connections (provider, provider_user_id, revoked_at)
@@ -384,7 +409,7 @@ class Storage:
                     user_id,
                     utc_now().isoformat(),
                     trace_id,
-                    json.dumps(payload),
+                    json.dumps(payload, default=str),
                 ),
             )
 
@@ -500,4 +525,111 @@ class Storage:
             return None
         result = dict(row)
         result["factors"] = json.loads(result.pop("factors_json"))
+        return result
+
+    def set_provider_cooldown(
+        self,
+        *,
+        provider: str,
+        user_id: str,
+        cooldown_until: datetime,
+        error_code: str,
+        error_message: str,
+    ) -> None:
+        now = utc_now().isoformat()
+        with self.connect() as connection:
+            self._execute(
+                connection,
+                """
+                INSERT INTO provider_resilience_state
+                    (provider, user_id, cooldown_until, error_code, error_message, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT(provider, user_id) DO UPDATE SET
+                    cooldown_until = excluded.cooldown_until,
+                    error_code = excluded.error_code,
+                    error_message = excluded.error_message,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    provider,
+                    user_id,
+                    cooldown_until.isoformat(),
+                    error_code,
+                    error_message,
+                    now,
+                ),
+            )
+
+    def get_provider_cooldown(self, provider: str, user_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = self._execute(
+                connection,
+                """
+                SELECT cooldown_until, error_code, error_message, updated_at
+                FROM provider_resilience_state
+                WHERE provider = %s AND user_id = %s
+                """,
+                (provider, user_id),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def clear_provider_cooldown(self, provider: str, user_id: str) -> None:
+        with self.connect() as connection:
+            self._execute(
+                connection,
+                """
+                DELETE FROM provider_resilience_state
+                WHERE provider = %s AND user_id = %s
+                """,
+                (provider, user_id),
+            )
+
+    def save_provider_snapshot(
+        self,
+        *,
+        provider: str,
+        user_id: str,
+        resource_key: str,
+        payload: dict[str, Any],
+    ) -> None:
+        with self.connect() as connection:
+            self._execute(
+                connection,
+                """
+                INSERT INTO provider_response_snapshots
+                    (provider, user_id, resource_key, payload_json, captured_at)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT(provider, user_id, resource_key) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    captured_at = excluded.captured_at
+                """,
+                (
+                    provider,
+                    user_id,
+                    resource_key,
+                    json.dumps(payload, default=str),
+                    utc_now().isoformat(),
+                ),
+            )
+
+    def get_provider_snapshot(
+        self, provider: str, user_id: str, resource_key: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = self._execute(
+                connection,
+                """
+                SELECT resource_key, payload_json, captured_at
+                FROM provider_response_snapshots
+                WHERE provider = %s AND user_id = %s
+                ORDER BY CASE WHEN resource_key = %s THEN 0 ELSE 1 END, captured_at DESC
+                LIMIT 1
+                """,
+                (provider, user_id, resource_key),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["payload"] = json.loads(result.pop("payload_json"))
+        result["exact_match"] = result["resource_key"] == resource_key
         return result

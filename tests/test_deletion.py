@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -184,6 +185,19 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
         playback_seconds=180,
         completion_ratio=1.0,
     )
+    store.set_provider_cooldown(
+        provider="spotify",
+        user_id=user_id,
+        cooldown_until=datetime.now(UTC) + timedelta(minutes=5),
+        error_code="spotify_rate_limited",
+        error_message="cooling down",
+    )
+    store.save_provider_snapshot(
+        provider="spotify",
+        user_id=user_id,
+        resource_key="recommendations:delete",
+        payload={"recommendations": []},
+    )
     return user_id
 
 
@@ -220,6 +234,8 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "recommendation_exposures": 1,
         "music_data_imports": 1,
         "music_dna_profiles": 1,
+        "provider_resilience_state": 1,
+        "provider_response_snapshots": 1,
         "music_item_preferences": 1,
         "playback_learning_outcomes": 1,
         "temporal_mood_observations": 1,

@@ -462,6 +462,38 @@
       ]
     },
     {
+      "id": "spotify-provider-resilience-last-known-good",
+      "severity": "severity-1",
+      "description": "Spotify 429 responses and transient timeouts persist a provider-wide cooldown and return a clearly labeled last-known-good EchoSense playback plan without reconnect loops or repeated catalog calls.",
+      "covers": [
+        "provider-cooldown-persisted",
+        "provider-cooldown-survives-restart",
+        "provider-calls-suppressed-during-cooldown",
+        "last-known-good-plan-returned",
+        "degraded-mode-visible",
+        "reconnect-loop-prohibited",
+        "provider-resilience-data-deleted"
+      ],
+      "evidence": [
+        {
+          "source": "tests/test_provider_resilience.py",
+          "pattern": "test_provider_cooldown_and_snapshot_survive_storage_restart"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "test_spotify_data_uses_persisted_last_known_good_during_provider_cooldown"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Cached playback plan active. No reconnect is needed."
+        },
+        {
+          "source": "tests/test_deletion.py",
+          "pattern": "provider_response_snapshots"
+        }
+      ]
+    },
+    {
       "id": "spotify-library-request-storm-protection",
       "severity": "severity-1",
       "description": "Unchanged player-state events and duplicate tabs cannot repeatedly query Spotify library status; checks are identity-gated, cached, single-flight, and paused for Retry-After after a 429.",
@@ -623,6 +655,13 @@
         "saved-status-single-flight",
         "saved-status-server-cache",
         "saved-status-rate-limit-cooldown",
+        "provider-cooldown-persisted",
+        "provider-cooldown-survives-restart",
+        "provider-calls-suppressed-during-cooldown",
+        "last-known-good-plan-returned",
+        "degraded-mode-visible",
+        "reconnect-loop-prohibited",
+        "provider-resilience-data-deleted",
         "normalized-match-score-derived",
         "hero-factor-breakdown",
         "memory-inspector-visible",
