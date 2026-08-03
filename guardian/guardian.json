@@ -360,7 +360,10 @@
         "selected-moment-ranking-impact-visible",
         "detected-activity-can-drive-moment",
         "unchanged-moment-order-reported-honestly",
-        "moment-impact-decision-bound"
+        "moment-impact-decision-bound",
+        "selected-moment-plan-visible",
+        "active-song-preserved-during-moment-switch",
+        "selected-moment-plan-becomes-next-playback"
       ],
       "evidence": [
         {
@@ -382,6 +385,14 @@
         {
           "source": "tests/test_product_ui.py",
           "pattern": "No activity-specific candidate generation or reranking is applied"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Social plan applied · 6 reranked tracks will follow the current song"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "pendingPlanTransitionFromTrackId"
         }
       ]
     },
@@ -489,6 +500,9 @@
         "detected-activity-can-drive-moment",
         "unchanged-moment-order-reported-honestly",
         "moment-impact-decision-bound",
+        "selected-moment-plan-visible",
+        "active-song-preserved-during-moment-switch",
+        "selected-moment-plan-becomes-next-playback",
         "listener-kpis-visible",
         "recommendation-history-decision-bound",
         "listener-scope-labeled",

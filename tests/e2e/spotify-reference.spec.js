@@ -72,14 +72,16 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     contextDataRequests.push(route.request().url());
     const moment = new URL(route.request().url()).searchParams.get('moment');
     const working = moment === 'working';
-    const selectedId = skippedToNext ? 'post-skip-track' : working ? 'working-track' : 'general-track';
-    const selectedTitle = skippedToNext ? 'Fresh Horizon' : working ? 'Focused Motion' : 'Open Road';
-    const selectedDecision = skippedToNext ? 'decision-post-skip' : working ? 'decision-working' : 'decision-general';
-    const momentImpact = working
+    const social = moment === 'social';
+    const contextual = moment !== 'general';
+    const selectedId = social ? 'social-track-1' : skippedToNext ? 'post-skip-track' : working ? 'working-track' : 'general-track';
+    const selectedTitle = social ? 'Open Road' : skippedToNext ? 'Fresh Horizon' : working ? 'Focused Motion' : 'Open Road';
+    const selectedDecision = social ? 'decision-social-1' : skippedToNext ? 'decision-post-skip' : working ? 'decision-working' : 'decision-general';
+    const momentImpact = contextual
       ? {
-          moment: 'working', requested_moment: 'working', source: 'selected', applied: true,
+          moment, requested_moment: moment, source: 'selected', applied: true,
           changed_order: true, compared_candidates: 6,
-          message: 'Working selected changed the candidate ordering using moment-specific catalog evidence and context-fit scoring.',
+          message: `${moment[0].toUpperCase()}${moment.slice(1)} selected changed the candidate ordering using moment-specific catalog evidence and context-fit scoring.`,
         }
       : {
           moment: 'general', requested_moment: 'general', source: 'general', applied: false,
@@ -130,40 +132,40 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             },
           },
           {
-            id: working ? 'distinct-track' : 'alternate-track',
-            decision_id: working ? 'decision-distinct' : 'decision-alternate',
+            id: social ? 'social-track-2' : working ? 'distinct-track' : 'alternate-track',
+            decision_id: social ? 'decision-social-2' : working ? 'decision-distinct' : 'decision-alternate',
             rank: 2,
             title: working ? 'Distinct Motion' : 'Open Sky',
             artist: 'Another Artist',
             reason: 'Adds artist diversity.',
           },
           {
-            id: 'autopilot-3',
-            decision_id: 'decision-autopilot-3',
+            id: social ? 'social-track-3' : 'autopilot-3',
+            decision_id: social ? 'decision-social-3' : 'decision-autopilot-3',
             rank: 3,
             title: 'Open Current',
             artist: 'Third Artist',
             reason: 'Extends the listening flow.',
           },
           {
-            id: 'autopilot-4',
-            decision_id: 'decision-autopilot-4',
+            id: social ? 'social-track-4' : 'autopilot-4',
+            decision_id: social ? 'decision-social-4' : 'decision-autopilot-4',
             rank: 4,
             title: 'Night Lines',
             artist: 'Fourth Artist',
             reason: 'Balances familiarity and discovery.',
           },
           {
-            id: 'autopilot-5',
-            decision_id: 'decision-autopilot-5',
+            id: social ? 'social-track-5' : 'autopilot-5',
+            decision_id: social ? 'decision-social-5' : 'decision-autopilot-5',
             rank: 5,
             title: 'Coastal Signal',
             artist: 'Fifth Artist',
             reason: 'Keeps the queue diverse.',
           },
           {
-            id: 'autopilot-6',
-            decision_id: 'decision-autopilot-6',
+            id: social ? 'social-track-6' : 'autopilot-6',
+            decision_id: social ? 'decision-social-6' : 'decision-autopilot-6',
             rank: 6,
             title: 'Pacific Light',
             artist: 'Sixth Artist',
@@ -662,6 +664,20 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
   await expect(page.locator('#player-status')).toContainText('Last session restored');
   await expect(page.locator('#toggle')).toHaveText('▶');
+
+  await page.locator('#moment').selectOption('social');
+  await expect(page.locator('#moment-impact')).toContainText(
+    'Social selected changed the candidate ordering',
+  );
+  await expect(page.locator('#autopilot-status')).toContainText(
+    'Social plan applied · 6 reranked tracks will follow the current song',
+  );
+  await expect(page.locator('#dna-plan-statement')).toContainText(
+    'then EchoSense will play this newly ranked plan',
+  );
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Open Road');
+  await expect(page.locator('#pick-heading')).toHaveText('Coastal Signal');
+  await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
 
   await page.locator('#account-action').click();
   await expect(page.locator('#account-status')).toHaveText('Spotify not connected');
