@@ -320,6 +320,18 @@ def test_recommendation_boosters_drive_every_spotify_recommendation_request() ->
     assert "pendingPlanTransitionLabel" in page
 
 
+def test_saved_library_status_is_cached_deduplicated_and_rate_limit_aware() -> None:
+    page = client.get("/").text
+
+    assert "if(changed)refreshSavedState(item.id)" in page
+    assert "const savedStateCache = new Map()" in page
+    assert "const savedStateRequests = new Map()" in page
+    assert "savedStateRequests.has(trackId)" in page
+    assert "now<savedStateCooldownUntil" in page
+    assert "error.status===429" in page
+    assert "error.retryAfter" in page
+
+
 def test_live_context_names_unavailable_movement_instead_of_showing_unknown() -> None:
     page = client.get("/").text
 

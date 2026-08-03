@@ -7,6 +7,8 @@ import secrets
 import time
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
+from math import ceil
+from threading import Lock
 from typing import Callable, Literal
 from urllib.parse import urlencode
 from uuid import uuid4
@@ -62,10 +64,14 @@ SESSION_COOKIE = "echosense_spotify_session"
 STATE_COOKIE = "echosense_spotify_oauth_state"
 VERIFIER_COOKIE = "echosense_spotify_pkce_verifier"
 SPOTIFY_PROFILE_RETRY_LIMIT_SECONDS = 30
+SPOTIFY_LIBRARY_STATUS_CACHE_SECONDS = 300
 
 
 SpotifySession = ProviderConnection
 _connection_repository: ProviderConnectionRepository | None = None
+_library_status_cache: dict[tuple[str, str], tuple[bool, float]] = {}
+_library_cooldown_until: dict[str, float] = {}
+_library_status_lock = Lock()
 
 
 def _spotify_profile_with_backoff(
@@ -1066,10 +1072,28 @@ def spotify_library_status(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
-    try:
-        saved = SpotifyLibrary(SpotifyClient(session, _refresh_session)).contains_track(track_id)
-    except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
-        raise _library_error(exc) from exc
+    cache_key = (session.provider_user_id, track_id)
+    with _library_status_lock:
+        now = time.monotonic()
+        cooldown_until = _library_cooldown_until.get(session.provider_user_id, 0)
+        if cooldown_until > now:
+            raise _library_error(SpotifyRateLimited(max(1, ceil(cooldown_until - now))))
+        cached = _library_status_cache.get(cache_key)
+        if cached and cached[1] > now:
+            return {"provider": "spotify", "track_id": track_id, "saved": cached[0]}
+        try:
+            saved = SpotifyLibrary(SpotifyClient(session, _refresh_session)).contains_track(
+                track_id
+            )
+        except SpotifyRateLimited as exc:
+            _library_cooldown_until[session.provider_user_id] = now + exc.retry_after
+            raise _library_error(exc) from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise _library_error(exc) from exc
+        _library_status_cache[cache_key] = (
+            saved,
+            now + SPOTIFY_LIBRARY_STATUS_CACHE_SECONDS,
+        )
     return {"provider": "spotify", "track_id": track_id, "saved": saved}
 
 
@@ -1084,6 +1108,11 @@ def spotify_save_track(
         SpotifyLibrary(SpotifyClient(session, _refresh_session)).save_track(track_id)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
         raise _library_error(exc) from exc
+    with _library_status_lock:
+        _library_status_cache[(session.provider_user_id, track_id)] = (
+            True,
+            time.monotonic() + SPOTIFY_LIBRARY_STATUS_CACHE_SECONDS,
+        )
     learning = spotify_feedback(
         SpotifyFeedbackRequest(
             outcome_id=request.outcome_id,
@@ -1111,6 +1140,11 @@ def spotify_remove_track(
         SpotifyLibrary(SpotifyClient(session, _refresh_session)).remove_track(track_id)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
         raise _library_error(exc) from exc
+    with _library_status_lock:
+        _library_status_cache[(session.provider_user_id, track_id)] = (
+            False,
+            time.monotonic() + SPOTIFY_LIBRARY_STATUS_CACHE_SECONDS,
+        )
     learning = spotify_feedback(
         SpotifyFeedbackRequest(
             outcome_id=request.outcome_id,

@@ -21,6 +21,8 @@ def connection_repository(tmp_path, monkeypatch) -> ProviderConnectionRepository
         Fernet.generate_key(),
     )
     monkeypatch.setattr(spotify_auth, "_connection_repository", repository)
+    monkeypatch.setattr(spotify_auth, "_library_status_cache", {})
+    monkeypatch.setattr(spotify_auth, "_library_cooldown_until", {})
     return repository
 
 
@@ -316,6 +318,10 @@ def test_spotify_data_builds_live_music_profile(
         "/auth/spotify/library/tracks/track-1",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
     )
+    repeated_library_status = client.get(
+        "/auth/spotify/library/tracks/track-1",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
     saved = client.put(
         "/auth/spotify/library/tracks/track-1",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
@@ -335,6 +341,7 @@ def test_spotify_data_builds_live_music_profile(
     )
 
     assert library_status.json()["saved"] is False
+    assert repeated_library_status.json()["saved"] is False
     assert saved.status_code == 200
     assert saved.json()["saved"] is True
     assert saved.json()["learning"]["signal"] == "saved"
@@ -346,6 +353,26 @@ def test_spotify_data_builds_live_music_profile(
         ("save", "track-1"),
         ("remove", "track-1"),
     ]
+
+    rate_limited_calls = []
+
+    def rate_limited_contains(self, track_id):
+        rate_limited_calls.append(track_id)
+        raise spotify_auth.SpotifyRateLimited(120)
+
+    monkeypatch.setattr(spotify_auth.SpotifyLibrary, "contains_track", rate_limited_contains)
+    first_rate_limit = client.get(
+        "/auth/spotify/library/tracks/rate-limited-track",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    repeated_rate_limit = client.get(
+        "/auth/spotify/library/tracks/another-track",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    assert first_rate_limit.status_code == 429
+    assert repeated_rate_limit.status_code == 429
+    assert repeated_rate_limit.headers["Retry-After"] == "120"
+    assert rate_limited_calls == ["rate-limited-track"]
 
     feedback = client.post(
         "/auth/spotify/feedback",

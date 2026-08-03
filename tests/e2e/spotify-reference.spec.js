@@ -14,6 +14,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   const playbackModes = [];
   const savedTracks = new Set();
   const libraryMutations = [];
+  const libraryStatusRequests = [];
   const feedback = [];
   const controlEvents = [];
   const contextDataRequests = [];
@@ -368,6 +369,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
         json: {provider: 'spotify', track_id: trackId, saved: false},
       });
     }
+    libraryStatusRequests.push(trackId);
     return route.fulfill({
       json: {provider: 'spotify', track_id: trackId, saved: savedTracks.has(trackId)},
     });
@@ -543,6 +545,13 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#pick-heading')).toHaveText('Distinct Motion');
   await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
   await expect(page.locator('#dna-queue-items tbody tr[aria-current="true"]')).toContainText('Distinct Motion');
+  await expect.poll(() => libraryStatusRequests).toContain('distinct-track');
+  const savedChecksBeforeRepeatedState = libraryStatusRequests.length;
+  await page.evaluate(() => {
+    for (let index = 0; index < 8; index += 1) window.__mockPlayer.emit(window.__sdkPlaybackState);
+  });
+  await page.waitForTimeout(100);
+  expect(libraryStatusRequests).toHaveLength(savedChecksBeforeRepeatedState);
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
   await expect(page.locator('#autopilot-status')).toContainText('4 planned tracks ready ahead');
   await expect(page.locator('#dna-queue-items tbody tr').first().locator('.why-cell')).toContainText(

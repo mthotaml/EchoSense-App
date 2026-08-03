@@ -462,6 +462,31 @@
       ]
     },
     {
+      "id": "spotify-library-request-storm-protection",
+      "severity": "severity-1",
+      "description": "Unchanged player-state events and duplicate tabs cannot repeatedly query Spotify library status; checks are identity-gated, cached, single-flight, and paused for Retry-After after a 429.",
+      "covers": [
+        "saved-status-track-change-gated",
+        "saved-status-single-flight",
+        "saved-status-server-cache",
+        "saved-status-rate-limit-cooldown"
+      ],
+      "evidence": [
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "test_saved_library_status_is_cached_deduplicated_and_rate_limit_aware"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "savedChecksBeforeRepeatedState"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "rate_limited_calls == [\"rate-limited-track\"]"
+        }
+      ]
+    },
+    {
       "id": "recommendation-boost-truthfulness",
       "severity": "severity-1",
       "description": "User boosts are bounded and normalized, alter the same ranking decision that drives Autopilot, and the displayed context statement reports those exact inputs and effective weights.",
@@ -594,6 +619,10 @@
         "factor-help-consistent-across-surfaces",
         "factor-help-explains-listener-benefit",
         "recommendation-rationale-not-duplicated",
+        "saved-status-track-change-gated",
+        "saved-status-single-flight",
+        "saved-status-server-cache",
+        "saved-status-rate-limit-cooldown",
         "normalized-match-score-derived",
         "hero-factor-breakdown",
         "memory-inspector-visible",
