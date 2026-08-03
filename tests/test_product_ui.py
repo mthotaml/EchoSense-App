@@ -159,7 +159,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Spotify advanced outside the EchoSense Playback Plan" in response.text
     assert "if(observedDecisionId)" in response.text
     assert "const completedIndex=activeRound.findIndex" in response.text
-    assert ".slice(completedIndex+1)" in response.text
+    assert ".slice(transitionsIntoNewestPlan?0:completedIndex+1)" in response.text
     assert "await playDnaTrack(next)" in response.text
     assert "dnaContinuationDecisionIds" in response.text
     assert "continuation_decision_ids:dnaContinuationDecisionIds(item)" in response.text
@@ -179,6 +179,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
     assert "function syncRecommendationSurfaces(trackId)" in response.text
+    assert "async function changeListeningMoment()" in response.text
+    assert "pendingPlanTransitionFromTrackId=activePlaybackTrackId" in response.text
+    assert "trackId===pendingPlanTransitionFromTrackId" in response.text
+    assert "then EchoSense will play this newly ranked plan" in response.text
     assert "syncRecommendationSurfaces(item.id)" in response.text
     assert "syncRecommendationSurfaces(nextDna.id)" in response.text
     assert "aria-current" in response.text
@@ -305,6 +309,10 @@ def test_recommendation_boosters_drive_every_spotify_recommendation_request() ->
     assert "boostDefinitions.forEach(([key])=>params.set(`boost_${key}`" in page
     assert "echosenseRecommendationBoosts" in page
     assert "data.context_statement" in page
+    assert "async function changeRecommendationBoost(label)" in page
+    assert "changeRecommendationBoost(label)" in page
+    assert "`${label} boost`" in page
+    assert "pendingPlanTransitionLabel" in page
 
 
 def test_live_context_names_unavailable_movement_instead_of_showing_unknown() -> None:
@@ -321,7 +329,8 @@ def test_playback_verification_prefers_owned_dna_and_collapses_provider_duplicat
     assert "Now and next · EchoSense controlled" in page
     assert 'id="queue-status"' in page
     assert "const providerUnique=[...new Map" in page
-    assert "const ownedRound=[...dnaRounds].reverse().find" in page
+    assert "const momentTransition=currentId&&currentId===pendingPlanTransitionFromTrackId" in page
+    assert "? dnaRounds.at(-1)" in page
     assert "ownedTracks.length?ownedTracks:providerUnique" in page
     assert "repeated Spotify queue entr" in page
     assert "EchoSense Playback Plan" in page

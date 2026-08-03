@@ -360,7 +360,10 @@
         "selected-moment-ranking-impact-visible",
         "detected-activity-can-drive-moment",
         "unchanged-moment-order-reported-honestly",
-        "moment-impact-decision-bound"
+        "moment-impact-decision-bound",
+        "selected-moment-plan-visible",
+        "active-song-preserved-during-moment-switch",
+        "selected-moment-plan-becomes-next-playback"
       ],
       "evidence": [
         {
@@ -382,6 +385,14 @@
         {
           "source": "tests/test_product_ui.py",
           "pattern": "No activity-specific candidate generation or reranking is applied"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Social plan applied · 6 reranked tracks will follow the current song"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "pendingPlanTransitionFromTrackId"
         }
       ]
     },
@@ -448,6 +459,8 @@
         "recommendation-boosts-normalized",
         "diversity-boost-reranks",
         "boosts-propagate-to-autopilot",
+        "boost-change-adopts-visible-successor-plan",
+        "active-song-preserved-during-boost-change",
         "context-statement-decision-bound"
       ],
       "evidence": [
@@ -462,6 +475,10 @@
         {
           "source": "tests/test_product_ui.py",
           "pattern": "test_recommendation_boosters_drive_every_spotify_recommendation_request"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Music DNA affinity boost plan applied"
         },
         {
           "source": "tests/test_spotify_auth.py",
@@ -482,6 +499,8 @@
         "recommendation-boosts-normalized",
         "diversity-boost-reranks",
         "boosts-propagate-to-autopilot",
+        "boost-change-adopts-visible-successor-plan",
+        "active-song-preserved-during-boost-change",
         "context-statement-decision-bound",
         "user-config-center-visible",
         "all-listening-moments-generate-candidates",
@@ -489,6 +508,9 @@
         "detected-activity-can-drive-moment",
         "unchanged-moment-order-reported-honestly",
         "moment-impact-decision-bound",
+        "selected-moment-plan-visible",
+        "active-song-preserved-during-moment-switch",
+        "selected-moment-plan-becomes-next-playback",
         "listener-kpis-visible",
         "recommendation-history-decision-bound",
         "listener-scope-labeled",
