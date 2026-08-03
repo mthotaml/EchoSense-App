@@ -1,4 +1,7 @@
+import pytest
+
 from echosense.context_candidates import ContextCandidateService
+from echosense.providers.spotify.client import SpotifyRateLimited
 
 
 class FakeSpotifyClient:
@@ -82,6 +85,22 @@ def test_optional_mood_candidate_outage_is_isolated() -> None:
     assert result.tracks == ()
     assert result.scores == {}
     assert result.evidence == {}
+
+
+def test_context_search_never_swallows_provider_cooldown() -> None:
+    class LimitedClient:
+        def request(self, *args, **kwargs):
+            raise SpotifyRateLimited(60, reason="QUOTA_EXCEEDED")
+
+    with pytest.raises(SpotifyRateLimited, match="Spotify rate limit reached"):
+        ContextCandidateService().expand(
+            LimitedClient(),
+            weather="sunny",
+            region=None,
+            road_setting=None,
+            activity=None,
+            daypart="morning",
+        )
 
 
 def test_every_selected_listening_moment_generates_explainable_catalog_candidates() -> None:

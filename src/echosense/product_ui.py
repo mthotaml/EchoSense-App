@@ -97,6 +97,9 @@ PAGE = r"""<!doctype html>
     .resilience-banner { display:flex; justify-content:space-between; gap:18px; align-items:center; padding:14px 18px; border:1px solid rgba(255,183,77,.35); border-radius:16px; background:rgba(255,183,77,.08); color:#ffe0ad; }
     .resilience-banner strong,.resilience-banner span { display:block; }
     .resilience-banner span { margin-top:3px; color:var(--muted); font-size:.84rem; }
+    .resilience-banner details { min-width:220px; color:var(--muted); font-size:.78rem; }
+    .provider-health { color:#bfffd5; border-color:rgba(30,215,96,.25); }
+    .provider-health.cooldown { color:#ffe0ad; border-color:rgba(255,183,77,.35); }
     .connection,.pick-top { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; }
     .track { margin:16px 0 4px; font-size:clamp(2.2rem,6vw,4.4rem); letter-spacing:-.055em; line-height:1; }
     .artist { color:var(--muted); font-size:1.15rem; }
@@ -267,11 +270,11 @@ PAGE = r"""<!doctype html>
   </style>
 </head>
 <body>
-  <nav><div class="brand"><span class="brand-mark">≋</span>EchoSense</div><div id="account" class="account"><span class="status-dot" aria-hidden="true"></span><span id="account-status">Spotify not connected</span><button id="settings-trigger" class="secondary" type="button">Settings</button><a id="account-action" class="button-link secondary" href="/auth/spotify/login">Connect Spotify</a></div></nav>
+  <nav><div class="brand"><span class="brand-mark">≋</span>EchoSense</div><div id="account" class="account"><span class="status-dot" aria-hidden="true"></span><span id="account-status">Spotify not connected</span><span id="provider-health" class="scope-badge provider-health" hidden>Spotify protected</span><button id="settings-trigger" class="secondary" type="button">Settings</button><a id="account-action" class="button-link secondary" href="/auth/spotify/login">Connect Spotify</a></div></nav>
   <main>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. Music selected from your DNA, your context, and what it learns—with every decision explained.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
-    <aside id="provider-resilience" class="resilience-banner" role="status" aria-live="polite" hidden><div><strong>Spotify is cooling down</strong><span id="provider-resilience-copy">EchoSense is using your last verified playback plan.</span></div><span id="provider-resilience-timer"></span></aside>
+    <aside id="provider-resilience" class="resilience-banner" role="status" aria-live="polite" hidden><div><strong id="provider-resilience-title">Spotify is cooling down</strong><span id="provider-resilience-copy">EchoSense is using your last verified playback plan.</span></div><div><span id="provider-resilience-timer"></span><details><summary>Request protection details</summary><span id="provider-resilience-details">Loading request budget…</span></details></div></aside>
     <section id="listening-controls" class="panel control-center"><div class="control-center-header"><div><div class="eyebrow blue">Listening controls</div><h2>Shape what plays next</h2></div></div><div class="control-groups"><section id="moment-panel" class="control-group"><div class="eyebrow">Listening moment</div><h3>What are you doing?</h3><label class="sr-only" for="moment">Listening moment</label><select id="moment" class="secondary moment-select" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><p id="moment-impact" class="moment-impact" aria-live="polite">Choose an activity to tune the order.</p></section><section id="boost-panel" class="control-group"><div class="eyebrow blue">Recommendation priorities</div><h3>What should matter more?</h3><div id="boost-controls" class="boost-grid"></div></section><section id="live-context-panel" class="control-group context-group"><div><div class="eyebrow">Live context</div><h3>Add situational signals</h3><p id="context-status" class="connection-copy">Optional: weather, area, road, and movement.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location resolves current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section></div><p id="context-statement" class="context-statement" aria-live="polite">Preparing your next-track context…</p></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
@@ -329,6 +332,7 @@ PAGE = r"""<!doctype html>
     let spotifyConnected = false;
     let lastSpotifyData = null;
     let spotifyProviderCooldownUntil = 0;
+    let providerStatusTimer = null;
     let deviceId = null;
     let playerState = null;
     let progressTimer = null;
@@ -469,9 +473,37 @@ PAGE = r"""<!doctype html>
       const retryAfter=Math.max(1,Number(resilience.retry_after_seconds||60));
       spotifyProviderCooldownUntil=Date.now()+retryAfter*1000;
       savedStateCooldownUntil=Math.max(savedStateCooldownUntil,spotifyProviderCooldownUntil);
+      const reason=String(resilience.reason||'').toLowerCase();
+      setText('#provider-resilience-title',reason==='quota_exceeded'?'Spotify development quota reached':reason==='local_request_budget'?'EchoSense prevented a Spotify lockout':'Spotify asked EchoSense to slow down');
       setText('#provider-resilience-copy',resilience.exact_context_match?'Using the last verified plan for these settings.':'Using your most recent verified plan until live context returns.');
       setText('#provider-resilience-timer',`Try live Spotify again in about ${Math.ceil(retryAfter/60)} min`);
       setText('#toast','Cached playback plan active. No reconnect is needed.');
+    }
+
+    function renderProviderStatus(status={mode:'live'}) {
+      const health=$('#provider-health');health.hidden=false;
+      const cooldown=status.mode==='cooldown';
+      health.classList.toggle('cooldown',cooldown);
+      setText('#provider-health',cooldown?'Spotify protected · cached':'Spotify protected · live');
+      if(!cooldown){spotifyProviderCooldownUntil=0;$('#provider-resilience').hidden=true;return;}
+      const retryAfter=Math.max(1,Number(status.retry_after_seconds||60));
+      spotifyProviderCooldownUntil=Date.now()+retryAfter*1000;
+      $('#provider-resilience').hidden=false;
+      const reason=String(status.reason||'').toLowerCase();
+      const quota=reason==='quota_exceeded';
+      const preventive=reason==='local_request_budget';
+      setText('#provider-resilience-title',quota?'Spotify development quota reached':preventive?'EchoSense prevented a Spotify lockout':'Spotify asked EchoSense to slow down');
+      setText('#provider-resilience-copy',status.message||'EchoSense is using verified recommendations until live access resumes automatically.');
+      setText('#provider-resilience-timer',`Live access retry in about ${Math.ceil(retryAfter/60)} min · no reconnect needed`);
+      const budget=status.budget||{};const telemetry=status.telemetry||{};
+      const endpoints=(telemetry.top_endpoints||[]).map(item=>`${item.endpoint_group}: ${item.request_count}`).join(' · ');
+      setText('#provider-resilience-details',`${budget.requests_in_window||0}/${budget.limit||0} requests in ${budget.window_seconds||30}s. Last 15 min: ${telemetry.total_requests||0} total, ${telemetry.rate_limits||0} rate limits, ${telemetry.quota_limits||0} quota limits.${endpoints?` Top paths: ${endpoints}`:''}`);
+    }
+
+    async function loadProviderStatus() {
+      if(!spotifyConnected)return;
+      try { const response=await api('/auth/spotify/resilience/status');renderProviderStatus(await response.json()); }
+      catch(error) { if(error.status!==401)setText('#provider-health','Spotify protection status unavailable'); }
     }
 
     function renderMomentImpact(impact,item=null) {
@@ -1277,7 +1309,7 @@ PAGE = r"""<!doctype html>
     async function load() {
       renderBoostControls();
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); const initialData=await loadLiveSpotify();const degraded=initialData.resilience?.mode==='last_known_good';$('#playlists-panel').hidden=degraded;await Promise.allSettled([degraded?Promise.resolve():loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
+      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer();await loadProviderStatus(); const initialData=await loadLiveSpotify();const degraded=initialData.resilience?.mode==='last_known_good';$('#playlists-panel').hidden=degraded;await Promise.allSettled([degraded?Promise.resolve():loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
@@ -1311,6 +1343,7 @@ PAGE = r"""<!doctype html>
       $('#repeat').addEventListener('change',()=>setRepeat().catch(e=>setText('#toast',e.message)));
       progressTimer=setInterval(updateProgressClock,500);
       autopilotTimer=setInterval(()=>maintainAutopilot().catch(()=>{}),10000);
+      providerStatusTimer=setInterval(()=>loadProviderStatus(),30000);
       document.addEventListener('visibilitychange',()=>{if(!document.hidden) restorePlaybackState();});
       window.addEventListener('focus',restorePlaybackState);
       if(session) { await restorePlaybackState(); await maintainAutopilot(); }

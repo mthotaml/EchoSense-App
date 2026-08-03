@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -17,6 +18,7 @@ from echosense.spotify_auth import (
     get_connection_repository,
     spotify_feedback,
 )
+from echosense.spotify_resilience import SpotifyRequestDeferred, SpotifyRequestGovernor
 
 router = APIRouter(prefix="/v1/player", tags=["spotify-player"])
 
@@ -90,18 +92,58 @@ def _spotify_request(
 ) -> httpx.Response:
     session = _connected_session(session_id)
     _refresh_session(session)
+    governor = SpotifyRequestGovernor(get_connection_repository().storage, session.provider_user_id)
+
+    def deferred_error(exc: SpotifyRequestDeferred) -> HTTPException:
+        code = {
+            "QUOTA_EXCEEDED": "spotify_quota_exceeded",
+            "RATE_LIMIT_EXCEEDED": "spotify_rate_limited",
+        }.get(exc.reason, "spotify_request_deferred")
+        return HTTPException(
+            status_code=429,
+            detail={
+                "code": code,
+                "reason": exc.reason,
+                "endpoint": exc.endpoint,
+                "retry_after_seconds": exc.retry_after,
+                "retry_after": str(exc.retry_after),
+                "locally_deferred": exc.locally_deferred,
+                "correlation_id": uuid4().hex,
+                "message": (
+                    "EchoSense is waiting for Spotify's quota to resume. Reconnecting is not needed."
+                    if code == "spotify_quota_exceeded"
+                    else "EchoSense paused Spotify requests to prevent a longer lockout."
+                ),
+            },
+            headers={"Retry-After": str(exc.retry_after)},
+        )
 
     def send() -> httpx.Response:
         try:
-            return httpx.request(
+            ticket = governor.begin(method, path, request_class="player")
+        except SpotifyRequestDeferred as exc:
+            raise deferred_error(exc) from exc
+        try:
+            response = httpx.request(
                 method,
                 f"{SPOTIFY_API_URL}{path}",
                 params=params,
                 json=json,
                 headers={"Authorization": f"Bearer {session.access_token}"},
-                timeout=15.0,
+                timeout=max(
+                    3.0,
+                    min(
+                        15.0,
+                        float(os.getenv("ECHOSENSE_SPOTIFY_TIMEOUT_SECONDS", "8")),
+                    ),
+                ),
             )
+            deferred = governor.observe_response(ticket, response, path)
+            if deferred:
+                raise deferred_error(deferred)
+            return response
         except httpx.HTTPError as exc:
+            governor.observe_transport_error(ticket)
             raise HTTPException(
                 status_code=502,
                 detail={
@@ -162,7 +204,24 @@ def player_state(
 ) -> Response | dict[str, object]:
     session = _connected_session(session_id)
     continuity = PlaybackContinuityStore(get_connection_repository().storage)
-    response = _spotify_request(session_id, "GET", "/me/player")
+    try:
+        response = _spotify_request(session_id, "GET", "/me/player")
+    except HTTPException as exc:
+        if exc.status_code != 429:
+            raise
+        snapshot = continuity.latest(session.provider_user_id, "spotify")
+        if snapshot:
+            return {
+                **snapshot.state,
+                "continuity": {
+                    "source": "last_known_good",
+                    "revision": snapshot.revision,
+                    "observed_at": snapshot.observed_at.isoformat(),
+                    "requires_confirmation": True,
+                    "provider_status": exc.detail,
+                },
+            }
+        raise
     if response.status_code == 204 or not response.content:
         snapshot = continuity.latest(session.provider_user_id, "spotify")
         if snapshot:

@@ -50,8 +50,9 @@ class ContextCandidateService:
                     "/search",
                     params={"q": query, "type": "track", "limit": 5},
                 )
+            except SpotifyRateLimited:
+                raise
             except (
-                SpotifyRateLimited,
                 httpx.HTTPError,
                 ImportError,
                 KeyError,

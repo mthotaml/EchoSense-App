@@ -6,6 +6,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let skippedToNext = false;
   let restoreFromSnapshot = false;
   let providerResilienceMode = false;
+  let providerStatusMode = 'live';
   let providerTrack = {id: 'working-track', name: 'Focused Motion'};
   const playRequests = [];
   const recommendationPlays = [];
@@ -68,6 +69,23 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       json: connected
         ? {connected: true, profile: {display_name: 'Guardian Listener'}}
         : {connected: false},
+    }),
+  );
+  await page.route('**/auth/spotify/resilience/status', route =>
+    route.fulfill({
+      json: providerStatusMode === 'quota'
+        ? {
+            mode: 'cooldown', reason: 'quota_exceeded', retry_after_seconds: 3600,
+            message: "Spotify's development quota is temporarily exhausted. EchoSense is using your last verified plan; reconnecting will not restore the quota sooner.",
+            budget: {limit: 20, window_seconds: 30, requests_in_window: 8},
+            telemetry: {total_requests: 18, rate_limits: 0, quota_limits: 1, top_endpoints: [{endpoint_group: '/me/top/tracks', request_count: 6}]},
+          }
+        : {
+            mode: 'live', reason: null, retry_after_seconds: 0,
+            message: 'Spotify access is live and protected by EchoSense request budgeting.',
+            budget: {limit: 20, window_seconds: 30, requests_in_window: 2},
+            telemetry: {total_requests: 4, rate_limits: 0, quota_limits: 0, top_endpoints: []},
+          },
     }),
   );
   await page.route('**/auth/spotify/data?moment=*', route => {
@@ -716,13 +734,18 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
 
   providerResilienceMode = true;
+  providerStatusMode = 'quota';
   await page.locator('#boost-diversity').fill('50');
+  await page.evaluate(() => loadProviderStatus());
   await expect(page.locator('#provider-resilience')).toBeVisible();
-  await expect(page.locator('#provider-resilience')).toContainText(
-    'Using the last verified plan for these settings.',
+  await expect(page.locator('#provider-resilience-title')).toHaveText(
+    'Spotify development quota reached',
   );
-  await expect(page.locator('#toast')).toContainText(
-    'Cached playback plan active. No reconnect is needed.',
+  await expect(page.locator('#provider-resilience')).toContainText(
+    'reconnecting will not restore the quota sooner',
+  );
+  await expect(page.locator('#provider-resilience-details')).toContainText(
+    '8/20 requests in 30s',
   );
   const requestsAtCooldown = contextDataRequests.length;
   await page.locator('#boost-live_context').fill('50');

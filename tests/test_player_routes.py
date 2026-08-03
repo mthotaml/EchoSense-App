@@ -107,6 +107,52 @@ def test_player_state_restores_recent_snapshot_when_provider_has_no_active_devic
     assert restored.json()["continuity"]["requires_confirmation"] is True
 
 
+def test_player_state_uses_last_known_good_during_provider_cooldown(
+    monkeypatch, connection_repository: ProviderConnectionRepository
+) -> None:
+    session_id = _session(connection_repository)
+    provider_calls = 0
+
+    def live_request(*args, **kwargs):
+        nonlocal provider_calls
+        provider_calls += 1
+        return httpx.Response(
+            200,
+            request=httpx.Request("GET", "https://api.spotify.com"),
+            json={
+                "is_playing": True,
+                "progress_ms": 12000,
+                "item": {"id": "track-lkg", "name": "Verified Playback"},
+                "device": {"id": "browser", "name": "EchoSense Browser"},
+            },
+        )
+
+    monkeypatch.setattr(player_routes.httpx, "request", live_request)
+    live = client.get(
+        "/v1/player/state",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    connection_repository.storage.set_provider_cooldown(
+        provider="spotify",
+        user_id=player_routes.SpotifyRequestGovernor.APP_SCOPE,
+        cooldown_until=datetime.now(UTC) + timedelta(minutes=5),
+        error_code="quota_exceeded",
+        error_message="Spotify quota exhausted.",
+    )
+
+    cached = client.get(
+        "/v1/player/state",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert live.status_code == 200
+    assert cached.status_code == 200
+    assert cached.json()["item"]["id"] == "track-lkg"
+    assert cached.json()["continuity"]["source"] == "last_known_good"
+    assert cached.json()["continuity"]["provider_status"]["reason"] == "QUOTA_EXCEEDED"
+    assert provider_calls == 1
+
+
 def test_transfer_playback_targets_browser_device(
     monkeypatch, connection_repository: ProviderConnectionRepository
 ) -> None:

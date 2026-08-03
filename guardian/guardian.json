@@ -462,6 +462,44 @@
       ]
     },
     {
+      "id": "spotify-request-governor",
+      "severity": "severity-1",
+      "description": "Every authenticated Spotify Web API path participates in one persistent request budget, classifies quota versus rate limits, redacts item identifiers from telemetry, and gives the listener an actionable provider-status explanation.",
+      "covers": [
+        "spotify-request-budget-centralized",
+        "spotify-local-budget-prevents-lockout",
+        "spotify-quota-reason-classified",
+        "spotify-endpoint-telemetry-redacted",
+        "spotify-provider-status-visible",
+        "spotify-player-state-lkg-during-cooldown",
+        "spotify-request-telemetry-deleted",
+        "spotify-transport-circuit-breaker",
+        "spotify-provider-timeout-bounded"
+      ],
+      "evidence": [
+        {
+          "source": "tests/test_provider_resilience.py",
+          "pattern": "test_request_budget_prevents_provider_call_before_spotify_lockout"
+        },
+        {
+          "source": "tests/test_provider_resilience.py",
+          "pattern": "test_quota_exceeded_is_classified_and_explained"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Spotify development quota reached"
+        },
+        {
+          "source": "tests/test_deletion.py",
+          "pattern": "provider_request_telemetry"
+        },
+        {
+          "source": "tests/test_provider_resilience.py",
+          "pattern": "test_repeated_transport_failures_open_short_provider_circuit"
+        }
+      ]
+    },
+    {
       "id": "spotify-provider-resilience-last-known-good",
       "severity": "severity-1",
       "description": "Spotify 429 responses and transient timeouts persist a provider-wide cooldown and return a clearly labeled last-known-good EchoSense playback plan without reconnect loops or repeated catalog calls.",
@@ -485,7 +523,7 @@
         },
         {
           "source": "tests/e2e/spotify-reference.spec.js",
-          "pattern": "Cached playback plan active. No reconnect is needed."
+          "pattern": "reconnecting will not restore the quota sooner"
         },
         {
           "source": "tests/test_deletion.py",
@@ -662,6 +700,15 @@
         "degraded-mode-visible",
         "reconnect-loop-prohibited",
         "provider-resilience-data-deleted",
+        "spotify-request-budget-centralized",
+        "spotify-local-budget-prevents-lockout",
+        "spotify-quota-reason-classified",
+        "spotify-endpoint-telemetry-redacted",
+        "spotify-provider-status-visible",
+        "spotify-player-state-lkg-during-cooldown",
+        "spotify-request-telemetry-deleted",
+        "spotify-transport-circuit-breaker",
+        "spotify-provider-timeout-bounded",
         "normalized-match-score-derived",
         "hero-factor-breakdown",
         "memory-inspector-visible",
