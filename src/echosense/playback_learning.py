@@ -8,7 +8,9 @@ from echosense.providers.models import Track
 from echosense.ranking_boosts import RecommendationBoosts
 from echosense.storage import Storage
 
-PlaybackSignal = Literal["played", "completed", "skipped", "saved", "liked", "disliked", "rated"]
+PlaybackSignal = Literal[
+    "played", "completed", "skipped", "saved", "unsaved", "liked", "disliked", "rated"
+]
 PREFERENCE_COEFFICIENT = 0.25
 
 
@@ -46,6 +48,7 @@ class PlaybackLearningService:
         "completed": 0.08,
         "skipped": -0.08,
         "saved": 0.12,
+        "unsaved": -0.05,
         "liked": 0.12,
         "disliked": -0.15,
     }

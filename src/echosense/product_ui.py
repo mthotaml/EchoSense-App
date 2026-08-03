@@ -176,6 +176,8 @@ PAGE = r"""<!doctype html>
     .dna-table { width:100%; min-width:840px; border-collapse:collapse; font-size:.86rem; }
     .dna-table th { padding:11px 12px; color:var(--muted); background:var(--soft); text-align:left; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
     .dna-table td { padding:14px 12px; border-top:1px solid var(--line); vertical-align:middle; }
+    .dna-table tr[aria-current="true"] { background:linear-gradient(90deg,rgba(30,215,96,.13),rgba(100,181,246,.05)); box-shadow:inset 3px 0 0 var(--green); }
+    .dna-table tr[aria-current="true"] .track-cell strong::after { content:"Playing"; display:inline-flex; margin-left:9px; padding:3px 7px; border-radius:999px; color:#07130c; background:var(--green); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; vertical-align:middle; }
     .dna-table td.metric { text-align:center; font-variant-numeric:tabular-nums; white-space:nowrap; }
     .dna-table .track-cell { min-width:210px; }
     .dna-table .track-cell strong,.dna-table .track-cell span { display:block; }
@@ -490,6 +492,7 @@ PAGE = r"""<!doctype html>
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderMemory(profile,data); renderDnaQueue();
+      if(activePlaybackTrackId)syncRecommendationSurfaces(activePlaybackTrackId);
       return data;
     }
 
@@ -585,6 +588,45 @@ PAGE = r"""<!doctype html>
       setText('#pick-label','Current EchoSense recommendation');
     }
 
+    function recommendationForTrack(trackId) {
+      if(!trackId)return null;
+      for(let index=dnaRounds.length-1;index>=0;index-=1) {
+        const item=dnaRounds[index].find(candidate=>candidate?.id===trackId);
+        if(item)return {item,roundIndex:index};
+      }
+      const item=recommendationSlate.find(candidate=>candidate?.id===trackId);
+      return item?{item,roundIndex:null}:null;
+    }
+
+    function syncRecommendationSurfaces(trackId) {
+      const match=recommendationForTrack(trackId);
+      if(!match?.item?.decision_id)return false;
+      const item=match.item;
+      const changed=currentTrackId!==item.id||currentRecommendationId!==item.decision_id;
+      activePlaybackTrackId=item.id;
+      activePlaybackDecisionId=item.decision_id;
+      currentTrackId=item.id;
+      currentRecommendationId=item.decision_id;
+      if(changed) {
+        currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`;
+        currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`;
+        reportedSignals.clear();
+      }
+      setText('#pick-heading',item.title||'Current recommendation');
+      setText('#artist',`${item.artist||'Unknown artist'} · Playing from your EchoSense Playback Plan`);
+      const score=item.match_score??item.why_now?.overall_score;
+      setText('#match',Number.isFinite(score)?`${score}% EchoSense score`:'EchoSense selected');
+      setText('#reason',item.reason||item.why_now?.summary||'Selected from your final EchoSense Playback Plan.');
+      setText('#why-pill',`✨ ${item.why_now?.summary||item.reason||'This track is the active EchoSense recommendation.'}`);
+      const cover=item.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';
+      renderHeroFactors(item);
+      syncPickLabel();
+      if(match.roundIndex!==null)dnaPageIndex=match.roundIndex;
+      renderDnaQueue();
+      refreshSavedState(item.id).catch(()=>{});
+      return true;
+    }
+
     function playbackPlanSuccessor(trackId) {
       if(!trackId)return null;
       const round=[...dnaRounds].reverse().find(items=>items.some(item=>item.id===trackId))||[];
@@ -625,6 +667,7 @@ PAGE = r"""<!doctype html>
         if(observedDecisionId) {
           activePlaybackTrackId=track.id;
           activePlaybackDecisionId=observedDecisionId;
+          syncRecommendationSurfaces(track.id);
         }
       } else {
         activePlaybackTrackId=null;
@@ -829,7 +872,7 @@ PAGE = r"""<!doctype html>
       head.appendChild(header); table.appendChild(head);
       const body=document.createElement('tbody');
       displayedRound.forEach(item=>{
-        const row=document.createElement('tr');
+        const row=document.createElement('tr');row.setAttribute('aria-current',String(item.id===activePlaybackTrackId));
         const rank=document.createElement('td');rank.className='metric';rank.textContent=item.rank||displayedRound.indexOf(item)+1;row.appendChild(rank);
         const track=document.createElement('td');track.className='track-cell';const identity=document.createElement('div');identity.className='track-identity';const image=document.createElement('img');image.className='queue-cover';image.alt='';image.src=item.image_url||'';const copy=document.createElement('div');const title=document.createElement('strong');title.textContent=item.title;const artist=document.createElement('span');artist.textContent=item.artist;copy.append(title,artist);identity.append(image,copy);track.appendChild(identity);row.appendChild(track);
         const recommendationScore=document.createElement('td');recommendationScore.className='metric';const finalScore=item.why_now?.overall_score;recommendationScore.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'—';recommendationScore.title='Final EchoSense Recommendation Score after all factors and boosts';row.appendChild(recommendationScore);
@@ -935,6 +978,7 @@ PAGE = r"""<!doctype html>
         await api(`/v1/player/recommendations/${encodeURIComponent(item.decision_id)}/play`,{method:'PUT',body:JSON.stringify({device_id:deviceId,outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,continuation_decision_ids:dnaContinuationDecisionIds(item)})});
         await restorePlaybackState();
         await waitForAudibleBrowserPlayback(item.id);
+        syncRecommendationSurfaces(item.id);
         await maintainAutopilot(true);
         setText('#toast',`Playing ${item.title}. Autopilot will keep the EchoSense Playback Plan moving.`);
       } finally {
@@ -990,7 +1034,7 @@ PAGE = r"""<!doctype html>
       const trackId=currentTrackId;
       $('#save').disabled=true;
       const options=currentTrackSaved
-        ? {method:'DELETE'}
+        ? {method:'DELETE',body:JSON.stringify({outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,decision_id:currentRecommendationId})}
         : {method:'PUT',body:JSON.stringify({outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,decision_id:currentRecommendationId})};
       const status=await (await api(`/auth/spotify/library/tracks/${encodeURIComponent(trackId)}`,options)).json();
       if(currentTrackId===trackId) renderSavedState(status.saved);
@@ -1081,10 +1125,10 @@ PAGE = r"""<!doctype html>
         const previousId=before?.track_window?.current_track?.id||null;
         if(!previousId)throw new Error('No active Spotify track is available to skip.');
         await feedback('skipped');
-        let nextDna=null;
-        if(startNewRound) {
+        let nextDna=playbackPlanSuccessor(previousId);
+        if(!nextDna&&startNewRound) {
           nextDna=await generateNextDnaRound('skip');
-        } else {
+        } else if(!nextDna) {
           const currentIndex=recommendationSlate.findIndex(item=>item?.id===previousId);
           const orderedCandidates=currentIndex>=0
             ? [...recommendationSlate.slice(currentIndex+1),...recommendationSlate.slice(0,currentIndex)]
@@ -1112,6 +1156,7 @@ PAGE = r"""<!doctype html>
         if(!changed)throw new Error(`Spotify did not start the selected EchoSense recommendation (${nextDna.title}). Make sure the EchoSense browser player is active, then try again.`);
         activePlaybackTrackId=nextDna.id;
         activePlaybackDecisionId=nextDna.decision_id;
+        syncRecommendationSurfaces(nextDna.id);
         rememberAutopilotTrack(previousId);
         const refreshExclusions=startNewRound
           ? [...autopilotHistory,...allGeneratedDnaIds()]

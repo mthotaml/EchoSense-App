@@ -7,10 +7,12 @@ import echosense.app as app_module
 from echosense.cognitive_memory import CognitiveMemoryStore
 from echosense.evaluation_service import EvaluationService
 from echosense.exposure_store import ExposureStore
+from echosense.listening_intelligence_store import ListeningIntelligenceStore
 from echosense.memory import InMemoryPreferenceMemory
 from echosense.memory_lifecycle_service import MemoryLifecycleService
 from echosense.playback_learning import PlaybackLearningService
 from echosense.providers import FixtureMusicProvider
+from echosense.recording_identity import RecordingReference
 from echosense.storage import Storage
 
 
@@ -151,6 +153,37 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
         outcome="liked",
         completion_ratio=1.0,
     )
+    intelligence = ListeningIntelligenceStore(store)
+    identity = intelligence.resolve_user(provider="spotify", provider_user_id=user_id)
+    echo_track_id = intelligence.observe_track(
+        RecordingReference(
+            provider="spotify",
+            provider_id="spotify-delete-track",
+            title="Delete Me",
+            artists=("Privacy Artist",),
+            album="Privacy Album",
+            isrc="US-DEL-26-00001",
+            duration_ms=180_000,
+        )
+    )
+    session_id = intelligence.ensure_session(
+        echo_user_id=identity.echo_user_id,
+        provider="spotify",
+        provider_session_id="delete-session",
+    )
+    intelligence.record_event(
+        event_id="intelligence-delete-01",
+        echo_user_id=identity.echo_user_id,
+        echo_track_id=echo_track_id,
+        provider="spotify",
+        provider_track_id="spotify-delete-track",
+        event_type="completed",
+        context="general",
+        decision_id="dec-delete-01",
+        listening_session_id=session_id,
+        playback_seconds=180,
+        completion_ratio=1.0,
+    )
     return user_id
 
 
@@ -197,6 +230,11 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "consent_grants": 1,
         "preferences": 1,
         "learning_outcomes": 1,
+        "listening_events": 1,
+        "user_track_intelligence": 1,
+        "listening_sessions": 1,
+        "provider_user_aliases": 1,
+        "echo_users": 1,
     }
     assert body["subject_hash"] != user_id
     assert not store.has_active_consent(user_id, "contextual_recommendation")

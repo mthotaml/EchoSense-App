@@ -261,6 +261,8 @@ def test_spotify_data_builds_live_music_profile(
     assert trace["factors"]["listening_moment_source"] == "selected"
     assert trace["factors"]["track_snapshot"]["title"] == "A Real Track"
     assert trace["factors"]["track_snapshot"]["artist"] == "Artist One"
+    assert trace["factors"]["echo_user_id"].startswith("es_user_")
+    assert trace["factors"]["echo_track_id"].startswith("es_recording_")
     intelligence = client.get(
         "/auth/spotify/intelligence",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
@@ -268,6 +270,8 @@ def test_spotify_data_builds_live_music_profile(
     assert intelligence.status_code == 200
     assert intelligence.json()["scope"] == "connected_listener"
     assert intelligence.json()["data_status"] == "learning"
+    assert intelligence.json()["provider_neutral"]["scope"] == "provider_neutral_listener"
+    assert intelligence.json()["provider_neutral"]["summary"]["events"] == 0
     snapshot = connection_repository.storage._execute
     with connection_repository.storage.connect() as database:
         row = snapshot(
@@ -314,9 +318,14 @@ def test_spotify_data_builds_live_music_profile(
             "decision_id": payload["recommendation"]["decision_id"],
         },
     )
-    removed = client.delete(
+    removed = client.request(
+        "DELETE",
         "/auth/spotify/library/tracks/track-1",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
+        json={
+            "outcome_id": "spotify-unsave-1",
+            "decision_id": payload["recommendation"]["decision_id"],
+        },
     )
 
     assert library_status.json()["saved"] is False
@@ -325,6 +334,7 @@ def test_spotify_data_builds_live_music_profile(
     assert saved.json()["learning"]["signal"] == "saved"
     assert saved.json()["learning"]["applied"] is True
     assert removed.json()["saved"] is False
+    assert removed.json()["learning"]["signal"] == "unsaved"
     assert library_calls == [
         ("contains", "track-1"),
         ("save", "track-1"),
@@ -358,6 +368,27 @@ def test_spotify_data_builds_live_music_profile(
     assert feedback.json()["applied"] is True
     assert feedback.json()["evaluation"]["observed_reward"] < 0
     assert duplicate.json()["applied"] is False
+    provider_neutral = client.get(
+        "/auth/spotify/intelligence/kpis",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    assert provider_neutral.status_code == 200
+    assert provider_neutral.json()["scope"] == "provider_neutral_listener"
+    assert provider_neutral.json()["summary"] == {
+        "events": 3,
+        "tracks": 1,
+        "sessions": 1,
+        "completed": 0,
+        "skipped": 1,
+        "saved": 1,
+        "unsaved": 1,
+        "liked": 0,
+        "disliked": 0,
+        "replayed": 0,
+        "listen_seconds": 12.0,
+        "completion_rate": 0,
+        "recommendation_acceptance_rate": 33,
+    }
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(

@@ -287,18 +287,19 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
       'decision-distinct': {id: 'distinct-track', name: 'Distinct Motion'},
       'decision-autopilot-3': {id: 'autopilot-3', name: 'Open Current'},
       'decision-autopilot-4': {id: 'autopilot-4', name: 'Night Lines'},
+      'decision-autopilot-5': {id: 'autopilot-5', name: 'Coastal Signal'},
       'decision-post-skip': {id: 'post-skip-track', name: 'Fresh Horizon'},
     };
     providerTrack = tracksByDecision[decisionId] || {id: 'working-track', name: 'Focused Motion'};
     const trackId = providerTrack.id;
-    if (decisionId === 'decision-distinct' && feedback.some(item => item.signal === 'skipped')) {
+    if (decisionId === 'decision-autopilot-3' && feedback.some(item => item.signal === 'skipped')) {
       controlEvents.push('dna-play');
       skippedToNext = true;
     }
-    if (decisionId === 'decision-autopilot-3') {
+    if (decisionId === 'decision-autopilot-4' && feedback.some(item => item.signal === 'completed')) {
       controlEvents.push('dna-completion-play');
     }
-    if (decisionId === 'decision-autopilot-4') {
+    if (decisionId === 'decision-autopilot-5') {
       controlEvents.push('provider-autoplay-overridden');
     }
     await route.fulfill({
@@ -529,6 +530,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     ],
   });
   expect(queueCommands).toHaveLength(0);
+  await expect(page.locator('#pick-heading')).toHaveText('Distinct Motion');
+  await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
+  await expect(page.locator('#dna-queue-items tbody tr[aria-current="true"]')).toContainText('Distinct Motion');
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
   await expect(page.locator('#autopilot-status')).toContainText('4 planned tracks ready ahead');
   await expect(page.locator('#dna-queue-items tbody tr').first().locator('.why-cell')).toContainText(
@@ -538,21 +542,20 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Saved');
   await expect(page.locator('#save')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#toast')).toContainText('EchoSense learned');
   expect(libraryMutations[0]).toMatchObject({
     method: 'PUT',
-    trackId: 'working-track',
-    request: {decision_id: 'decision-working'},
+    trackId: 'distinct-track',
+    request: {decision_id: 'decision-distinct'},
   });
 
   await page.locator('#save').click();
   await expect(page.locator('#save')).toHaveText('Save');
-  expect(libraryMutations[1]).toEqual({method: 'DELETE', trackId: 'working-track'});
+  expect(libraryMutations[1]).toEqual({method: 'DELETE', trackId: 'distinct-track'});
 
   await page.locator('#play').click();
   await expect.poll(() => recommendationPlays).toHaveLength(2);
   expect(recommendationPlays[1]).toMatchObject({
-    decision_id: 'decision-working',
+    decision_id: 'decision-distinct',
     device_id: 'guardian-device',
   });
   await expect.poll(() => page.evaluate(() => window.__activateElementCalls || 0)).toBeGreaterThan(0);
@@ -572,32 +575,31 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   );
   expect(controlEvents).not.toContain('next');
   expect(recommendationPlays.at(-1)).toMatchObject({
-    decision_id: 'decision-distinct',
+    decision_id: 'decision-autopilot-3',
     device_id: 'guardian-device',
   });
-  await expect(page.locator('#player-title')).toHaveText('Distinct Motion');
-  await expect(page.locator('#pick-heading')).toHaveText('Fresh Horizon');
+  await expect(page.locator('#player-title')).toHaveText('Open Current');
+  await expect(page.locator('#pick-heading')).toHaveText('Open Current');
+  await expect(page.locator('#dna-queue-items tbody tr[aria-current="true"]')).toContainText('Open Current');
   await expect(page.locator('#pick-label')).toHaveText('Current EchoSense recommendation');
   await expect(page.locator('#toast')).toContainText(
-    'selected the next planned recommendation and verified Distinct Motion is playing',
+    'selected the next planned recommendation and verified Open Current is playing',
   );
-  await expect(page.locator('#dna-page-status')).toHaveText(
-    `Plan ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
-  );
+  await expect(page.locator('#dna-page-status')).toHaveText(`Plan ${roundsBeforeSkip} of ${roundsBeforeSkip}`);
   await expect(page.locator('#dna-page-previous')).toBeEnabled();
   await page.locator('#dna-page-previous').click();
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Plan ${roundsBeforeSkip} of ${roundsBeforeSkip + 1}`,
+    `Plan ${roundsBeforeSkip - 1} of ${roundsBeforeSkip}`,
   );
   await page.locator('#dna-page-next').click();
   await expect(page.locator('#dna-page-status')).toHaveText(
-    `Plan ${roundsBeforeSkip + 1} of ${roundsBeforeSkip + 1}`,
+    `Plan ${roundsBeforeSkip} of ${roundsBeforeSkip}`,
   );
 
   await page.evaluate(() => {
     const track = {
-      id: 'distinct-track',
-      name: 'Distinct Motion',
+      id: 'autopilot-3',
+      name: 'Open Current',
       duration_ms: 180000,
       artists: [{name: 'Echo Artist'}],
       album: {images: []},
@@ -617,17 +619,17 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await expect.poll(() => feedback.map(item => item.signal)).toContain('completed');
   expect(feedback.find(item => item.signal === 'completed').decision_id).toBe(
-    'decision-distinct',
+    'decision-autopilot-3',
   );
   await expect.poll(() => controlEvents).toContain('dna-completion-play');
   expect(controlEvents).not.toContain('next');
   expect(recommendationPlays.at(-1)).toMatchObject({
-    decision_id: 'decision-autopilot-3',
+    decision_id: 'decision-autopilot-4',
     device_id: 'guardian-device',
   });
-  await expect(page.locator('#player-title')).toHaveText('Open Current');
+  await expect(page.locator('#player-title')).toHaveText('Night Lines');
   await expect(page.locator('#toast')).toContainText(
-    'continued with Open Current from your Playback Plan',
+    'continued with Night Lines from your Playback Plan',
   );
 
   await page.evaluate(() => {
@@ -647,17 +649,17 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   await expect.poll(() => controlEvents).toContain('provider-autoplay-overridden');
   expect(recommendationPlays.at(-1)).toMatchObject({
-    decision_id: 'decision-autopilot-4',
+    decision_id: 'decision-autopilot-5',
     device_id: 'guardian-device',
   });
-  await expect(page.locator('#player-title')).toHaveText('Night Lines');
+  await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
   await expect(page.locator('#toast')).toContainText(
-    'Playback restored. Night Lines is playing from your EchoSense Playback Plan.',
+    'Playback restored. Coastal Signal is playing from your EchoSense Playback Plan.',
   );
 
   restoreFromSnapshot = true;
   await page.reload();
-  await expect(page.locator('#player-title')).toHaveText('Night Lines');
+  await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
   await expect(page.locator('#player-status')).toContainText('Last session restored');
   await expect(page.locator('#toggle')).toHaveText('▶');
 

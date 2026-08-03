@@ -123,6 +123,30 @@
       ]
     },
     {
+      "id": "active-recommendation-surface-alignment",
+      "severity": "severity-1",
+      "description": "The audible browser track, Hero recommendation, active Final EchoSense Playback Plan row, and feedback decision share one decision-owned identity after play, skip, completion, refresh, and provider-autoplay recovery.",
+      "covers": ["hero-player-plan-track-aligned", "skip-consumes-existing-plan-successor", "completion-consumes-existing-plan-successor", "provider-track-not-presented-as-echosense-decision"],
+      "evidence": [
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "tbody tr[aria-current=\"true\"]"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Open Current"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "syncRecommendationSurfaces"
+        },
+        {
+          "source": "src/echosense/product_ui.py",
+          "pattern": "playbackPlanSuccessor(previousId)"
+        }
+      ]
+    },
+    {
       "id": "provider-autoplay-overridden",
       "severity": "severity-1",
       "description": "If Spotify advances to a track outside the active EchoSense Playback Plan, EchoSense detects the drift and explicitly restores the expected recommendation instead of adopting the provider queue.",
@@ -205,8 +229,8 @@
     {
       "id": "continuous-diverse-autopilot",
       "severity": "severity-2",
-      "description": "Autopilot presents paginated rounds of six distinct tracks and generates a fresh excluded round after a hero skip or completion of all six tracks.",
-      "covers": ["autopilot-six-track-round", "autopilot-hero-skip-new-round", "autopilot-completed-round-rollover", "autopilot-round-pagination", "autopilot-manual-add-absent", "autopilot-candidate-exclusions-honored"],
+      "description": "Autopilot presents paginated rounds of six distinct tracks, consumes the displayed plan in order, and generates a fresh excluded round only after the current plan is exhausted.",
+      "covers": ["autopilot-six-track-round", "autopilot-existing-plan-consumed-first", "autopilot-completed-round-rollover", "autopilot-round-pagination", "autopilot-manual-add-absent", "autopilot-candidate-exclusions-honored"],
       "evidence": [
         {
           "source": "tests/test_product_ui.py",
@@ -218,7 +242,7 @@
         },
         {
           "source": "tests/e2e/spotify-reference.spec.js",
-          "pattern": "roundsBeforeSkip + 1"
+          "pattern": "decision-autopilot-3"
         },
         {
           "source": "tests/test_product_ui.py",
@@ -372,6 +396,30 @@
       ]
     },
     {
+      "id": "provider-neutral-listening-intelligence",
+      "severity": "severity-1",
+      "description": "Behavioral learning uses canonical EchoSense user and track identities, append-only idempotent events, decision attribution, truthful KPIs, and verified deletion across linked provider aliases.",
+      "covers": ["echo-user-provider-aliases", "echo-track-cross-provider-identity", "listening-event-idempotency", "listener-kpis-evidence-derived", "provider-neutral-data-deletion"],
+      "evidence": [
+        {
+          "source": "tests/test_listening_intelligence_store.py",
+          "pattern": "test_provider_accounts_and_tracks_resolve_to_canonical_echo_ids"
+        },
+        {
+          "source": "tests/test_listening_intelligence_store.py",
+          "pattern": "test_events_are_idempotent_and_update_listener_intelligence"
+        },
+        {
+          "source": "tests/test_listening_intelligence_store.py",
+          "pattern": "test_event_id_cannot_be_rebound_to_different_evidence"
+        },
+        {
+          "source": "tests/test_deletion.py",
+          "pattern": "listening_events"
+        }
+      ]
+    },
+    {
       "id": "recommendation-boost-truthfulness",
       "severity": "severity-1",
       "description": "User boosts are bounded and normalized, alter the same ranking decision that drives Autopilot, and the displayed context statement reports those exact inputs and effective weights.",
@@ -463,12 +511,21 @@
         "autopilot-provider-queue-write-prohibited",
         "autopilot-single-start",
         "autopilot-six-track-round",
-        "autopilot-hero-skip-new-round",
+        "autopilot-existing-plan-consumed-first",
         "autopilot-completed-round-rollover",
         "autopilot-round-pagination",
         "autopilot-manual-add-absent",
         "autopilot-candidate-exclusions-honored",
         "autopilot-current-decision-stable",
+        "hero-player-plan-track-aligned",
+        "skip-consumes-existing-plan-successor",
+        "completion-consumes-existing-plan-successor",
+        "provider-track-not-presented-as-echosense-decision",
+        "echo-user-provider-aliases",
+        "echo-track-cross-provider-identity",
+        "listening-event-idempotency",
+        "listener-kpis-evidence-derived",
+        "provider-neutral-data-deletion",
         "browser-audio-user-gesture-activated",
         "browser-audio-playing-verified",
         "silent-playback-not-reported-success",
