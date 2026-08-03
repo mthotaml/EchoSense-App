@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from echosense.providers.models import MusicDataImport
 
@@ -24,6 +24,27 @@ class ListeningContextService:
         "relaxing": frozenset({"ambient", "classical", "jazz", "folk", "acoustic"}),
         "social": frozenset({"pop", "dance", "latin", "hip hop", "r&b"}),
     }
+
+    @staticmethod
+    def resolve_moment(
+        requested: ListeningMoment, activity: str | None
+    ) -> tuple[ListeningMoment, str]:
+        detected = cast(
+            ListeningMoment | None,
+            {
+                "fast_driving": "driving",
+                "driving": "driving",
+                "exercising": "exercising",
+                "working": "working",
+                "relaxing": "relaxing",
+                "social": "social",
+            }.get(activity or ""),
+        )
+        if requested != "general":
+            return requested, "selected"
+        if detected is not None:
+            return detected, "detected"
+        return "general", "general"
 
     def score(self, imported: MusicDataImport, moment: ListeningMoment) -> dict[str, ContextFit]:
         artist_genres = {

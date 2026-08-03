@@ -29,6 +29,7 @@ class ContextCandidateService:
         activity: str | None,
         daypart: str | None,
         mood: str | None = None,
+        moment: str = "general",
     ) -> ContextCandidateResult:
         queries = self.queries(
             weather=weather,
@@ -37,6 +38,7 @@ class ContextCandidateService:
             activity=activity,
             daypart=daypart,
             mood=mood,
+            moment=moment,
         )
         tracks: dict[str, Track] = {}
         scores: dict[str, float] = {}
@@ -81,8 +83,24 @@ class ContextCandidateService:
         activity: str | None,
         daypart: str | None,
         mood: str | None = None,
+        moment: str = "general",
     ) -> list[tuple[str, str, float]]:
         result: list[tuple[str, str, float]] = []
+        moment_queries = {
+            "driving": "driving road trip music",
+            "working": "focus instrumental work music",
+            "exercising": "energetic workout music",
+            "relaxing": "relaxing calm music",
+            "social": "party social music",
+        }
+        if moment in moment_queries:
+            result.append(
+                (
+                    moment_queries[moment],
+                    f"selected {moment} moment",
+                    1.0,
+                )
+            )
         if mood in {"romantic", "melancholy", "calm", "reflective", "energetic", "uplifting"}:
             result.append(
                 (
@@ -113,7 +131,7 @@ class ContextCandidateService:
         if region and region != "your area":
             query = "California Los Angeles" if region == "Southern California" else region
             result.append((query, f"local connection to {region}", 0.8))
-        if activity in {"driving", "fast_driving"}:
+        if activity in {"driving", "fast_driving"} and moment != "driving":
             result.append(
                 (
                     "upbeat driving" if activity == "fast_driving" else "driving",

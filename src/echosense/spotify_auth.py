@@ -166,6 +166,7 @@ def _why_now(
     daypart: str | None,
     temporal_mood: TemporalMoodProfile | None = None,
     context_statement: str | None = None,
+    moment_impact: dict[str, object] | None = None,
 ) -> dict[str, object]:
     preference = float(candidate.get("preference_weight", 0.0))
     context_fit = float(candidate.get("context_fit", 0.0))
@@ -227,6 +228,7 @@ def _why_now(
             if temporal_mood and temporal_mood.mood
             else f"Selected from your Music DNA with {round(context_fit * 100)}% live-context fit."
         ),
+        "moment_impact": moment_impact,
     }
 
 
@@ -436,8 +438,9 @@ def spotify_data(
             daypart=daypart or "unknown",
         )
         context_service = ListeningContextService()
-        context_fits = context_service.score(imported, moment)
-        ranking_context = context_service.ranking_context(moment)
+        effective_moment, moment_source = context_service.resolve_moment(moment, activity)
+        context_fits = context_service.score(imported, effective_moment)
+        ranking_context = context_service.ranking_context(effective_moment)
         top_tracks = {item.track.provider_id: item.track for item in imported.top_tracks}
         recent_tracks = {item.track.provider_id: item.track for item in imported.recent_tracks}
         expanded = ContextCandidateService().expand(
@@ -448,6 +451,7 @@ def spotify_data(
             activity=activity,
             daypart=daypart,
             mood=temporal_profile.mood,
+            moment=effective_moment,
         )
         candidate_tracks = list(
             {
@@ -466,13 +470,16 @@ def spotify_data(
                 score,
             )
         live_context = any((weather, region, road_setting, activity, daypart))
+        moment_context_available = effective_moment != "general"
         boosts = RecommendationBoosts(
             music_dna=boost_music_dna,
             live_context=boost_live_context,
             learned_preference=boost_learned_preference,
             diversity=boost_diversity,
         )
-        effective_weights = boosts.effective_weights(live_context_available=live_context)
+        effective_weights = boosts.effective_weights(
+            live_context_available=live_context or moment_context_available
+        )
         recent_artist_positions: dict[str, int] = {}
         for position, observation in enumerate(imported.recent_tracks[:20]):
             recent_artist_positions.setdefault(
@@ -486,8 +493,24 @@ def spotify_data(
             )
             for track in candidate_tracks
         }
+        baseline_context_fits = context_service.score(imported, "general")
+        baseline_context_scores = {
+            item_id: fit.score for item_id, fit in baseline_context_fits.items()
+        }
+        _, baseline_slate = learning.rank(
+            user_id=session.provider_user_id,
+            provider="spotify",
+            context="general_listening",
+            tracks=candidate_tracks,
+            context_scores=baseline_context_scores,
+            context_weight=0.35 if live_context else 0.15,
+            diversity_scores=diversity_scores,
+            boosts=boosts,
+            live_context_available=live_context,
+        )
+        baseline_ranks = {str(item["item_id"]): int(item["final_rank"]) for item in baseline_slate}
         context_statement = build_context_statement(
-            moment=moment,
+            moment=effective_moment,
             weather=weather,
             region=region,
             road_setting=road_setting,
@@ -505,8 +528,35 @@ def spotify_data(
             context_weight=0.35 if live_context else 0.15,
             diversity_scores=diversity_scores,
             boosts=boosts,
-            live_context_available=live_context,
+            live_context_available=live_context or moment_context_available,
         )
+        moment_ranks = {str(item["item_id"]): int(item["final_rank"]) for item in candidate_slate}
+        moment_changed_order = effective_moment != "general" and any(
+            baseline_ranks.get(item_id) != rank for item_id, rank in moment_ranks.items()
+        )
+        moment_impact = {
+            "moment": effective_moment,
+            "requested_moment": moment,
+            "source": moment_source,
+            "applied": effective_moment != "general",
+            "changed_order": moment_changed_order,
+            "compared_candidates": len(candidate_slate),
+            "message": (
+                "Any moment is selected; no activity-specific reranking is applied."
+                if effective_moment == "general"
+                else (
+                    f"{effective_moment.title()} "
+                    f"({'detected automatically' if moment_source == 'detected' else 'selected'}) "
+                    "changed the candidate ordering using moment-specific "
+                    "catalog evidence and context-fit scoring."
+                    if moment_changed_order
+                    else f"{effective_moment.title()} "
+                    f"({'detected automatically' if moment_source == 'detected' else 'selected'}) "
+                    "was applied, but the available evidence did not "
+                    "materially change this ordering."
+                )
+            ),
+        }
         excluded_ids = {item_id for item_id in exclude[:50] if item_id}
         diverse_slate = DiverseSlateService().build(
             candidate_tracks,
@@ -546,7 +596,18 @@ def spotify_data(
                     "candidate_slate": candidate_slate,
                     "music_dna_confidence": music_dna.confidence,
                     "evidence_count": music_dna.evidence_count,
-                    "listening_moment": moment,
+                    "listening_moment": effective_moment,
+                    "requested_listening_moment": moment,
+                    "listening_moment_source": moment_source,
+                    "moment_impact": {
+                        **moment_impact,
+                        "baseline_rank": baseline_ranks.get(slate_item.track.provider_id),
+                        "moment_rank": moment_ranks.get(slate_item.track.provider_id),
+                        "rank_change": (
+                            baseline_ranks.get(slate_item.track.provider_id, 0)
+                            - moment_ranks.get(slate_item.track.provider_id, 0)
+                        ),
+                    },
                     "diverse_slate_rank": slate_item.rank,
                     "live_context": {
                         "weather": weather,
@@ -604,10 +665,14 @@ def spotify_data(
         music_dna=music_dna,
         recommendation=recommendation,
         decision_id=decision_id,
-        moment=moment,
+        moment=effective_moment,
         decision_evidence=(
             {
-                "noticed": f"You selected {moment}.",
+                "noticed": (
+                    f"EchoSense detected {effective_moment}."
+                    if moment_source == "detected"
+                    else f"You selected {effective_moment}."
+                ),
                 "remembered": (
                     f"Your Music DNA currently has {music_dna.evidence_count} listening signals."
                 ),
@@ -668,6 +733,26 @@ def spotify_data(
                 daypart=daypart,
                 temporal_mood=temporal_profile,
                 context_statement=context_statement,
+                moment_impact={
+                    **moment_impact,
+                    "baseline_rank": baseline_ranks.get(item.track.provider_id),
+                    "moment_rank": moment_ranks.get(item.track.provider_id),
+                    "rank_change": (
+                        baseline_ranks.get(item.track.provider_id, 0)
+                        - moment_ranks.get(item.track.provider_id, 0)
+                    ),
+                    "context_fit": round(
+                        float(
+                            next(
+                                candidate["context_fit"]
+                                for candidate in candidate_slate
+                                if candidate["item_id"] == item.track.provider_id
+                            )
+                        )
+                        * 100
+                    ),
+                    "evidence": list(expanded.evidence.get(item.track.provider_id, ())),
+                },
             ),
         }
         for item in diverse_slate
@@ -676,6 +761,7 @@ def spotify_data(
     result["context_statement"] = context_statement
     result["recommendation_boosts"] = boosts.as_dict()
     result["effective_weights"] = effective_weights
+    result["moment_impact"] = moment_impact
     return result
 
 

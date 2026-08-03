@@ -39,3 +39,12 @@ def test_context_fit_uses_normalized_artist_genres() -> None:
     assert social.score == 0.0
     assert social.matched_genres == ()
     assert ListeningContextService.ranking_context("general") == "general_listening"
+
+
+def test_detected_activity_drives_moment_unless_user_selects_an_override() -> None:
+    service = ListeningContextService()
+
+    assert service.resolve_moment("general", "fast_driving") == ("driving", "detected")
+    assert service.resolve_moment("general", "working") == ("working", "detected")
+    assert service.resolve_moment("relaxing", "driving") == ("relaxing", "selected")
+    assert service.resolve_moment("general", "unknown") == ("general", "general")

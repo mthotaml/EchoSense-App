@@ -75,6 +75,17 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     const selectedId = skippedToNext ? 'post-skip-track' : working ? 'working-track' : 'general-track';
     const selectedTitle = skippedToNext ? 'Fresh Horizon' : working ? 'Focused Motion' : 'Open Road';
     const selectedDecision = skippedToNext ? 'decision-post-skip' : working ? 'decision-working' : 'decision-general';
+    const momentImpact = working
+      ? {
+          moment: 'working', requested_moment: 'working', source: 'selected', applied: true,
+          changed_order: true, compared_candidates: 6,
+          message: 'Working selected changed the candidate ordering using moment-specific catalog evidence and context-fit scoring.',
+        }
+      : {
+          moment: 'general', requested_moment: 'general', source: 'general', applied: false,
+          changed_order: false, compared_candidates: 6,
+          message: 'Any moment is selected; no activity-specific reranking is applied.',
+        };
     return route.fulfill({
       json: {
         profile: {
@@ -113,6 +124,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
                 {name: 'Time pattern', score: 83},
               ],
               observations: ['sunny weather', 'Southern California', 'coastal drive matched to your Music DNA'],
+              moment_impact: working
+                ? {...momentImpact, baseline_rank: 4, moment_rank: 1, rank_change: 3, context_fit: 88, evidence: ['selected working moment']}
+                : {...momentImpact, baseline_rank: 1, moment_rank: 1, rank_change: 0, context_fit: 50, evidence: []},
             },
           },
           {
@@ -168,6 +182,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
           enabled: true,
           explanation: 'You often choose uplifting music during afternoon. EchoSense keeps this signal bounded by your Music DNA and feedback.',
         },
+        moment_impact: momentImpact,
       },
     });
   });
@@ -416,6 +431,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
+  const listeningControls = page.locator('#listening-controls');
+  await expect(listeningControls).toBeVisible();
+  await expect(listeningControls.locator('#moment-panel')).toBeVisible();
+  await expect(listeningControls.locator('#boost-panel')).toBeVisible();
+  await expect(listeningControls.locator('#live-context-panel')).toBeVisible();
+  await expect(page.locator('.hero-content #moment')).toHaveCount(0);
   await page.locator('#context-toggle').click();
   await expect(page.locator('#context-chips')).toContainText('Southern California');
   await expect(page.locator('#context-chips')).toContainText('sunny · 78°F');
@@ -475,6 +496,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
 
   await page.locator('#moment').selectOption('working');
   await expect(page.locator('#pick-heading')).toHaveText('Focused Motion');
+  await expect(page.locator('#moment-impact')).toContainText('Working selected changed the candidate ordering');
+  await expect(page.locator('#moment-proof')).toContainText('88% Working fit · moved up 3 places');
   await expect(page.locator('#evidence')).toContainText('Context evidence: ambient');
   await expect(page.locator('#save')).toHaveText('Save');
   await expect(page.locator('#queue-add')).toHaveCount(0);
