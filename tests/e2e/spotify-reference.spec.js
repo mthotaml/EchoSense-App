@@ -473,17 +473,23 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     'Live context fit',
   );
   await expect(
-    page.locator('#hero-factors').getByRole('button', {name: /Music DNA affinity: How closely/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Music DNA affinity.*Why it matters/}),
   ).toBeVisible();
   await expect(
-    page.locator('#hero-factors').getByRole('button', {name: /Live context fit: How well/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Live context fit.*Why it matters/}),
   ).toBeVisible();
   await expect(
-    page.locator('#hero-factors').getByRole('button', {name: /Learned preference: An adjustment/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Learned preference.*Why it matters/}),
   ).toBeVisible();
   await expect(
-    page.locator('#hero-factors').getByRole('button', {name: /Diversity guard: A repetition safeguard/}),
+    page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Diversity guard.*Why it matters/}),
   ).toBeVisible();
+  await expect(page.locator('#boost-panel').getByRole('button', {name: /Priority factor: Music DNA affinity.*Why it matters/})).toBeVisible();
+  await expect(page.locator('#dna-queue-items').getByRole('button', {name: /Queue factor: Music DNA affinity.*Why it matters/})).toBeVisible();
+  await page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Music DNA affinity/}).click();
+  await expect(page.locator('#factor-modal')).toBeVisible();
+  await expect(page.locator('#factor-detail')).toContainText('Why it matters: recommendations still feel like your taste.');
+  await page.locator('#factor-modal-close').click();
   await expect(page.locator('#dna-queue-items thead')).toContainText('Time pattern');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('95%');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('88%');
@@ -540,7 +546,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
   await expect(page.locator('#autopilot-status')).toContainText('4 planned tracks ready ahead');
   await expect(page.locator('#dna-queue-items tbody tr').first().locator('.why-cell')).toContainText(
-    'Picked because Music DNA affinity 95%, Diversity guard 91%, Live context fit 88%',
+    'Selected from your Music DNA with live-context fit.',
   );
 
   await page.locator('#save').click();

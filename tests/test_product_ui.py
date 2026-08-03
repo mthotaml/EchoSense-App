@@ -88,9 +88,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "playPlaylistTrack" in response.text
     assert 'id="moment"' in response.text
     assert 'id="listening-controls"' in response.text
-    assert "Personalize what EchoSense plays next" in response.text
+    assert "Shape what plays next" in response.text
     assert 'id="moment-panel"' in response.text
-    assert "What are you doing right now?" in response.text
+    assert "What are you doing?" in response.text
     assert "What should matter more?" in response.text
     assert 'id="moment-impact"' in response.text
     assert 'id="moment-proof"' in response.text
@@ -131,7 +131,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "maintainAutopilot" in response.text
     assert "EchoSense controls playback" in response.text
     assert "recommendationExplanation" in response.text
-    assert "Picked because ${factors.join(', ')}" in response.text
+    assert "item.why_now?.summary||contextReason" in response.text
+    assert "Picked because ${factors.join(', ')}" not in response.text
     autopilot = response.text[
         response.text.index("async function maintainAutopilot") : response.text.index(
             "function recommendationExplanation"
@@ -143,8 +144,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "autopilotTimer=setInterval" in response.text
     assert "updateCurrentPick=true" in response.text
     assert "if(!updateCurrentPick){renderDnaQueue();return data;}" in response.text
-    assert "Decision-owned sequence" in response.text
-    assert "Tracks EchoSense plans to play—in this exact order" in response.text
+    assert "EchoSense playback plan" in response.text
+    assert "<h2>Up next</h2>" in response.text
     assert 'id="dna-pagination"' in response.text
     assert "rememberDnaRound" in response.text
     assert "generateNextDnaRound('completed')" in response.text
@@ -226,10 +227,11 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "className='dna-table'" in response.text
     assert "factorNames" in response.text
     assert "factorExplanations" in response.text
-    assert "How closely this track matches your long-term Spotify taste" in response.text
-    assert "How well this track fits your current time, weather" in response.text
-    assert "An adjustment learned from your plays, completions, saves, and skips" in response.text
-    assert "avoids repeating the same tracks or artists" in response.text
+    assert "Matches this track to the artists, genres, and songs you enjoy" in response.text
+    assert "Checks the current time, weather, area, road, and activity" in response.text
+    assert "Learns from your plays, completions, saves, and skips" in response.text
+    assert "Limits recently repeated tracks and artists" in response.text
+    assert response.text.count("Why it matters:") == 4
     assert "className='factor-info'" in response.text
     assert "info.setAttribute('aria-label'" in response.text
     assert "EchoSense Recommendation Score: the final normalized result" in response.text
@@ -293,10 +295,13 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "Choose Driving, Working, Exercising, Relaxing, or Social" in page
     assert "factor.name==='Diversity guard'" in page
     assert "?'Passed':'Limited'" in page
-    assert "`${factor.name}: ${factorExplanations[factor.name]}`" in page
-    assert "`Queue factor: ${label}. ${explanation}`" in page
+    assert "function factorInfoButton(name,location='Recommendation')" in page
+    assert "`${location} factor: ${name}. ${factorExplanations[name]}`" in page
     assert "You selected general" not in page
-    assert "A repetition safeguard, not a recommendation-match score" in page
+    assert "Why it matters: your queue stays fresh" in page
+    assert "factorInfoButton(label,'Priority')" in page
+    assert "factorInfoButton(factor.name,'Current recommendation')" in page
+    assert "factorInfoButton(label,'Queue')" in page
     assert 'id="dna-load-more"' in page
     assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
 
@@ -340,13 +345,12 @@ def test_playback_verification_prefers_owned_dna_and_collapses_provider_duplicat
 def test_final_playback_plan_names_the_exact_ranked_dna_sequence() -> None:
     page = client.get("/").text
 
-    assert "Final EchoSense playback plan" in page
-    assert "Tracks EchoSense plans to play—in this exact order" in page
-    assert "after Music DNA affinity, live context, learned preference" in page
+    assert "EchoSense playback plan" in page
+    assert "<h2>Up next</h2>" in page
+    assert "Your ranked listening order." in page
     assert 'id="dna-plan-statement"' in page
-    assert "Decision-owned sequence" in page
     assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
-    assert "Prepare another six-track plan" in page
-    assert "EchoSense recommendation score" in page
+    assert "Prepare six more" in page
+    assert "EchoSense score" in page
     assert "item.why_now?.overall_score" in page
     assert "Final EchoSense Recommendation Score after all factors and boosts" in page
