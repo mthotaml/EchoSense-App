@@ -309,6 +309,10 @@ def test_recommendation_boosters_drive_every_spotify_recommendation_request() ->
     assert "boostDefinitions.forEach(([key])=>params.set(`boost_${key}`" in page
     assert "echosenseRecommendationBoosts" in page
     assert "data.context_statement" in page
+    assert "async function changeRecommendationBoost(label)" in page
+    assert "changeRecommendationBoost(label)" in page
+    assert "`${label} boost`" in page
+    assert "pendingPlanTransitionLabel" in page
 
 
 def test_live_context_names_unavailable_movement_instead_of_showing_unknown() -> None:

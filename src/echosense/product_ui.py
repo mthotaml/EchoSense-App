@@ -337,6 +337,7 @@ PAGE = r"""<!doctype html>
     ];
     const recommendationBoosts=JSON.parse(localStorage.getItem('echosenseRecommendationBoosts')||'{}');
     let boostRefreshTimer=null;
+    let pendingPlanTransitionLabel=null;
     const factorExplanations={
       'Music DNA affinity':'How closely this track matches your long-term Spotify taste, including artists, tracks, genres, and listening history.',
       'Live context fit':'How well this track fits your current time, weather, coarse location, road setting, and activity when live context is enabled.',
@@ -387,7 +388,7 @@ PAGE = r"""<!doctype html>
         const amount=document.createElement('strong');amount.textContent=`+${Number(recommendationBoosts[key]||0)}%`;heading.appendChild(amount);
         const slider=document.createElement('input');slider.id=`boost-${key}`;slider.type='range';slider.min='0';slider.max='100';slider.step='10';slider.value=String(recommendationBoosts[key]||0);slider.setAttribute('aria-label',`Boost ${label}`);
         const weight=document.createElement('div');weight.className='boost-value';weight.textContent=Number.isFinite(effectiveWeights[key])?`Effective weight ${Math.round(effectiveWeights[key]*100)}%`:'Balanced baseline';
-        slider.addEventListener('input',()=>{recommendationBoosts[key]=Number(slider.value);amount.textContent=`+${slider.value}%`;localStorage.setItem('echosenseRecommendationBoosts',JSON.stringify(recommendationBoosts));clearTimeout(boostRefreshTimer);boostRefreshTimer=setTimeout(()=>{if(spotifyConnected)loadLiveSpotify().then(()=>maintainAutopilot(true)).catch(e=>setText('#toast',e.message));},350);});
+        slider.addEventListener('input',()=>{recommendationBoosts[key]=Number(slider.value);amount.textContent=`+${slider.value}%`;localStorage.setItem('echosenseRecommendationBoosts',JSON.stringify(recommendationBoosts));clearTimeout(boostRefreshTimer);boostRefreshTimer=setTimeout(()=>{if(spotifyConnected)changeRecommendationBoost(label).catch(e=>setText('#toast',e.message));},350);});
         card.append(heading,slider,weight);container.appendChild(card);
       });
     }
@@ -474,7 +475,7 @@ PAGE = r"""<!doctype html>
         : impact.message;
     }
 
-    async function loadLiveSpotify(moment=$('#moment').value, exclusions=[], updateCurrentPick=true, recordRound=updateCurrentPick, adoptAsNextPlan=false) {
+    async function loadLiveSpotify(moment=$('#moment').value, exclusions=[], updateCurrentPick=true, recordRound=updateCurrentPick, adoptAsNextPlan=false, transitionLabel=null) {
       const hour=new Date().getHours(); const automaticDaypart=hour<6?'late_night':hour<12?'morning':hour<17?'afternoon':hour<21?'evening':'night';
       const params=new URLSearchParams({moment,daypart:liveContext?.daypart||automaticDaypart});
       boostDefinitions.forEach(([key])=>params.set(`boost_${key}`,String(recommendationBoosts[key]||0)));
@@ -498,9 +499,10 @@ PAGE = r"""<!doctype html>
         syncRecommendationSurfaces(activePlaybackTrackId);
         if(adoptAsNextPlan&&recordRound&&newestPlanIndex>=0) {
           pendingPlanTransitionFromTrackId=activePlaybackTrackId;
+          pendingPlanTransitionLabel=transitionLabel||$('#moment').selectedOptions[0]?.textContent||'Selected priorities';
           dnaPageIndex=newestPlanIndex;
           renderDnaQueue();
-          const selected=$('#moment').selectedOptions[0]?.textContent||'Selected moment';
+          const selected=pendingPlanTransitionLabel;
           setText('#autopilot-status',`${selected} plan applied · ${dnaRounds[newestPlanIndex].length} reranked tracks will follow the current song`);
           setText('#dna-plan-statement',`${data.moment_impact?.message||`${selected} is active.`} The current song will finish or can be skipped; then EchoSense will play this newly ranked plan.`);
         }
@@ -511,11 +513,22 @@ PAGE = r"""<!doctype html>
     async function changeListeningMoment() {
       const moment=$('#moment').value;
       const previousPlan=(dnaRounds[dnaPageIndex]||[]).map(item=>item.id).join('|');
-      const data=await loadLiveSpotify(moment,[],true,true,true);
+      const data=await loadLiveSpotify(moment,[],true,true,true,$('#moment').selectedOptions[0]?.textContent||'Selected moment');
       const currentPlan=(dnaRounds.at(-1)||[]).map(item=>item.id).join('|');
       const selected=$('#moment').selectedOptions[0]?.textContent||'Selected moment';
       if(data.moment_impact?.applied&&previousPlan===currentPlan) {
         setText('#autopilot-status',`${selected} was applied, but the available Spotify evidence did not change this plan.`);
+      }
+      await maintainAutopilot(true);
+    }
+
+    async function changeRecommendationBoost(label) {
+      const previousPlan=(dnaRounds[dnaPageIndex]||[]).map(item=>item.id).join('|');
+      await loadLiveSpotify($('#moment').value,[],true,true,true,`${label} boost`);
+      const currentPlan=(dnaRounds.at(-1)||[]).map(item=>item.id).join('|');
+      if(previousPlan===currentPlan) {
+        setText('#autopilot-status',`${label} boost was applied, but the available Spotify evidence did not change this plan.`);
+        return;
       }
       await maintainAutopilot(true);
     }
@@ -629,7 +642,7 @@ PAGE = r"""<!doctype html>
       const changed=currentTrackId!==item.id||currentRecommendationId!==item.decision_id;
       activePlaybackTrackId=item.id;
       activePlaybackDecisionId=item.decision_id;
-      if(pendingPlanTransitionFromTrackId&&trackId!==pendingPlanTransitionFromTrackId&&dnaRounds.at(-1)?.some(candidate=>candidate.id===trackId))pendingPlanTransitionFromTrackId=null;
+      if(pendingPlanTransitionFromTrackId&&trackId!==pendingPlanTransitionFromTrackId&&dnaRounds.at(-1)?.some(candidate=>candidate.id===trackId)){pendingPlanTransitionFromTrackId=null;pendingPlanTransitionLabel=null;}
       currentTrackId=item.id;
       currentRecommendationId=item.decision_id;
       if(changed) {
@@ -881,7 +894,7 @@ PAGE = r"""<!doctype html>
         const currentIndex=round.findIndex(item=>item.id===activePlaybackTrackId);
         const readyAhead=(currentIndex>=0?round.slice(currentIndex+1):round).filter(item=>item?.id&&item?.decision_id);
         if(activePlaybackTrackId===pendingPlanTransitionFromTrackId) {
-          const selected=$('#moment').selectedOptions[0]?.textContent||'Selected moment';
+          const selected=pendingPlanTransitionLabel||$('#moment').selectedOptions[0]?.textContent||'Selected priorities';
           setText('#autopilot-status',`${selected} plan applied · ${readyAhead.length} reranked tracks will follow the current song`);
         } else {
           setText('#autopilot-status',`EchoSense controls playback · ${readyAhead.length} planned track${readyAhead.length===1?'':'s'} ready ahead`);

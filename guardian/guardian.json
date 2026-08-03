@@ -459,6 +459,8 @@
         "recommendation-boosts-normalized",
         "diversity-boost-reranks",
         "boosts-propagate-to-autopilot",
+        "boost-change-adopts-visible-successor-plan",
+        "active-song-preserved-during-boost-change",
         "context-statement-decision-bound"
       ],
       "evidence": [
@@ -473,6 +475,10 @@
         {
           "source": "tests/test_product_ui.py",
           "pattern": "test_recommendation_boosters_drive_every_spotify_recommendation_request"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Music DNA affinity boost plan applied"
         },
         {
           "source": "tests/test_spotify_auth.py",
@@ -493,6 +499,8 @@
         "recommendation-boosts-normalized",
         "diversity-boost-reranks",
         "boosts-propagate-to-autopilot",
+        "boost-change-adopts-visible-successor-plan",
+        "active-song-preserved-during-boost-change",
         "context-statement-decision-bound",
         "user-config-center-visible",
         "all-listening-moments-generate-candidates",
