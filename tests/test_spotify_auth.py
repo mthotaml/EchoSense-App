@@ -153,6 +153,7 @@ def test_spotify_data_builds_live_music_profile(
     client: TestClient,
 ) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test-client-secret")
     session_id = "test-session"
     connection_repository.save(
         spotify_auth.SpotifySession(
