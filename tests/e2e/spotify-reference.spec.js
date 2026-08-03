@@ -428,6 +428,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     connected = false;
     return route.fulfill({json: {status: 'disconnected'}});
   });
+  await page.route('**/auth/spotify/intelligence?*', route => route.fulfill({json: {
+    generated_at: '2026-08-03T12:00:00Z', scope: 'connected_listener', data_status: 'ready',
+    summary: {total_listen_seconds: 3720, tracks_observed: 18, completed: 12, skipped: 3, saved: 4, loved: 2, disliked: 1, early_skips: 1, completion_rate: 80, recommendation_acceptance_rate: 72, recommendations_with_outcomes: 18},
+    moments: [{moment: 'working', signals: 9}, {moment: 'driving', signals: 6}],
+    trend: [{date: '2026-08-02', listen_seconds: 1800, positive: 5, skips: 1}, {date: '2026-08-03', listen_seconds: 1920, positive: 6, skips: 2}],
+    history: [{outcome_id: 'out-history', decision_id: 'decision-working', provider: 'spotify', provider_track_id: 'working-track', title: 'Focused Motion', artist: 'Echo Artist', signal: 'completed', moment: 'working', playback_seconds: 180, completion_ratio: .96, observed_at: '2026-08-03T12:00:00Z'}],
+    capabilities: {history_correction: true, personalization_reset: false, data_export: false, verified_deletion: false},
+  }}));
 
   await page.goto('/');
   await expect(page.locator('#account-status')).toHaveText('Connected as Guardian Listener');
@@ -437,6 +445,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(listeningControls.locator('#boost-panel')).toBeVisible();
   await expect(listeningControls.locator('#live-context-panel')).toBeVisible();
   await expect(page.locator('.hero-content #moment')).toHaveCount(0);
+  await expect(page.locator('#intelligence-metrics')).toContainText('1.0 hr');
+  await page.getByRole('tab', {name: 'Recommendation history'}).click();
+  await expect(page.locator('#intelligence-history-list')).toContainText('Focused Motion');
+  await page.getByRole('tab', {name: 'Product signals'}).click();
+  await expect(page.locator('#intelligence-product-metrics')).toContainText('80%');
+  await page.getByRole('tab', {name: 'Overview'}).click();
   await page.locator('#context-toggle').click();
   await expect(page.locator('#context-chips')).toContainText('Southern California');
   await expect(page.locator('#context-chips')).toContainText('sunny · 78°F');

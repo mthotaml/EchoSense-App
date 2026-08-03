@@ -142,6 +142,30 @@ PAGE = r"""<!doctype html>
     .moment-select { width:100%; min-height:48px; }
     .moment-impact { margin:12px 0 0; padding:10px 12px; border-radius:10px; background:rgba(100,181,246,.08); color:#d9ecff; font-size:.8rem; line-height:1.45; }
     .moment-proof { display:inline-flex; margin:10px 0 0; padding:7px 10px; border:1px solid rgba(100,181,246,.35); border-radius:999px; color:#d9ecff; background:rgba(100,181,246,.07); font-size:.76rem; font-weight:650; }
+    .intelligence-tabs { display:flex; gap:7px; margin:20px 0; padding:5px; border:1px solid var(--line); border-radius:13px; background:rgba(7,10,15,.5); overflow-x:auto; }
+    .intelligence-tab { flex:0 0 auto; padding:9px 13px; border:0; border-radius:9px; background:transparent; color:var(--muted); font-weight:700; }
+    .intelligence-tab[aria-selected="true"] { color:#08110c; background:var(--green); }
+    .intelligence-view[hidden] { display:none; }
+    .metric-grid { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)); gap:12px; }
+    .metric-card { min-height:116px; padding:16px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(145deg,rgba(25,31,42,.9),rgba(9,13,19,.8)); }
+    .metric-card span { display:block; color:var(--muted); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .metric-card strong { display:block; margin-top:12px; color:var(--text); font-size:1.8rem; line-height:1; }
+    .metric-card small { display:block; margin-top:8px; color:var(--muted); line-height:1.35; }
+    .intelligence-split { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    .insight-card { padding:17px; border:1px solid var(--line); border-radius:14px; background:rgba(7,10,15,.46); }
+    .signal-bars { display:grid; gap:9px; margin-top:12px; }
+    .signal-row { display:grid; grid-template-columns:minmax(82px,1fr) 3fr auto; gap:10px; align-items:center; color:var(--muted); font-size:.78rem; }
+    .signal-bar { height:8px; border-radius:99px; background:#1c2431; overflow:hidden; }
+    .signal-bar span { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,var(--blue),var(--green)); }
+    .history-list { display:grid; gap:9px; }
+    .history-row { display:grid; grid-template-columns:minmax(0,1.7fr) .7fr .7fr auto; gap:14px; align-items:center; padding:13px; border:1px solid var(--line); border-radius:12px; background:rgba(7,10,15,.44); }
+    .history-row strong,.history-row span { display:block; }
+    .history-row span { color:var(--muted); font-size:.75rem; margin-top:3px; }
+    .signal-badge { display:inline-flex!important; width:max-content; margin:0!important; padding:5px 8px; border-radius:999px; color:#d9ecff!important; background:rgba(100,181,246,.1); text-transform:capitalize; }
+    .control-actions { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .control-action { padding:17px; border:1px solid var(--line); border-radius:14px; background:rgba(7,10,15,.46); }
+    .control-action button { width:100%; margin-top:12px; }
+    .scope-badge { display:inline-flex; padding:6px 9px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:.72rem; }
     .context-group { grid-column:1/-1; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:20px; align-items:center; }
     .context-group .context-chips { margin-top:9px; }
     .context-group .privacy-note { margin-top:10px; }
@@ -232,8 +256,8 @@ PAGE = r"""<!doctype html>
     .modal-card { width:min(560px,100%); padding:28px; border:1px solid var(--line); border-radius:20px; background:#15161b; box-shadow:0 30px 90px #000; }
     .formula { margin:18px 0; padding:15px; border-radius:12px; color:#cbe8ff; background:rgba(100,181,246,.08); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
     .player { border-top-color:var(--line); background:rgba(10,10,12,.92); }
-    @media (max-width:1024px) { .memory-grid { grid-template-columns:1fr; } .boost-grid { grid-template-columns:repeat(2,1fr); } .control-groups { grid-template-columns:1fr; } .context-group { grid-column:auto; } }
-    @media (max-width:760px) { .small-grid,.hero-content,.governance-grid,.boost-grid,.context-group { grid-template-columns:1fr; } .control-center,.control-group { padding:18px; } .control-center-header { display:block; } .hero-art { width:112px; height:112px; } .factor-bars { grid-template-columns:1fr; } .pick-top,.connection { display:block; } .player { grid-template-columns:1fr auto; padding:12px; } .transport { justify-items:end; } .progress-row,.player-side { display:none; } .cover { width:52px; height:52px; } .account span { display:none; } }
+    @media (max-width:1024px) { .memory-grid { grid-template-columns:1fr; } .boost-grid { grid-template-columns:repeat(2,1fr); } .control-groups { grid-template-columns:1fr; } .context-group { grid-column:auto; } .metric-grid { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:760px) { .small-grid,.hero-content,.governance-grid,.boost-grid,.context-group,.intelligence-split,.control-actions { grid-template-columns:1fr; } .control-center,.control-group { padding:18px; } .control-center-header { display:block; } .metric-grid { grid-template-columns:1fr 1fr; } .history-row { grid-template-columns:1fr 1fr; } .hero-art { width:112px; height:112px; } .factor-bars { grid-template-columns:1fr; } .pick-top,.connection { display:block; } .player { grid-template-columns:1fr auto; padding:12px; } .transport { justify-items:end; } .progress-row,.player-side { display:none; } .cover { width:52px; height:52px; } .account span { display:none; } }
   </style>
 </head>
 <body>
@@ -246,6 +270,7 @@ PAGE = r"""<!doctype html>
     <div class="stack">
       <section class="panel"><div class="hero-content"><img id="hero-cover" class="hero-art" alt="Recommendation album art"><div><div class="pick-top"><div><div id="pick-label" class="eyebrow">Current EchoSense recommendation</div><h2 id="pick-heading" class="track">Finding your track…</h2><div id="artist" class="artist"></div><span id="hero-genre" class="genre-pill" hidden></span></div><div id="match" class="match"></div></div><p id="reason" class="reason">Listening to your recent patterns…</p><div id="why-pill" class="reason-pill">✨ Building an explainable recommendation…</div><div id="moment-proof" class="moment-proof">Any moment · no activity-specific reranking</div><div id="hero-factors" class="factor-bars"></div><p id="evidence" class="evidence"></p><div class="actions"><button id="play" class="primary" type="button">▶ Play</button><button id="save" class="secondary" type="button" aria-pressed="false" disabled>♥ Save</button><button id="skip" class="secondary" type="button">⏭ Skip current song</button></div><div id="toast" aria-live="polite"></div></div></div></section>
       <section id="dna-queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Final EchoSense playback plan</div><h2>Tracks EchoSense plans to play—in this exact order</h2><p class="copy">This is the final sequence after Music DNA affinity, live context, learned preference, diversity protection, and your boosts are applied.</p><p id="dna-plan-statement" class="context-statement">Building the decision context for this playback plan…</p><p id="autopilot-status" class="evidence" aria-live="polite">Autopilot starts with your first song.</p></div><span class="reason-pill">● Decision-owned sequence</span></div><div id="dna-queue-items" class="table-wrap"></div><nav id="dna-pagination" class="dna-pagination" aria-label="Music DNA playback-plan rounds" hidden><button id="dna-page-previous" class="secondary" type="button">Previous plan</button><span id="dna-page-status">Plan 1 of 1</span><button id="dna-page-next" class="secondary" type="button">Next plan</button></nav><div class="actions" style="justify-content:center;margin-top:16px"><button id="dna-load-more" class="secondary" type="button">＋ Prepare another six-track plan</button></div></section>
+      <section id="intelligence-panel" class="panel"><div class="pick-top"><div><div class="eyebrow blue">Your EchoSense</div><h2>Your listening intelligence</h2><p class="copy">A transparent view of what EchoSense has learned from qualified playback outcomes.</p></div><span class="scope-badge">Connected listener · persisted signals</span></div><div class="intelligence-tabs" role="tablist" aria-label="Listening intelligence views"><button class="intelligence-tab" type="button" role="tab" aria-selected="true" aria-controls="intelligence-overview" data-intelligence-view="overview">Overview</button><button class="intelligence-tab" type="button" role="tab" aria-selected="false" aria-controls="intelligence-history" data-intelligence-view="history">Recommendation history</button><button class="intelligence-tab" type="button" role="tab" aria-selected="false" aria-controls="intelligence-product" data-intelligence-view="product">Product signals</button><button class="intelligence-tab" type="button" role="tab" aria-selected="false" aria-controls="intelligence-controls" data-intelligence-view="controls">Your controls</button></div><div id="intelligence-overview" class="intelligence-view" role="tabpanel"><div id="intelligence-metrics" class="metric-grid"></div><div class="intelligence-split"><article class="insight-card"><div class="eyebrow">Listening moments</div><h3>Where EchoSense has evidence</h3><div id="intelligence-moments" class="signal-bars"></div></article><article class="insight-card"><div class="eyebrow blue">Recent learning</div><h3>Qualified signals over time</h3><div id="intelligence-trend" class="signal-bars"></div></article></div></div><div id="intelligence-history" class="intelligence-view" role="tabpanel" hidden><div class="pick-top"><div><h3>Recommendation history</h3><p class="copy">Every outcome remains bound to the recommendation decision and provider track.</p></div></div><div id="intelligence-history-list" class="history-list"></div></div><div id="intelligence-product" class="intelligence-view" role="tabpanel" hidden><div class="pick-top"><div><h3>Adoption and recommendation health</h3><p class="copy">Current-listener indicators only. Cohort-level product analytics require the provider-neutral intelligence warehouse.</p></div><span class="scope-badge">Not a global cohort</span></div><div id="intelligence-product-metrics" class="metric-grid"></div></div><div id="intelligence-controls" class="intelligence-view" role="tabpanel" hidden><div class="control-actions"><article class="control-action"><h3>Correct history</h3><p class="copy">Mark an earlier recommendation as a poor fit from the History tab.</p><button class="secondary" type="button" data-open-intelligence="history">Review history</button></article><article class="control-action"><h3>Export my intelligence</h3><p class="copy">Portable export will be enabled after canonical EchoSense track IDs are fully integrated.</p><button class="secondary" type="button" disabled>Export unavailable</button></article><article class="control-action"><h3>Reset or delete</h3><p class="copy">These actions remain locked until every source and derived aggregate participates in verified deletion.</p><button class="danger" type="button" disabled>Verified deletion unavailable</button></article></div></div><p id="intelligence-status" class="evidence" aria-live="polite">Loading persisted listening intelligence…</p></section>
       <section id="queue-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Playback verification</div><h2>Now and next · EchoSense controlled</h2><p id="queue-status" class="copy" aria-live="polite">Checking Spotify against the active EchoSense Playback Plan.</p></div><div class="actions"><button id="queue-skip" class="primary" type="button">Skip to next planned track</button><button id="queue-refresh" class="secondary" type="button">Verify</button></div></div><div id="queue-items" class="track-list"></div></section>
       <section id="playlists-panel" class="panel" hidden><div class="pick-top"><div><div class="eyebrow">Your Spotify playlists</div><h2>Browse and play here</h2><p class="copy">Owned and collaborative playlists can play inside EchoSense.</p><p id="playlists-status" class="evidence" aria-live="polite"></p></div><button id="more-playlists" class="secondary" type="button" hidden>Load more</button></div><div id="playlists" class="playlist-grid"></div><div id="playlist-detail" hidden><h2 id="playlist-title"></h2><div id="playlist-tracks" class="track-list"></div><button id="more-tracks" class="secondary" type="button" hidden>Load more tracks</button></div></section>
       <div class="small-grid"><section class="panel"><div class="eyebrow">EchoSense noticed</div><h2>One thing worth knowing</h2><p id="insight" class="copy">Reading your listening…</p></section><section class="panel"><div class="eyebrow">Your Music DNA</div><h2>A simple view of your taste</h2><div id="dna" class="dna-list"></div></section></div>
@@ -466,6 +491,67 @@ PAGE = r"""<!doctype html>
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderMemory(profile,data); renderDnaQueue();
       return data;
+    }
+
+    function metricCard(label,value,detail) {
+      const card=document.createElement('article');card.className='metric-card';
+      const name=document.createElement('span');name.textContent=label;
+      const metric=document.createElement('strong');metric.textContent=value;
+      const note=document.createElement('small');note.textContent=detail;
+      card.append(name,metric,note);return card;
+    }
+    function formatListeningTime(seconds) {
+      const total=Math.max(0,Number(seconds)||0);
+      if(total<60)return `${Math.round(total)} sec`;
+      if(total<3600)return `${Math.round(total/60)} min`;
+      return `${(total/3600).toFixed(1)} hr`;
+    }
+    function renderSignalBars(container,items,labelKey,valueKey) {
+      container.replaceChildren();
+      if(!items.length){const empty=document.createElement('p');empty.className='copy';empty.textContent='Not enough persisted evidence yet.';container.appendChild(empty);return;}
+      const max=Math.max(...items.map(item=>Number(item[valueKey])||0),1);
+      items.forEach(item=>{const row=document.createElement('div');row.className='signal-row';const label=document.createElement('span');label.textContent=String(item[labelKey]||'Unknown').replaceAll('_',' ');const bar=document.createElement('div');bar.className='signal-bar';const fill=document.createElement('span');fill.style.width=`${Math.max(4,(Number(item[valueKey])||0)/max*100)}%`;bar.appendChild(fill);const value=document.createElement('strong');value.textContent=String(Math.round(Number(item[valueKey])||0));row.append(label,bar,value);container.appendChild(row);});
+    }
+    function showIntelligenceView(name) {
+      document.querySelectorAll('.intelligence-tab').forEach(tab=>tab.setAttribute('aria-selected',String(tab.dataset.intelligenceView===name)));
+      document.querySelectorAll('.intelligence-view').forEach(view=>view.hidden=view.id!==`intelligence-${name}`);
+    }
+    async function correctHistoryDecision(item,button) {
+      button.disabled=true;
+      try {
+        await api('/auth/spotify/feedback',{method:'POST',body:JSON.stringify({outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,decision_id:item.decision_id,signal:'disliked'})});
+        setText('#intelligence-status',`${item.title} was marked as a poor fit. Future recommendations will reduce similar choices.`);
+        await loadListeningIntelligence();
+      } catch(error) {
+        button.disabled=false;setText('#intelligence-status',error.message);
+      }
+    }
+    function renderListeningIntelligence(data) {
+      const summary=data.summary||{};const metrics=$('#intelligence-metrics');metrics.replaceChildren();
+      [
+        ['Listening time',formatListeningTime(summary.total_listen_seconds),'Qualified playback time persisted'],
+        ['Tracks learned',String(summary.tracks_observed||0),'Distinct provider tracks with outcomes'],
+        ['Completed',String(summary.completed||0),'Completion outcomes'],
+        ['Saved + loved',String((summary.saved||0)+(summary.loved||0)),'Strong positive preference signals'],
+      ].forEach(item=>metrics.appendChild(metricCard(...item)));
+      renderSignalBars($('#intelligence-moments'),data.moments||[],'moment','signals');
+      renderSignalBars($('#intelligence-trend'),(data.trend||[]).map(item=>({...item,value:(item.positive||0)+(item.skips||0)})),'date','value');
+      const product=$('#intelligence-product-metrics');product.replaceChildren();
+      [
+        ['Completion rate',summary.completion_rate==null?'—':`${summary.completion_rate}%`,'Completed versus completed + skipped'],
+        ['Acceptance rate',summary.recommendation_acceptance_rate==null?'—':`${summary.recommendation_acceptance_rate}%`,'Completed, saved, or loved outcomes per decision'],
+        ['Early skips',String(summary.early_skips||0),'Skips before 20% completion'],
+        ['Decisions observed',String(summary.recommendations_with_outcomes||0),'Recommendations with persisted outcomes'],
+      ].forEach(item=>product.appendChild(metricCard(...item)));
+      const history=$('#intelligence-history-list');history.replaceChildren();
+      if(!(data.history||[]).length){const empty=document.createElement('article');empty.className='insight-card';const title=document.createElement('h3');title.textContent='EchoSense is still learning';const copy=document.createElement('p');copy.className='copy';copy.textContent='Play, complete, skip, save, or love recommendations to build your history.';empty.append(title,copy);history.appendChild(empty);}
+      (data.history||[]).forEach(item=>{const row=document.createElement('article');row.className='history-row';const identity=document.createElement('div');const title=document.createElement('strong');title.textContent=item.title;const artist=document.createElement('span');artist.textContent=`${item.artist} · ${item.provider}`;identity.append(title,artist);const signal=document.createElement('div');const badge=document.createElement('span');badge.className='signal-badge';badge.textContent=item.signal;signal.appendChild(badge);const context=document.createElement('div');const moment=document.createElement('strong');moment.textContent=String(item.moment||'general').replaceAll('_',' ');const detail=document.createElement('span');detail.textContent=item.completion_ratio==null?formatListeningTime(item.playback_seconds):`${Math.round(item.completion_ratio*100)}% completed`;context.append(moment,detail);const action=document.createElement('button');action.type='button';action.className='secondary';action.textContent='Poor fit';action.disabled=item.signal==='disliked';action.setAttribute('aria-label',`Mark ${item.title} as a poor fit`);action.addEventListener('click',()=>correctHistoryDecision(item,action));row.append(identity,signal,context,action);history.appendChild(row);});
+      setText('#intelligence-status',data.data_status==='ready'?`Updated from ${data.history.length} persisted outcomes. Metrics reflect this connected listener only.`:'No qualified outcomes yet. EchoSense will populate this view as you listen.');
+    }
+    async function loadListeningIntelligence() {
+      if(!spotifyConnected)return;
+      try {const data=await (await api('/auth/spotify/intelligence?history_limit=30')).json();renderListeningIntelligence(data);}
+      catch(error){setText('#intelligence-status',`Listening intelligence is temporarily unavailable: ${error.message}`);}
     }
 
     async function loadDemo() {
@@ -909,6 +995,7 @@ PAGE = r"""<!doctype html>
       const status=await (await api(`/auth/spotify/library/tracks/${encodeURIComponent(trackId)}`,options)).json();
       if(currentTrackId===trackId) renderSavedState(status.saved);
       setText('#toast',status.saved?'Saved to Spotify. EchoSense learned from this choice.':'Removed from Spotify.');
+      await loadListeningIntelligence();
     }
     function playlistCard(item) {
       const button=document.createElement('button'); button.className='playlist-card'; button.type='button'; button.disabled=!item.can_browse;
@@ -983,6 +1070,7 @@ PAGE = r"""<!doctype html>
         reportedSignals.add(key);
       }
       setText('#toast','Understood. EchoSense will adjust your next pick.');
+      if(spotifyConnected)loadListeningIntelligence().catch(()=>{});
     }
     async function skipAndPlayNext(startNewRound=false) {
       if(skipInFlight)return;
@@ -1046,7 +1134,7 @@ PAGE = r"""<!doctype html>
     async function load() {
       renderBoostControls();
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.allSettled([loadPlaylistsSafely(),loadDevices()]); } else await loadDemo();
+      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.allSettled([loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
@@ -1057,6 +1145,8 @@ PAGE = r"""<!doctype html>
       $('#dna-page-previous').addEventListener('click',()=>changeDnaPage(-1));
       $('#dna-page-next').addEventListener('click',()=>changeDnaPage(1));
       $('#dna-load-more').addEventListener('click',()=>generateNextDnaRound('manual').catch(e=>setText('#toast',e.message)));
+      document.querySelectorAll('.intelligence-tab').forEach(tab=>tab.addEventListener('click',()=>showIntelligenceView(tab.dataset.intelligenceView)));
+      document.querySelectorAll('[data-open-intelligence]').forEach(button=>button.addEventListener('click',()=>showIntelligenceView(button.dataset.openIntelligence)));
       $('#context-toggle').addEventListener('click',toggleLiveContext);
       $('#settings-trigger').addEventListener('click',()=>$('#governance-panel').scrollIntoView({behavior:'smooth',block:'center'}));
       $('#factor-modal-close').addEventListener('click',closeFactorModal);

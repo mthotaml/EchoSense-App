@@ -327,6 +327,36 @@
       ]
     },
     {
+      "id": "listening-intelligence-visibility",
+      "severity": "severity-2",
+      "description": "The listener intelligence workspace renders only persisted, decision-bound outcomes, labels its single-listener scope, provides honest empty states, and keeps unsupported export, reset, and verified deletion controls disabled.",
+      "covers": [
+        "listener-kpis-visible",
+        "recommendation-history-decision-bound",
+        "listener-scope-labeled",
+        "intelligence-empty-state-honest",
+        "unsupported-data-controls-disabled"
+      ],
+      "evidence": [
+        {
+          "source": "tests/test_listening_intelligence.py",
+          "pattern": "test_listening_intelligence_aggregates_truthful_persisted_outcomes"
+        },
+        {
+          "source": "tests/test_listening_intelligence.py",
+          "pattern": "test_listening_intelligence_has_honest_empty_state"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Recommendation history"
+        },
+        {
+          "source": "tests/test_product_ui.py",
+          "pattern": "Verified deletion unavailable"
+        }
+      ]
+    },
+    {
       "id": "recommendation-boost-truthfulness",
       "severity": "severity-1",
       "description": "User boosts are bounded and normalized, alter the same ranking decision that drives Autopilot, and the displayed context statement reports those exact inputs and effective weights.",
@@ -376,6 +406,11 @@
         "detected-activity-can-drive-moment",
         "unchanged-moment-order-reported-honestly",
         "moment-impact-decision-bound",
+        "listener-kpis-visible",
+        "recommendation-history-decision-bound",
+        "listener-scope-labeled",
+        "intelligence-empty-state-honest",
+        "unsupported-data-controls-disabled",
         "spotify-data-failure-rendered",
         "oauth-profile-rate-limit-retried",
         "oauth-rate-limit-bounded",

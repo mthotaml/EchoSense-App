@@ -241,6 +241,15 @@ def test_spotify_data_builds_live_music_profile(
     assert trace["factors"]["listening_moment"] == "working"
     assert trace["factors"]["requested_listening_moment"] == "working"
     assert trace["factors"]["listening_moment_source"] == "selected"
+    assert trace["factors"]["track_snapshot"]["title"] == "A Real Track"
+    assert trace["factors"]["track_snapshot"]["artist"] == "Artist One"
+    intelligence = client.get(
+        "/auth/spotify/intelligence",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    assert intelligence.status_code == 200
+    assert intelligence.json()["scope"] == "connected_listener"
+    assert intelligence.json()["data_status"] == "learning"
     snapshot = connection_repository.storage._execute
     with connection_repository.storage.connect() as database:
         row = snapshot(
