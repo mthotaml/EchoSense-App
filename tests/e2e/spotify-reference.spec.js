@@ -741,6 +741,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#provider-resilience-title')).toHaveText(
     'Spotify development quota reached',
   );
+  await expect(page.locator('#provider-health')).toHaveText('Spotify protected · cached');
+  await expect(page.locator('#context-statement')).toBeHidden();
   await expect(page.locator('#provider-resilience')).toContainText(
     'reconnecting will not restore the quota sooner',
   );

@@ -122,6 +122,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Spotify development quota reached" in response.text
     assert "EchoSense prevented a Spotify lockout" in response.text
     assert "no reconnect needed" in response.text
+    assert "Spotify protected · cached" in response.text
+    assert "$('#context-statement').hidden=cachedPlan" in response.text
     assert "disconnectSpotify" in response.text
     assert "/auth/spotify/logout" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text
