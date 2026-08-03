@@ -153,7 +153,7 @@ def test_spotify_data_builds_live_music_profile(
     client: TestClient,
 ) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
-    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test-client-secret")
+    monkeypatch.setattr(spotify_auth, "_refresh_session", lambda *args, **kwargs: None)
     session_id = "test-session"
     connection_repository.save(
         spotify_auth.SpotifySession(
@@ -198,6 +198,11 @@ def test_spotify_data_builds_live_music_profile(
             }
 
     monkeypatch.setattr(spotify_auth.SpotifyClient, "items", fake_items)
+    monkeypatch.setattr(
+        spotify_auth.SpotifyClient,
+        "request",
+        lambda self, method, path, *, params=None: {"tracks": {"items": []}},
+    )
 
     response = client.get(
         "/auth/spotify/data?moment=working",
