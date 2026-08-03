@@ -693,10 +693,24 @@ def spotify_data(
             },
             headers={"Retry-After": str(exc.retry_after)},
         ) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "spotify_temporarily_unavailable",
+                "message": (
+                    "Spotify took too long to respond. Your connection is still saved; "
+                    "wait a moment and refresh EchoSense."
+                ),
+            },
+        ) from exc
     except (httpx.HTTPError, ValueError) as exc:
         raise HTTPException(
             status_code=502,
-            detail={"code": "spotify_api_failed", "message": str(exc)},
+            detail={
+                "code": "spotify_api_failed",
+                "message": "Spotify is temporarily unavailable. Refresh EchoSense to try again.",
+            },
         ) from exc
     result = music_dna_service.build_provider_profile(
         imported,

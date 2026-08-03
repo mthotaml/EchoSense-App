@@ -153,6 +153,7 @@ def test_spotify_data_builds_live_music_profile(
     client: TestClient,
 ) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(spotify_auth, "_refresh_session", lambda *args, **kwargs: None)
     session_id = "test-session"
     connection_repository.save(
         spotify_auth.SpotifySession(
@@ -197,6 +198,11 @@ def test_spotify_data_builds_live_music_profile(
             }
 
     monkeypatch.setattr(spotify_auth.SpotifyClient, "items", fake_items)
+    monkeypatch.setattr(
+        spotify_auth.SpotifyClient,
+        "request",
+        lambda self, method, path, *, params=None: {"tracks": {"items": []}},
+    )
 
     response = client.get(
         "/auth/spotify/data?moment=working",
@@ -389,6 +395,46 @@ def test_spotify_data_builds_live_music_profile(
         "completion_rate": 0,
         "recommendation_acceptance_rate": 33,
     }
+
+
+def test_spotify_data_returns_bounded_message_after_transport_timeout(
+    monkeypatch,
+    connection_repository: ProviderConnectionRepository,
+    client: TestClient,
+) -> None:
+    session_id = "timeout-session"
+    connection_repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id="spotify-timeout-user",
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"display_name": "Mohan"},
+        )
+    )
+
+    def timed_out_items(self, path, params, *, limit):
+        raise httpx.ConnectTimeout("_ssl.c:1064: The handshake operation timed out")
+        yield
+
+    monkeypatch.setattr(spotify_auth.SpotifyClient, "items", timed_out_items)
+
+    response = client.get(
+        "/auth/spotify/data?moment=general",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "code": "spotify_temporarily_unavailable",
+        "message": (
+            "Spotify took too long to respond. Your connection is still saved; "
+            "wait a moment and refresh EchoSense."
+        ),
+    }
+    assert "_ssl" not in response.text
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(

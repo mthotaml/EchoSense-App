@@ -32,27 +32,12 @@ class SpotifyClient:
 
     def _get(self, path: str, params: dict[str, object] | None = None) -> dict[str, Any]:
         self.refresh_connection(self.connection)
-        response = httpx.get(
-            f"{self.base_url}{path}",
-            params=params,
-            headers={"Authorization": f"Bearer {self.connection.access_token}"},
-            timeout=self.timeout_seconds,
-        )
+        response = self._safe_get(path, params)
         if response.status_code == 401:
             self.refresh_connection(self.connection, force=True)
-            response = httpx.get(
-                f"{self.base_url}{path}",
-                params=params,
-                headers={"Authorization": f"Bearer {self.connection.access_token}"},
-                timeout=self.timeout_seconds,
-            )
+            response = self._safe_get(path, params)
         elif response.status_code in {502, 503, 504}:
-            response = httpx.get(
-                f"{self.base_url}{path}",
-                params=params,
-                headers={"Authorization": f"Bearer {self.connection.access_token}"},
-                timeout=self.timeout_seconds,
-            )
+            response = self._safe_get(path, params)
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After", "1")
             raise SpotifyRateLimited(int(retry_after) if retry_after.isdigit() else 1)
@@ -61,6 +46,21 @@ class SpotifyClient:
         if not isinstance(payload, dict):
             raise ValueError("Spotify returned a non-object response")
         return payload
+
+    def _safe_get(self, path: str, params: dict[str, object] | None = None) -> httpx.Response:
+        """Retry one transport-level failure for an idempotent Spotify GET."""
+        for attempt in range(2):
+            try:
+                return httpx.get(
+                    f"{self.base_url}{path}",
+                    params=params,
+                    headers={"Authorization": f"Bearer {self.connection.access_token}"},
+                    timeout=self.timeout_seconds,
+                )
+            except httpx.TransportError:
+                if attempt == 1:
+                    raise
+        raise RuntimeError("unreachable Spotify GET retry state")
 
     def request(
         self,

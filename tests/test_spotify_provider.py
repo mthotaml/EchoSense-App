@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import httpx
+import pytest
 
 from echosense.providers.spotify.client import SpotifyClient, SpotifyRateLimited
 from echosense.providers.spotify.mapper import map_track
@@ -171,3 +172,56 @@ def test_client_retries_one_transient_provider_failure(monkeypatch) -> None:
     client = SpotifyClient(connection, lambda session, **kwargs: None)
 
     assert list(client.items("/playlists", {"limit": 1}, limit=1)) == [{"id": "recovered"}]
+
+
+def test_client_retries_one_transport_timeout_for_safe_get(monkeypatch) -> None:
+    connection = ProviderConnection(
+        session_id="session",
+        provider="spotify",
+        provider_user_id="user",
+        access_token="token",
+        refresh_token="refresh",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+        profile={},
+    )
+    calls = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        if len(calls) == 1:
+            raise httpx.ConnectTimeout("TLS handshake timed out")
+        return httpx.Response(
+            200,
+            json={"items": [{"id": "recovered"}], "next": None},
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    client = SpotifyClient(connection, lambda session, **kwargs: None)
+
+    assert list(client.items("/top", {"limit": 1}, limit=1)) == [{"id": "recovered"}]
+    assert len(calls) == 2
+
+
+def test_client_stops_after_two_transport_timeouts(monkeypatch) -> None:
+    connection = ProviderConnection(
+        session_id="session",
+        provider="spotify",
+        provider_user_id="user",
+        access_token="token",
+        refresh_token="refresh",
+        expires_at=datetime.now(UTC) + timedelta(hours=1),
+        profile={},
+    )
+    calls = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        raise httpx.ConnectTimeout("TLS handshake timed out")
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    client = SpotifyClient(connection, lambda session, **kwargs: None)
+
+    with pytest.raises(httpx.ConnectTimeout):
+        list(client.items("/top", {"limit": 1}, limit=1))
+    assert len(calls) == 2
