@@ -46,8 +46,11 @@
     {
       "id": "spotify-auth-test-isolation",
       "severity": "severity-1",
-      "description": "Spotify authentication contract tests use a fresh client and cookie jar per test so session state cannot leak across test order or CI runtime versions.",
-      "covers": ["spotify-auth-client-isolated"],
+      "description": "Spotify authentication contract tests use a fresh client and explicit provider configuration so neither session state nor developer secrets can leak across test order or CI environments.",
+      "covers": [
+        "spotify-auth-client-isolated",
+        "spotify-test-provider-config-explicit"
+      ],
       "evidence": [
         {
           "source": "tests/test_spotify_auth.py",
@@ -428,6 +431,7 @@
         "oauth-rate-limit-bounded",
         "oauth-tight-retry-prohibited",
         "spotify-auth-client-isolated",
+        "spotify-test-provider-config-explicit",
         "recommendation-ranked",
         "dna-slate-diversified",
         "already-queued-track-skipped",
