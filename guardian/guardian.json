@@ -293,6 +293,9 @@
       "covers": [
         "dna-factor-comparison-table",
         "dna-factor-definitions-accessible",
+        "factor-help-consistent-across-surfaces",
+        "factor-help-explains-listener-benefit",
+        "recommendation-rationale-not-duplicated",
         "normalized-match-score-derived"
       ],
       "evidence": [
@@ -302,7 +305,15 @@
         },
         {
           "source": "tests/test_product_ui.py",
-          "pattern": "info.setAttribute('aria-label'"
+          "pattern": "factorInfoButton"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Priority factor: Music DNA affinity"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "Why it matters"
         },
         {
           "source": "tests/test_playback_learning.py",
@@ -347,7 +358,7 @@
         },
         {
           "source": "tests/test_product_ui.py",
-          "pattern": "Personalize what EchoSense plays next"
+          "pattern": "Shape what plays next"
         }
       ]
     },
@@ -580,6 +591,9 @@
         "context-summary-compact",
         "dna-factor-comparison-table",
         "dna-factor-definitions-accessible",
+        "factor-help-consistent-across-surfaces",
+        "factor-help-explains-listener-benefit",
+        "recommendation-rationale-not-duplicated",
         "normalized-match-score-derived",
         "hero-factor-breakdown",
         "memory-inspector-visible",
