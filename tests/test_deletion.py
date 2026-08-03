@@ -198,6 +198,14 @@ def seed_user(store: Storage, memory: InMemoryPreferenceMemory) -> str:
         resource_key="recommendations:delete",
         payload={"recommendations": []},
     )
+    store.start_provider_request(
+        request_id="spotify-request-delete",
+        provider="spotify",
+        user_id=user_id,
+        endpoint_group="/me/top/tracks",
+        method="GET",
+        request_class="web_api",
+    )
     return user_id
 
 
@@ -236,6 +244,7 @@ def test_deletion_removes_sql_tokens_memory_evaluation_and_exposures(
         "music_dna_profiles": 1,
         "provider_resilience_state": 1,
         "provider_response_snapshots": 1,
+        "provider_request_telemetry": 1,
         "music_item_preferences": 1,
         "playback_learning_outcomes": 1,
         "temporal_mood_observations": 1,

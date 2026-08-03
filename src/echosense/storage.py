@@ -164,6 +164,22 @@ class Storage:
             )
             """,
             """
+            CREATE TABLE IF NOT EXISTS provider_request_telemetry (
+                request_id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                endpoint_group TEXT NOT NULL,
+                method TEXT NOT NULL,
+                request_class TEXT NOT NULL,
+                requested_at TEXT NOT NULL,
+                completed_at TEXT,
+                status_code INTEGER,
+                outcome TEXT NOT NULL,
+                reason TEXT,
+                retry_after_seconds INTEGER
+            )
+            """,
+            """
             CREATE TABLE IF NOT EXISTS music_item_preferences (
                 user_id TEXT NOT NULL,
                 provider TEXT NOT NULL,
@@ -216,6 +232,10 @@ class Storage:
             """
             CREATE INDEX IF NOT EXISTS idx_provider_snapshots_latest
             ON provider_response_snapshots (provider, user_id, captured_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_provider_requests_window
+            ON provider_request_telemetry (provider, user_id, requested_at)
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_provider_connections_account
@@ -633,3 +653,122 @@ class Storage:
         result["payload"] = json.loads(result.pop("payload_json"))
         result["exact_match"] = result["resource_key"] == resource_key
         return result
+
+    def start_provider_request(
+        self,
+        *,
+        request_id: str,
+        provider: str,
+        user_id: str,
+        endpoint_group: str,
+        method: str,
+        request_class: str,
+    ) -> None:
+        with self.connect() as connection:
+            self._execute(
+                connection,
+                """
+                INSERT INTO provider_request_telemetry
+                    (request_id, provider, user_id, endpoint_group, method,
+                     request_class, requested_at, outcome)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    request_id,
+                    provider,
+                    user_id,
+                    endpoint_group,
+                    method,
+                    request_class,
+                    utc_now().isoformat(),
+                    "pending",
+                ),
+            )
+
+    def finish_provider_request(
+        self,
+        request_id: str,
+        *,
+        status_code: int | None,
+        outcome: str,
+        reason: str | None,
+        retry_after_seconds: int | None,
+    ) -> None:
+        with self.connect() as connection:
+            self._execute(
+                connection,
+                """
+                UPDATE provider_request_telemetry
+                SET completed_at = %s, status_code = %s, outcome = %s,
+                    reason = %s, retry_after_seconds = %s
+                WHERE request_id = %s
+                """,
+                (
+                    utc_now().isoformat(),
+                    status_code,
+                    outcome,
+                    reason,
+                    retry_after_seconds,
+                    request_id,
+                ),
+            )
+
+    def count_provider_requests(
+        self, provider: str, user_id: str | None, *, since: datetime
+    ) -> int:
+        with self.connect() as connection:
+            if user_id is None:
+                row = self._execute(
+                    connection,
+                    """
+                    SELECT COUNT(*) AS request_count
+                    FROM provider_request_telemetry
+                    WHERE provider = %s AND requested_at >= %s
+                    """,
+                    (provider, since.isoformat()),
+                ).fetchone()
+            else:
+                row = self._execute(
+                    connection,
+                    """
+                    SELECT COUNT(*) AS request_count
+                    FROM provider_request_telemetry
+                    WHERE provider = %s AND user_id = %s AND requested_at >= %s
+                    """,
+                    (provider, user_id, since.isoformat()),
+                ).fetchone()
+        return int(dict(row)["request_count"]) if row else 0
+
+    def provider_request_summary(
+        self, provider: str, user_id: str | None, *, since: datetime
+    ) -> dict[str, object]:
+        with self.connect() as connection:
+            user_clause = "" if user_id is None else "AND user_id = %s"
+            params = (
+                (provider, since.isoformat())
+                if user_id is None
+                else (provider, since.isoformat(), user_id)
+            )
+            rows = self._execute(
+                connection,
+                f"""
+                SELECT endpoint_group, COUNT(*) AS request_count,
+                       SUM(CASE WHEN outcome = 'rate_limited' THEN 1 ELSE 0 END) AS rate_limits,
+                       SUM(CASE WHEN outcome = 'quota_exceeded' THEN 1 ELSE 0 END) AS quota_limits,
+                       SUM(CASE WHEN outcome = 'transport_error' THEN 1 ELSE 0 END) AS transport_errors
+                FROM provider_request_telemetry
+                WHERE provider = %s AND requested_at >= %s {user_clause}
+                GROUP BY endpoint_group
+                ORDER BY request_count DESC, endpoint_group
+                """,
+                params,
+            ).fetchall()
+        endpoints = [dict(row) for row in rows]
+        return {
+            "window_minutes": 15,
+            "total_requests": sum(int(item["request_count"] or 0) for item in endpoints),
+            "rate_limits": sum(int(item["rate_limits"] or 0) for item in endpoints),
+            "quota_limits": sum(int(item["quota_limits"] or 0) for item in endpoints),
+            "transport_errors": sum(int(item["transport_errors"] or 0) for item in endpoints),
+            "top_endpoints": endpoints[:5],
+        }

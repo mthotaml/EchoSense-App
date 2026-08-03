@@ -524,13 +524,49 @@ def test_spotify_data_uses_persisted_last_known_good_during_provider_cooldown(
     assert first.status_code == 200
     assert first.json()["recommendation"]["id"] == "lkg-track"
     assert first.json()["resilience"]["mode"] == "last_known_good"
-    assert first.json()["resilience"]["reason"] == "spotify_rate_limited"
+    assert first.json()["resilience"]["reason"] == "rate_limit_exceeded"
     assert first.json()["resilience"]["retry_after_seconds"] == 120
     assert first.json()["resilience"]["exact_context_match"] is True
     assert "last verified playback plan" in first.json()["context_statement"]
     assert second.status_code == 200
     assert second.json()["resilience"]["mode"] == "last_known_good"
     assert provider_calls == 1
+
+
+def test_spotify_resilience_status_explains_quota_without_reconnect(
+    connection_repository: ProviderConnectionRepository,
+    client: TestClient,
+) -> None:
+    session_id = "quota-status-session"
+    user_id = "quota-status-user"
+    connection_repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id=user_id,
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"display_name": "Mohan"},
+        )
+    )
+    connection_repository.storage.set_provider_cooldown(
+        provider="spotify",
+        user_id=spotify_auth.SpotifyRequestGovernor.APP_SCOPE,
+        cooldown_until=datetime.now(UTC) + timedelta(minutes=5),
+        error_code="quota_exceeded",
+        error_message="Spotify development quota reached.",
+    )
+
+    response = client.get(
+        "/auth/spotify/resilience/status",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "cooldown"
+    assert response.json()["reason"] == "quota_exceeded"
+    assert "reconnecting will not restore the quota sooner" in response.json()["message"]
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(

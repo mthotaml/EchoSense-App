@@ -22,6 +22,24 @@ but it must label the plan as cached and must not imply that live context was re
 6. A later successful live response replaces the snapshot and clears the cooldown.
 7. Disconnect and verified user-data deletion remove both provider cooldown and snapshot records.
 
+## Request governor
+
+- One application-wide persistent 30-second budget covers catalog, search, library, playlist,
+  device, queue, and player-state calls across listeners, tabs, ports, and application restarts.
+- The default safety budget is 20 Spotify Web API calls per 30 seconds and can be lowered with
+  `ECHOSENSE_SPOTIFY_REQUEST_BUDGET`. It is a protective EchoSense ceiling, not a claim about
+  Spotify's unpublished account limit.
+- If the safety budget is reached, EchoSense pauses outbound calls for 30 seconds before Spotify
+  can impose a longer lockout.
+- Spotify `429` bodies are classified as `QUOTA_EXCEEDED` or `RATE_LIMIT_EXCEEDED`, with the exact
+  `Retry-After` retained.
+- Telemetry stores only normalized endpoint groups, status, outcome, and timing. Spotify item IDs,
+  access tokens, raw responses, and listening coordinates are never retained.
+- The local provider-status endpoint exposes budget utilization and five highest-volume endpoint
+  groups without making a Spotify request.
+- Spotify calls time out after eight seconds by default, and two transport failures within one
+  minute open a 30-second circuit so stalled provider traffic cannot exhaust application workers.
+
 ## Acceptance criteria
 
 - One provider rate-limit response can occur; repeated recommendation reads during `Retry-After`
@@ -34,3 +52,7 @@ but it must label the plan as cached and must not imply that live context was re
   does not tell the listener to reconnect.
 - Guardian covers persistence, server suppression, browser suppression, bounded no-cache failure,
   and governed deletion.
+- Player state uses its last verified continuity snapshot during cooldown instead of erasing the
+  current listening surface.
+- The UI distinguishes provider quota exhaustion, ordinary Spotify backoff, and an EchoSense
+  preventive pause; all states include a countdown and explicitly say whether reconnecting helps.

@@ -42,6 +42,7 @@ from echosense.repositories.provider_connections import (
     ProviderConnection,
     ProviderConnectionRepository,
 )
+from echosense.spotify_resilience import SpotifyRequestGovernor
 from echosense.temporal_mood import (
     MoodEvidence,
     TemporalMoodLearningService,
@@ -147,6 +148,19 @@ def get_connection_repository() -> ProviderConnectionRepository:
                 },
             ) from exc
     return _connection_repository
+
+
+def _spotify_client(session: ProviderConnection) -> SpotifyClient:
+    return SpotifyClient(
+        session,
+        _refresh_session,
+        timeout_seconds=max(
+            3.0, min(15.0, float(os.getenv("ECHOSENSE_SPOTIFY_TIMEOUT_SECONDS", "8")))
+        ),
+        governor=SpotifyRequestGovernor(
+            get_connection_repository().storage, session.provider_user_id
+        ),
+    )
 
 
 def _required_environment(name: str) -> str:
@@ -419,6 +433,35 @@ def spotify_session(
     }
 
 
+@router.get("/resilience/status")
+def spotify_resilience_status(
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    status_payload = SpotifyRequestGovernor(
+        get_connection_repository().storage, session.provider_user_id
+    ).status()
+    reason = str(status_payload.get("reason") or "")
+    if reason == "quota_exceeded":
+        message = (
+            "Spotify's development quota is temporarily exhausted. EchoSense is using "
+            "your last verified plan; reconnecting will not restore the quota sooner."
+        )
+    elif reason == "local_request_budget":
+        message = (
+            "EchoSense briefly paused Spotify calls to prevent a provider lockout. "
+            "Playback intelligence remains available from verified data."
+        )
+    elif status_payload["mode"] == "cooldown":
+        message = (
+            "Spotify asked EchoSense to slow down. Verified recommendations remain available "
+            "until live access resumes automatically."
+        )
+    else:
+        message = "Spotify access is live and protected by EchoSense request budgeting."
+    return {**status_payload, "message": message}
+
+
 def _spotify_data_resource_key(
     *,
     moment: str,
@@ -446,7 +489,9 @@ def _spotify_data_resource_key(
 
 
 def _provider_cooldown(storage, user_id: str) -> tuple[int, str] | None:
-    state = storage.get_provider_cooldown("spotify", user_id)
+    state = storage.get_provider_cooldown("spotify", SpotifyRequestGovernor.APP_SCOPE)
+    if state is None:
+        state = storage.get_provider_cooldown("spotify", user_id)
     if state is None or not state.get("cooldown_until"):
         return None
     remaining = (
@@ -538,7 +583,7 @@ def spotify_data(
             headers={"Retry-After": str(cooldown_remaining)},
         )
     try:
-        spotify_client = SpotifyClient(session, _refresh_session)
+        spotify_client = _spotify_client(session)
         imported = SpotifyProvider(spotify_client).import_music_data()
         repository = MusicDNARepository(get_connection_repository().storage)
         repository.save(session.provider_user_id, imported)
@@ -793,18 +838,19 @@ def spotify_data(
             decision_ids.get(recommendation.provider_id) if recommendation is not None else None
         )
     except SpotifyRateLimited as exc:
+        reason = str(getattr(exc, "reason", "RATE_LIMIT_EXCEEDED"))
         storage.set_provider_cooldown(
             provider="spotify",
-            user_id=session.provider_user_id,
+            user_id=SpotifyRequestGovernor.APP_SCOPE,
             cooldown_until=datetime.now(UTC) + timedelta(seconds=exc.retry_after),
-            error_code="spotify_rate_limited",
-            error_message="Spotify requested a provider-wide cooldown.",
+            error_code=reason.lower(),
+            error_message=f"Spotify paused {getattr(exc, 'endpoint', 'Web API')} requests.",
         )
         cached = _cached_spotify_data(
             storage,
             user_id=session.provider_user_id,
             resource_key=resource_key,
-            reason="spotify_rate_limited",
+            reason=reason.lower(),
             retry_after=exc.retry_after,
         )
         if cached is not None:
@@ -813,6 +859,9 @@ def spotify_data(
             status_code=429,
             detail={
                 "code": "spotify_rate_limited",
+                "reason": reason,
+                "endpoint": getattr(exc, "endpoint", "unknown"),
+                "locally_deferred": getattr(exc, "locally_deferred", False),
                 "retry_after_seconds": exc.retry_after,
             },
             headers={"Retry-After": str(exc.retry_after)},
@@ -821,7 +870,7 @@ def spotify_data(
         retry_after = 30
         storage.set_provider_cooldown(
             provider="spotify",
-            user_id=session.provider_user_id,
+            user_id=SpotifyRequestGovernor.APP_SCOPE,
             cooldown_until=datetime.now(UTC) + timedelta(seconds=retry_after),
             error_code="spotify_temporarily_unavailable",
             error_message="Spotify timed out.",
@@ -849,7 +898,7 @@ def spotify_data(
         retry_after = 60
         storage.set_provider_cooldown(
             provider="spotify",
-            user_id=session.provider_user_id,
+            user_id=SpotifyRequestGovernor.APP_SCOPE,
             cooldown_until=datetime.now(UTC) + timedelta(seconds=retry_after),
             error_code="spotify_api_failed",
             error_message="Spotify provider request failed.",
@@ -980,6 +1029,7 @@ def spotify_data(
         resource_key=resource_key,
         payload=result,
     )
+    storage.clear_provider_cooldown("spotify", SpotifyRequestGovernor.APP_SCOPE)
     storage.clear_provider_cooldown("spotify", session.provider_user_id)
     return result
 
@@ -1242,9 +1292,7 @@ def spotify_library_status(
         if cached and cached[1] > now:
             return {"provider": "spotify", "track_id": track_id, "saved": cached[0]}
         try:
-            saved = SpotifyLibrary(SpotifyClient(session, _refresh_session)).contains_track(
-                track_id
-            )
+            saved = SpotifyLibrary(_spotify_client(session)).contains_track(track_id)
         except SpotifyRateLimited as exc:
             _library_cooldown_until[session.provider_user_id] = now + exc.retry_after
             raise _library_error(exc) from exc
@@ -1265,7 +1313,7 @@ def spotify_save_track(
 ) -> dict[str, object]:
     session = _connected_session(session_id)
     try:
-        SpotifyLibrary(SpotifyClient(session, _refresh_session)).save_track(track_id)
+        SpotifyLibrary(_spotify_client(session)).save_track(track_id)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
         raise _library_error(exc) from exc
     with _library_status_lock:
@@ -1297,7 +1345,7 @@ def spotify_remove_track(
 ) -> dict[str, object]:
     session = _connected_session(session_id)
     try:
-        SpotifyLibrary(SpotifyClient(session, _refresh_session)).remove_track(track_id)
+        SpotifyLibrary(_spotify_client(session)).remove_track(track_id)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
         raise _library_error(exc) from exc
     with _library_status_lock:
@@ -1330,7 +1378,7 @@ def spotify_playlists(
     session = _connected_session(session_id)
     try:
         page = SpotifyPlaylists(
-            SpotifyClient(session, _refresh_session),
+            _spotify_client(session),
             session.provider_user_id,
         ).list(limit=limit, offset=offset)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
@@ -1366,7 +1414,7 @@ def spotify_playlist_tracks(
     session = _connected_session(session_id)
     try:
         page = SpotifyPlaylists(
-            SpotifyClient(session, _refresh_session),
+            _spotify_client(session),
             session.provider_user_id,
         ).tracks(playlist_id, limit=limit, offset=offset)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
