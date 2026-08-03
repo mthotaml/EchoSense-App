@@ -20,6 +20,7 @@ from echosense.context_candidates import ContextCandidateService
 from echosense.diverse_slate import DiverseSlateService
 from echosense.evaluation_service import EvaluationService
 from echosense.listening_context import ListeningContextService, ListeningMoment
+from echosense.listening_intelligence import ListeningIntelligenceService
 from echosense.music_dna import MusicDNAGenerator
 from echosense.music_dna_service import music_dna_service
 from echosense.playback_learning import PlaybackLearningService
@@ -570,6 +571,9 @@ def spotify_data(
             slate_decision_id = f"dec_{uuid4().hex}"
             decision_ids[slate_item.track.provider_id] = slate_decision_id
             context_evidence = expanded.evidence.get(slate_item.track.provider_id, ())
+            ranked_candidate = next(
+                item for item in candidate_slate if item["item_id"] == slate_item.track.provider_id
+            )
             inferred_mood = temporal_service.infer_track(
                 slate_item.track,
                 context_evidence,
@@ -593,6 +597,16 @@ def spotify_data(
                 provider="spotify",
                 item_id=slate_item.track.provider_id,
                 factors={
+                    "track_snapshot": {
+                        "title": slate_item.track.title,
+                        "artist": slate_item.track.primary_artist,
+                        "artists": list(slate_item.track.artists),
+                        "album": slate_item.track.album,
+                        "image_url": slate_item.track.image_url,
+                        "isrc": slate_item.track.isrc,
+                        "duration_ms": slate_item.track.duration_ms,
+                    },
+                    "recommendation_score": ranked_candidate["normalized_score"],
                     "candidate_slate": candidate_slate,
                     "music_dna_confidence": music_dna.confidence,
                     "evidence_count": music_dna.evidence_count,
@@ -763,6 +777,18 @@ def spotify_data(
     result["effective_weights"] = effective_weights
     result["moment_impact"] = moment_impact
     return result
+
+
+@router.get("/intelligence")
+def spotify_listening_intelligence(
+    history_limit: int = Query(default=30, ge=1, le=100),
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    return ListeningIntelligenceService(get_connection_repository().storage).snapshot(
+        session.provider_user_id,
+        history_limit=history_limit,
+    )
 
 
 @router.post("/feedback")

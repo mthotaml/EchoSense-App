@@ -97,6 +97,15 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "function renderMomentImpact(impact,item=null)" in response.text
     assert "No activity-specific candidate generation or reranking is applied" in response.text
     assert "entered through moment-specific candidates" in response.text
+    assert 'id="intelligence-panel"' in response.text
+    assert "Your listening intelligence" in response.text
+    assert 'id="intelligence-metrics"' in response.text
+    assert 'id="intelligence-history-list"' in response.text
+    assert 'id="intelligence-product-metrics"' in response.text
+    assert "Current-listener indicators only" in response.text
+    assert "function renderListeningIntelligence(data)" in response.text
+    assert "/auth/spotify/intelligence?history_limit=30" in response.text
+    assert "Verified deletion unavailable" in response.text
     assert response.text.index('id="moment-panel"') < response.text.index('id="boost-panel"')
     assert response.text.index('id="boost-panel"') < response.text.index('id="live-context-panel"')
     assert "/auth/spotify/data?" in response.text
