@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
+from echosense.listening_intelligence_store import ListeningIntelligenceStore
 from echosense.memory import PreferenceMemory
 from echosense.storage import Storage, utc_now
 
@@ -28,6 +29,7 @@ class DeletionCoordinator:
         self._initialize()
 
     def _initialize(self) -> None:
+        ListeningIntelligenceStore(self.storage)
         statements = [
             """
             CREATE TABLE IF NOT EXISTS deletion_requests (
@@ -230,6 +232,43 @@ class DeletionCoordinator:
     def _delete_sql_data(self, user_id: str) -> dict[str, int]:
         counts: dict[str, int] = {}
         with self.storage.connect() as connection:
+            identity_rows = self.storage._execute(
+                connection,
+                """
+                SELECT DISTINCT echo_user_id FROM provider_user_aliases
+                WHERE provider_user_id = %s OR echo_user_id = %s
+                """,
+                (user_id, user_id),
+            ).fetchall()
+            echo_user_ids = [str(dict(row)["echo_user_id"]) for row in identity_rows]
+            for name in (
+                "listening_events",
+                "user_track_intelligence",
+                "listening_sessions",
+                "provider_user_aliases",
+                "echo_users",
+            ):
+                counts[name] = 0
+            for echo_user_id in echo_user_ids:
+                for name, table in (
+                    ("listening_events", "listening_events"),
+                    ("user_track_intelligence", "user_track_intelligence"),
+                    ("listening_sessions", "listening_sessions"),
+                    ("provider_user_aliases", "provider_user_aliases"),
+                    ("echo_users", "echo_users"),
+                ):
+                    row = self.storage._execute(
+                        connection,
+                        f"SELECT COUNT(*) AS count FROM {table} WHERE echo_user_id = %s",
+                        (echo_user_id,),
+                    ).fetchone()
+                    counts[name] += int(dict(row)["count"])
+                    self.storage._execute(
+                        connection,
+                        f"DELETE FROM {table} WHERE echo_user_id = %s",
+                        (echo_user_id,),
+                    )
+
             decision_rows = self.storage._execute(
                 connection,
                 "SELECT decision_id FROM decision_traces WHERE user_id = %s",

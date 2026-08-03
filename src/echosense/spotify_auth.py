@@ -21,6 +21,7 @@ from echosense.diverse_slate import DiverseSlateService
 from echosense.evaluation_service import EvaluationService
 from echosense.listening_context import ListeningContextService, ListeningMoment
 from echosense.listening_intelligence import ListeningIntelligenceService
+from echosense.listening_intelligence_store import ListeningIntelligenceStore
 from echosense.music_dna import MusicDNAGenerator
 from echosense.music_dna_service import music_dna_service
 from echosense.playback_learning import PlaybackLearningService
@@ -32,6 +33,7 @@ from echosense.providers.spotify import (
     SpotifyRateLimited,
 )
 from echosense.ranking_boosts import RecommendationBoosts, build_context_statement
+from echosense.recording_identity import RecordingReference
 from echosense.repositories.music_dna import MusicDNARepository
 from echosense.repositories.provider_connections import (
     ProviderConnection,
@@ -102,7 +104,9 @@ def _spotify_profile_with_backoff(
 class SpotifyFeedbackRequest(BaseModel):
     outcome_id: str = Field(min_length=1)
     decision_id: str = Field(min_length=1)
-    signal: Literal["played", "completed", "skipped", "saved", "liked", "disliked", "rated"]
+    signal: Literal[
+        "played", "completed", "skipped", "saved", "unsaved", "liked", "disliked", "rated"
+    ]
     completion_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     playback_seconds: float | None = Field(default=None, ge=0.0)
     rating: int | None = Field(default=None, ge=1, le=5)
@@ -433,6 +437,12 @@ def spotify_data(
         repository.save_profile(music_dna)
         storage = get_connection_repository().storage
         learning = PlaybackLearningService(storage)
+        intelligence_store = ListeningIntelligenceStore(storage)
+        echo_identity = intelligence_store.resolve_user(
+            provider="spotify",
+            provider_user_id=session.provider_user_id,
+            display_name=str(session.profile.get("display_name") or "Spotify listener"),
+        )
         temporal_service = TemporalMoodLearningService(storage)
         temporal_profile = temporal_service.profile(
             user_id=session.provider_user_id,
@@ -570,6 +580,19 @@ def spotify_data(
         for slate_item in diverse_slate:
             slate_decision_id = f"dec_{uuid4().hex}"
             decision_ids[slate_item.track.provider_id] = slate_decision_id
+            echo_track_id = intelligence_store.observe_track(
+                RecordingReference(
+                    provider="spotify",
+                    provider_id=slate_item.track.provider_id,
+                    title=slate_item.track.title,
+                    artists=slate_item.track.artists,
+                    album=slate_item.track.album,
+                    isrc=slate_item.track.isrc,
+                    duration_ms=slate_item.track.duration_ms,
+                ),
+                image_url=slate_item.track.image_url,
+                metadata={"spotify_url": slate_item.track.external_url},
+            )
             context_evidence = expanded.evidence.get(slate_item.track.provider_id, ())
             ranked_candidate = next(
                 item for item in candidate_slate if item["item_id"] == slate_item.track.provider_id
@@ -597,6 +620,8 @@ def spotify_data(
                 provider="spotify",
                 item_id=slate_item.track.provider_id,
                 factors={
+                    "echo_user_id": echo_identity.echo_user_id,
+                    "echo_track_id": echo_track_id,
                     "track_snapshot": {
                         "title": slate_item.track.title,
                         "artist": slate_item.track.primary_artist,
@@ -785,10 +810,33 @@ def spotify_listening_intelligence(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
-    return ListeningIntelligenceService(get_connection_repository().storage).snapshot(
+    storage = get_connection_repository().storage
+    snapshot = ListeningIntelligenceService(storage).snapshot(
         session.provider_user_id,
         history_limit=history_limit,
     )
+    intelligence_store = ListeningIntelligenceStore(storage)
+    identity = intelligence_store.resolve_user(
+        provider="spotify",
+        provider_user_id=session.provider_user_id,
+        display_name=str(session.profile.get("display_name") or "Spotify listener"),
+    )
+    snapshot["provider_neutral"] = intelligence_store.listener_snapshot(identity.echo_user_id)
+    return snapshot
+
+
+@router.get("/intelligence/kpis")
+def spotify_provider_neutral_kpis(
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+) -> dict[str, object]:
+    session = _connected_session(session_id)
+    intelligence_store = ListeningIntelligenceStore(get_connection_repository().storage)
+    identity = intelligence_store.resolve_user(
+        provider="spotify",
+        provider_user_id=session.provider_user_id,
+        display_name=str(session.profile.get("display_name") or "Spotify listener"),
+    )
+    return intelligence_store.listener_snapshot(identity.echo_user_id)
 
 
 @router.post("/feedback")
@@ -853,6 +901,57 @@ def spotify_feedback(
             if trace
             else False
         )
+        if trace:
+            factors = trace["factors"]
+            intelligence_store = ListeningIntelligenceStore(storage)
+            identity = intelligence_store.resolve_user(
+                provider=trace["provider"],
+                provider_user_id=session.provider_user_id,
+                display_name=str(session.profile.get("display_name") or "Spotify listener"),
+                echo_user_id=factors.get("echo_user_id"),
+            )
+            echo_track_id = factors.get("echo_track_id")
+            if not echo_track_id:
+                track = factors.get("track_snapshot") or {}
+                echo_track_id = intelligence_store.observe_track(
+                    RecordingReference(
+                        provider=trace["provider"],
+                        provider_id=trace["item_id"],
+                        title=str(track.get("title") or "Unknown track"),
+                        artists=tuple(
+                            track.get("artists") or [track.get("artist") or "Unknown artist"]
+                        ),
+                        album=track.get("album"),
+                        isrc=track.get("isrc"),
+                        duration_ms=track.get("duration_ms"),
+                    ),
+                    image_url=track.get("image_url"),
+                )
+            listening_session_id = intelligence_store.ensure_session(
+                echo_user_id=identity.echo_user_id,
+                provider=trace["provider"],
+                provider_session_id=session.session_id,
+                context={
+                    "ranking_context": trace["context"],
+                    "listening_moment": factors.get("listening_moment"),
+                    "live_context": factors.get("live_context"),
+                },
+            )
+            intelligence_store.record_event(
+                event_id=request.outcome_id,
+                echo_user_id=identity.echo_user_id,
+                echo_track_id=str(echo_track_id),
+                provider=trace["provider"],
+                provider_track_id=trace["item_id"],
+                event_type=request.signal,
+                context=trace["context"],
+                decision_id=request.decision_id,
+                listening_session_id=listening_session_id,
+                playback_seconds=request.playback_seconds,
+                completion_ratio=request.completion_ratio,
+                rating=request.rating,
+                payload={"source": "playback_learning_outcome"},
+            )
         storage.append_event(
             event_id=f"evt_{uuid4().hex}",
             event_type="playback.learning.applied",
@@ -990,6 +1089,7 @@ def spotify_save_track(
 @router.delete("/library/tracks/{track_id}")
 def spotify_remove_track(
     track_id: str,
+    request: SpotifyLibrarySaveRequest,
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
@@ -997,7 +1097,20 @@ def spotify_remove_track(
         SpotifyLibrary(SpotifyClient(session, _refresh_session)).remove_track(track_id)
     except (SpotifyRateLimited, httpx.HTTPError, ValueError) as exc:
         raise _library_error(exc) from exc
-    return {"provider": "spotify", "track_id": track_id, "saved": False}
+    learning = spotify_feedback(
+        SpotifyFeedbackRequest(
+            outcome_id=request.outcome_id,
+            decision_id=request.decision_id,
+            signal="unsaved",
+        ),
+        session_id,
+    )
+    return {
+        "provider": "spotify",
+        "track_id": track_id,
+        "saved": False,
+        "learning": learning,
+    }
 
 
 @router.get("/playlists")

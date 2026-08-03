@@ -178,6 +178,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Current EchoSense recommendation" in response.text
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
+    assert "function syncRecommendationSurfaces(trackId)" in response.text
+    assert "syncRecommendationSurfaces(item.id)" in response.text
+    assert "syncRecommendationSurfaces(nextDna.id)" in response.text
+    assert "aria-current" in response.text
     assert (
         "const sameTrackFinished=track?.id&&track.id===previous?.track_window?.current_track?.id"
         in response.text
