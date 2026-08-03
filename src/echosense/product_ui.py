@@ -299,6 +299,10 @@ PAGE = r"""<!doctype html>
     let currentPlayOutcomeId = null;
     let currentQueueCommandId = null;
     let currentTrackSaved = false;
+    const savedStateCache = new Map();
+    const savedStateRequests = new Map();
+    let savedStateCooldownUntil = 0;
+    const SAVED_STATE_CACHE_MS = 300000;
     let recommendationSlate = [];
     const dnaRounds = [];
     let dnaPageIndex = 0;
@@ -418,7 +422,7 @@ PAGE = r"""<!doctype html>
 
     async function api(path, options={}) {
       const response = await fetch(path, {headers:{'Content-Type':'application/json', ...(options.headers||{})}, ...options});
-      if (!response.ok && response.status !== 204) { let detail={}; try { detail=await response.json(); } catch (_) {} throw new Error(detail.detail?.spotify?.error?.message || detail.detail?.message || detail.detail?.code || `Request failed (${response.status})`); }
+      if (!response.ok && response.status !== 204) { let detail={}; try { detail=await response.json(); } catch (_) {} const error=new Error(detail.detail?.spotify?.error?.message || detail.detail?.message || detail.detail?.code || `Request failed (${response.status})`);error.status=response.status;error.retryAfter=Number(response.headers.get('Retry-After')||detail.detail?.retry_after_seconds||0);throw error; }
       return response;
     }
 
@@ -663,7 +667,7 @@ PAGE = r"""<!doctype html>
       syncPickLabel();
       if(match.roundIndex!==null)dnaPageIndex=match.roundIndex;
       renderDnaQueue();
-      refreshSavedState(item.id).catch(()=>{});
+      if(changed)refreshSavedState(item.id).catch(()=>{});
       return true;
     }
 
@@ -1074,10 +1078,27 @@ PAGE = r"""<!doctype html>
       $('#save').setAttribute('aria-pressed',String(saved));
       $('#save').disabled=!spotifyConnected||!currentTrackId;
     }
-    async function refreshSavedState(trackId) {
+    async function refreshSavedState(trackId,{force=false}={}) {
+      if(!trackId)return;
+      const now=Date.now();
+      const cached=savedStateCache.get(trackId);
+      if(!force&&cached&&cached.expiresAt>now){if(currentTrackId===trackId)renderSavedState(cached.saved);return cached.saved;}
+      if(now<savedStateCooldownUntil){$('#save').disabled=true;$('#save').title='Spotify library checks are paused during rate-limit recovery.';return null;}
+      if(savedStateRequests.has(trackId))return savedStateRequests.get(trackId);
       $('#save').disabled=true;
-      const status=await (await api(`/auth/spotify/library/tracks/${encodeURIComponent(trackId)}`)).json();
-      if(currentTrackId===trackId) renderSavedState(status.saved);
+      const request=(async()=>{
+        try {
+          const status=await (await api(`/auth/spotify/library/tracks/${encodeURIComponent(trackId)}`)).json();
+          savedStateCache.set(trackId,{saved:Boolean(status.saved),expiresAt:Date.now()+SAVED_STATE_CACHE_MS});
+          if(currentTrackId===trackId){$('#save').title='';renderSavedState(Boolean(status.saved));}
+          return Boolean(status.saved);
+        } catch(error) {
+          if(error.status===429){savedStateCooldownUntil=Date.now()+Math.max(1,error.retryAfter||60)*1000;$('#save').disabled=true;$('#save').title='Spotify library checks are paused during rate-limit recovery.';return null;}
+          throw error;
+        } finally { savedStateRequests.delete(trackId); }
+      })();
+      savedStateRequests.set(trackId,request);
+      return request;
     }
     async function toggleSaved() {
       if(!spotifyConnected||!currentTrackId||!currentRecommendationId)return;
@@ -1087,6 +1108,7 @@ PAGE = r"""<!doctype html>
         ? {method:'DELETE',body:JSON.stringify({outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,decision_id:currentRecommendationId})}
         : {method:'PUT',body:JSON.stringify({outcome_id:`out_${crypto.randomUUID?.()||Date.now()}`,decision_id:currentRecommendationId})};
       const status=await (await api(`/auth/spotify/library/tracks/${encodeURIComponent(trackId)}`,options)).json();
+      savedStateCache.set(trackId,{saved:Boolean(status.saved),expiresAt:Date.now()+SAVED_STATE_CACHE_MS});
       if(currentTrackId===trackId) renderSavedState(status.saved);
       setText('#toast',status.saved?'Saved to Spotify. EchoSense learned from this choice.':'Removed from Spotify.');
       await loadListeningIntelligence();
