@@ -331,7 +331,11 @@ PAGE = r"""<!doctype html>
     let tracksNextOffset = null;
     let spotifyConnected = false;
     let lastSpotifyData = null;
+    const spotifyDataCache = new Map();
+    const spotifyDataInFlight = new Map();
+    const SPOTIFY_DATA_CACHE_MS = 15000;
     let spotifyProviderCooldownUntil = 0;
+    let spotifyProviderCooldownStatus = null;
     let providerStatusTimer = null;
     let deviceId = null;
     let playerState = null;
@@ -476,7 +480,8 @@ PAGE = r"""<!doctype html>
       savedStateCooldownUntil=Math.max(savedStateCooldownUntil,spotifyProviderCooldownUntil);
       const reason=String(resilience.reason||'').toLowerCase();
       setText('#provider-resilience-title',reason==='quota_exceeded'?'Spotify development quota reached':reason==='local_request_budget'?'EchoSense prevented a Spotify lockout':'Spotify asked EchoSense to slow down');
-      setText('#provider-resilience-copy',resilience.exact_context_match?'Using the last verified plan for these settings.':'Using your most recent verified plan until live context returns.');
+      const cachedCopy=resilience.exact_context_match?'Using the last verified plan for these settings.':'Using your most recent verified plan until live context returns.';
+      setText('#provider-resilience-copy',resilience.message||cachedCopy);
       setText('#provider-resilience-timer',`Try live Spotify again in about ${Math.ceil(retryAfter/60)} min`);
       setText('#toast','Cached playback plan active. No reconnect is needed.');
     }
@@ -486,7 +491,8 @@ PAGE = r"""<!doctype html>
       const cooldown=status.mode==='cooldown';
       health.classList.toggle('cooldown',cooldown);
       setText('#provider-health',cooldown?'Spotify protected · cached':'Spotify protected · live');
-      if(!cooldown){spotifyProviderCooldownUntil=0;$('#provider-resilience').hidden=true;return;}
+      if(!cooldown){spotifyProviderCooldownUntil=0;spotifyProviderCooldownStatus=null;$('#provider-resilience').hidden=true;return;}
+      spotifyProviderCooldownStatus={...status};
       const retryAfter=Math.max(1,Number(status.retry_after_seconds||60));
       spotifyProviderCooldownUntil=Date.now()+retryAfter*1000;
       $('#provider-resilience').hidden=false;
@@ -505,6 +511,22 @@ PAGE = r"""<!doctype html>
       if(!spotifyConnected)return;
       try { const response=await api('/auth/spotify/resilience/status');renderProviderStatus(await response.json()); }
       catch(error) { if(error.status!==401)setText('#provider-health','Spotify protection status unavailable'); }
+    }
+
+    async function fetchSpotifyData(params) {
+      const key=params.toString();
+      const cached=spotifyDataCache.get(key);
+      if(cached&&Date.now()-cached.savedAt<SPOTIFY_DATA_CACHE_MS)return structuredClone(cached.data);
+      if(spotifyDataInFlight.has(key))return structuredClone(await spotifyDataInFlight.get(key));
+      const request=(async()=>{
+        const response=await api(`/auth/spotify/data?${key}`);
+        const data=await response.json();
+        spotifyDataCache.set(key,{savedAt:Date.now(),data});
+        return data;
+      })();
+      spotifyDataInFlight.set(key,request);
+      try{return structuredClone(await request);}
+      finally{spotifyDataInFlight.delete(key);}
     }
 
     function renderMomentImpact(impact,item=null) {
@@ -543,8 +565,9 @@ PAGE = r"""<!doctype html>
       let data;
       if(Date.now()<spotifyProviderCooldownUntil&&lastSpotifyData) {
         data=JSON.parse(JSON.stringify(lastSpotifyData));
+        data.resilience={...(data.resilience||{}),...(spotifyProviderCooldownStatus||{}),mode:'last_known_good'};
       } else {
-        const response=await api(`/auth/spotify/data?${params}`);data=await response.json();lastSpotifyData=data;
+        data=await fetchSpotifyData(params);lastSpotifyData=data;
       }
       renderProviderResilience(data.resilience);
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
