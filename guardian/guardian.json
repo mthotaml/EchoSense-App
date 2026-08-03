@@ -44,6 +44,18 @@
       ]
     },
     {
+      "id": "spotify-auth-test-isolation",
+      "severity": "severity-1",
+      "description": "Spotify authentication contract tests use a fresh client and cookie jar per test so session state cannot leak across test order or CI runtime versions.",
+      "covers": ["spotify-auth-client-isolated"],
+      "evidence": [
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "test_spotify_auth_client_isolation"
+        }
+      ]
+    },
+    {
       "id": "audible-browser-playback",
       "severity": "severity-1",
       "description": "Playback success requires an activated browser player and observed unpaused SDK state.",
@@ -415,6 +427,7 @@
         "oauth-profile-rate-limit-retried",
         "oauth-rate-limit-bounded",
         "oauth-tight-retry-prohibited",
+        "spotify-auth-client-isolated",
         "recommendation-ranked",
         "dna-slate-diversified",
         "already-queued-track-skipped",

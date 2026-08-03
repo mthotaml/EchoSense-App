@@ -13,8 +13,6 @@ from echosense.repositories.provider_connections import ProviderConnectionReposi
 from echosense.storage import Storage
 from echosense.temporal_mood import TemporalMoodLearningService
 
-client = TestClient(app)
-
 
 @pytest.fixture(autouse=True)
 def connection_repository(tmp_path, monkeypatch) -> ProviderConnectionRepository:
@@ -26,13 +24,20 @@ def connection_repository(tmp_path, monkeypatch) -> ProviderConnectionRepository
     return repository
 
 
-def test_spotify_session_is_disconnected_by_default() -> None:
+@pytest.fixture
+def client() -> TestClient:
+    """Keep cookies and ASGI lifespan state isolated between authentication tests."""
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_spotify_session_is_disconnected_by_default(client: TestClient) -> None:
     response = client.get("/auth/spotify/session")
     assert response.status_code == 200
     assert response.json() == {"connected": False}
 
 
-def test_spotify_login_builds_authorization_redirect(monkeypatch) -> None:
+def test_spotify_login_builds_authorization_redirect(monkeypatch, client: TestClient) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
     monkeypatch.setenv(
         "SPOTIFY_REDIRECT_URI",
@@ -58,7 +63,7 @@ def test_spotify_login_builds_authorization_redirect(monkeypatch) -> None:
     assert "echosense_spotify_pkce_verifier" in response.cookies
 
 
-def test_spotify_login_requires_client_id(monkeypatch) -> None:
+def test_spotify_login_requires_client_id(monkeypatch, client: TestClient) -> None:
     monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
 
     response = client.get("/auth/spotify/login", follow_redirects=False)
@@ -67,7 +72,9 @@ def test_spotify_login_requires_client_id(monkeypatch) -> None:
     assert response.json()["detail"]["code"] == "spotify_not_configured"
 
 
-def test_session_requires_encrypted_token_storage_when_cookie_is_present(monkeypatch) -> None:
+def test_session_requires_encrypted_token_storage_when_cookie_is_present(
+    monkeypatch, client: TestClient
+) -> None:
     monkeypatch.setattr(spotify_auth, "_connection_repository", None)
     monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEY", raising=False)
     monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEYS", raising=False)
@@ -81,7 +88,7 @@ def test_session_requires_encrypted_token_storage_when_cookie_is_present(monkeyp
     assert response.json()["detail"]["code"] == "spotify_token_storage_not_configured"
 
 
-def test_spotify_callback_rejects_invalid_state() -> None:
+def test_spotify_callback_rejects_invalid_state(client: TestClient) -> None:
     response = client.get(
         "/auth/spotify/callback?code=test-code&state=unexpected",
         cookies={"echosense_spotify_oauth_state": "expected"},
@@ -132,8 +139,18 @@ def test_spotify_profile_returns_bounded_rate_limit_error_after_retry() -> None:
     assert error.value.headers == {"Retry-After": "3"}
 
 
+def test_spotify_auth_client_isolation(client: TestClient) -> None:
+    assert spotify_auth.SESSION_COOKIE not in client.cookies
+    client.cookies.set(spotify_auth.SESSION_COOKIE, "stale-session")
+
+    with TestClient(app) as isolated_client:
+        assert spotify_auth.SESSION_COOKIE not in isolated_client.cookies
+
+
 def test_spotify_data_builds_live_music_profile(
-    monkeypatch, connection_repository: ProviderConnectionRepository
+    monkeypatch,
+    connection_repository: ProviderConnectionRepository,
+    client: TestClient,
 ) -> None:
     session_id = "test-session"
     connection_repository.save(
@@ -185,7 +202,7 @@ def test_spotify_data_builds_live_music_profile(
         cookies={spotify_auth.SESSION_COOKIE: session_id},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 200, response.json()
     payload = response.json()
     assert payload["profile"]["display_name"] == "Mohan"
     assert payload["profile"]["genres"][0]["name"] == "Ambient"
@@ -343,7 +360,7 @@ def test_spotify_data_builds_live_music_profile(
 
 
 def test_logout_revokes_server_connection_and_clears_cookie(
-    connection_repository: ProviderConnectionRepository,
+    connection_repository: ProviderConnectionRepository, client: TestClient
 ) -> None:
     session_id = "logout-session"
     connection_repository.save(
@@ -371,7 +388,7 @@ def test_logout_revokes_server_connection_and_clears_cookie(
 
 
 def test_temporal_mood_controls_are_scoped_to_connected_listener(
-    connection_repository: ProviderConnectionRepository,
+    connection_repository: ProviderConnectionRepository, client: TestClient
 ) -> None:
     session_id = "temporal-session"
     connection_repository.save(
