@@ -5,6 +5,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   let playbackStarted = false;
   let skippedToNext = false;
   let restoreFromSnapshot = false;
+  let providerResilienceMode = false;
   let providerTrack = {id: 'working-track', name: 'Focused Motion'};
   const playRequests = [];
   const recommendationPlays = [];
@@ -188,6 +189,15 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
           explanation: 'You often choose uplifting music during afternoon. EchoSense keeps this signal bounded by your Music DNA and feedback.',
         },
         moment_impact: momentImpact,
+        resilience: providerResilienceMode
+          ? {
+              mode: 'last_known_good',
+              reason: 'spotify_rate_limited',
+              captured_at: '2026-08-02T12:00:00Z',
+              retry_after_seconds: 120,
+              exact_context_match: true,
+            }
+          : {mode: 'live'},
       },
     });
   });
@@ -704,6 +714,20 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('DNA Lift');
   await expect(page.locator('#pick-heading')).toHaveText('Coastal Signal');
   await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
+
+  providerResilienceMode = true;
+  await page.locator('#boost-diversity').fill('50');
+  await expect(page.locator('#provider-resilience')).toBeVisible();
+  await expect(page.locator('#provider-resilience')).toContainText(
+    'Using the last verified plan for these settings.',
+  );
+  await expect(page.locator('#toast')).toContainText(
+    'Cached playback plan active. No reconnect is needed.',
+  );
+  const requestsAtCooldown = contextDataRequests.length;
+  await page.locator('#boost-live_context').fill('50');
+  await page.waitForTimeout(500);
+  expect(contextDataRequests).toHaveLength(requestsAtCooldown);
 
   await page.locator('#account-action').click();
   await expect(page.locator('#account-status')).toHaveText('Spotify not connected');

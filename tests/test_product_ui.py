@@ -110,6 +110,12 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert response.text.index('id="boost-panel"') < response.text.index('id="live-context-panel"')
     assert "/auth/spotify/data?" in response.text
     assert "Context evidence:" in response.text
+    assert 'id="provider-resilience"' in response.text
+    assert "Spotify is cooling down" in response.text
+    assert "lastSpotifyData" in response.text
+    assert "spotifyProviderCooldownUntil" in response.text
+    assert "Date.now()<spotifyProviderCooldownUntil&&lastSpotifyData" in response.text
+    assert "Cached playback plan active. No reconnect is needed." in response.text
     assert "disconnectSpotify" in response.text
     assert "/auth/spotify/logout" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text

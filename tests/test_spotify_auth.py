@@ -464,6 +464,75 @@ def test_spotify_data_returns_bounded_message_after_transport_timeout(
     assert "_ssl" not in response.text
 
 
+def test_spotify_data_uses_persisted_last_known_good_during_provider_cooldown(
+    monkeypatch,
+    connection_repository: ProviderConnectionRepository,
+    client: TestClient,
+) -> None:
+    session_id = "resilient-session"
+    user_id = "spotify-resilient-user"
+    connection_repository.save(
+        spotify_auth.SpotifySession(
+            session_id=session_id,
+            provider="spotify",
+            provider_user_id=user_id,
+            access_token="access-token",
+            refresh_token="refresh-token",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            profile={"display_name": "Mohan"},
+        )
+    )
+    resource_key = spotify_auth._spotify_data_resource_key(
+        moment="driving",
+        weather=None,
+        region=None,
+        road_setting=None,
+        activity=None,
+        daypart=None,
+        boosts=(0, 0, 0, 0),
+    )
+    connection_repository.storage.save_provider_snapshot(
+        provider="spotify",
+        user_id=user_id,
+        resource_key=resource_key,
+        payload={
+            "profile": {"display_name": "Mohan"},
+            "recommendation": {"id": "lkg-track", "title": "Last Good Track"},
+            "recommendations": [{"id": "lkg-track", "title": "Last Good Track"}],
+            "context_statement": "Live driving plan.",
+            "moment_impact": {"message": "Driving plan applied."},
+        },
+    )
+    provider_calls = 0
+
+    def rate_limited_import(self):
+        nonlocal provider_calls
+        provider_calls += 1
+        raise spotify_auth.SpotifyRateLimited(120)
+
+    monkeypatch.setattr(spotify_auth.SpotifyProvider, "import_music_data", rate_limited_import)
+
+    first = client.get(
+        "/auth/spotify/data?moment=driving",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+    second = client.get(
+        "/auth/spotify/data?moment=driving",
+        cookies={spotify_auth.SESSION_COOKIE: session_id},
+    )
+
+    assert first.status_code == 200
+    assert first.json()["recommendation"]["id"] == "lkg-track"
+    assert first.json()["resilience"]["mode"] == "last_known_good"
+    assert first.json()["resilience"]["reason"] == "spotify_rate_limited"
+    assert first.json()["resilience"]["retry_after_seconds"] == 120
+    assert first.json()["resilience"]["exact_context_match"] is True
+    assert "last verified playback plan" in first.json()["context_statement"]
+    assert second.status_code == 200
+    assert second.json()["resilience"]["mode"] == "last_known_good"
+    assert provider_calls == 1
+
+
 def test_logout_revokes_server_connection_and_clears_cookie(
     connection_repository: ProviderConnectionRepository, client: TestClient
 ) -> None:

@@ -94,6 +94,9 @@ PAGE = r"""<!doctype html>
     .lead,.copy,.connection-copy { color:var(--muted); line-height:1.6; }
     .stack { display:grid; gap:18px; }
     .panel { background:rgba(17,21,29,.93); border:1px solid var(--line); border-radius:24px; padding:clamp(24px,4vw,38px); }
+    .resilience-banner { display:flex; justify-content:space-between; gap:18px; align-items:center; padding:14px 18px; border:1px solid rgba(255,183,77,.35); border-radius:16px; background:rgba(255,183,77,.08); color:#ffe0ad; }
+    .resilience-banner strong,.resilience-banner span { display:block; }
+    .resilience-banner span { margin-top:3px; color:var(--muted); font-size:.84rem; }
     .connection,.pick-top { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; }
     .track { margin:16px 0 4px; font-size:clamp(2.2rem,6vw,4.4rem); letter-spacing:-.055em; line-height:1; }
     .artist { color:var(--muted); font-size:1.15rem; }
@@ -268,6 +271,7 @@ PAGE = r"""<!doctype html>
   <main>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. Music selected from your DNA, your context, and what it learns—with every decision explained.</p></section>
     <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">Spotify gives EchoSense the signals needed to begin building your real Music DNA.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Connect Spotify</a></section>
+    <aside id="provider-resilience" class="resilience-banner" role="status" aria-live="polite" hidden><div><strong>Spotify is cooling down</strong><span id="provider-resilience-copy">EchoSense is using your last verified playback plan.</span></div><span id="provider-resilience-timer"></span></aside>
     <section id="listening-controls" class="panel control-center"><div class="control-center-header"><div><div class="eyebrow blue">Listening controls</div><h2>Shape what plays next</h2></div></div><div class="control-groups"><section id="moment-panel" class="control-group"><div class="eyebrow">Listening moment</div><h3>What are you doing?</h3><label class="sr-only" for="moment">Listening moment</label><select id="moment" class="secondary moment-select" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><p id="moment-impact" class="moment-impact" aria-live="polite">Choose an activity to tune the order.</p></section><section id="boost-panel" class="control-group"><div class="eyebrow blue">Recommendation priorities</div><h3>What should matter more?</h3><div id="boost-controls" class="boost-grid"></div></section><section id="live-context-panel" class="control-group context-group"><div><div class="eyebrow">Live context</div><h3>Add situational signals</h3><p id="context-status" class="connection-copy">Optional: weather, area, road, and movement.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location resolves current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section></div><p id="context-statement" class="context-statement" aria-live="polite">Preparing your next-track context…</p></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
     <div class="stack">
@@ -323,6 +327,8 @@ PAGE = r"""<!doctype html>
     let selectedPlaylistId = null;
     let tracksNextOffset = null;
     let spotifyConnected = false;
+    let lastSpotifyData = null;
+    let spotifyProviderCooldownUntil = 0;
     let deviceId = null;
     let playerState = null;
     let progressTimer = null;
@@ -449,9 +455,23 @@ PAGE = r"""<!doctype html>
     function rememberDnaRound(items) {
       const round=(items||[]).filter(item=>item?.id&&item?.decision_id).slice(0,DNA_ROUND_SIZE);
       if(!round.length)return;
+      const signature=round.map(item=>item.id).join('|');
+      if(dnaRounds.at(-1)?.map(item=>item.id).join('|')===signature){dnaPageIndex=dnaRounds.length-1;return;}
       dnaRounds.push(round);
       dnaPageIndex=dnaRounds.length-1;
       completedDnaTrackIds.clear();
+    }
+
+    function renderProviderResilience(resilience={mode:'live'}) {
+      const cached=resilience.mode==='last_known_good';
+      $('#provider-resilience').hidden=!cached;
+      if(!cached){spotifyProviderCooldownUntil=0;return;}
+      const retryAfter=Math.max(1,Number(resilience.retry_after_seconds||60));
+      spotifyProviderCooldownUntil=Date.now()+retryAfter*1000;
+      savedStateCooldownUntil=Math.max(savedStateCooldownUntil,spotifyProviderCooldownUntil);
+      setText('#provider-resilience-copy',resilience.exact_context_match?'Using the last verified plan for these settings.':'Using your most recent verified plan until live context returns.');
+      setText('#provider-resilience-timer',`Try live Spotify again in about ${Math.ceil(retryAfter/60)} min`);
+      setText('#toast','Cached playback plan active. No reconnect is needed.');
     }
 
     function renderMomentImpact(impact,item=null) {
@@ -487,7 +507,13 @@ PAGE = r"""<!doctype html>
       boostDefinitions.forEach(([key])=>params.set(`boost_${key}`,String(recommendationBoosts[key]||0)));
       if(liveContext){['weather','region','road_setting','activity'].forEach(key=>liveContext[key]&&params.set(key,liveContext[key]));}
       exclusions.slice(-50).forEach(itemId=>params.append('exclude',itemId));
-      const response=await api(`/auth/spotify/data?${params}`); const data=await response.json();
+      let data;
+      if(Date.now()<spotifyProviderCooldownUntil&&lastSpotifyData) {
+        data=JSON.parse(JSON.stringify(lastSpotifyData));
+      } else {
+        const response=await api(`/auth/spotify/data?${params}`);data=await response.json();lastSpotifyData=data;
+      }
+      renderProviderResilience(data.resilience);
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
       recommendationSlate.forEach(item=>item?.id&&item?.decision_id&&decisionByTrackId.set(item.id,item.decision_id));
@@ -1251,7 +1277,7 @@ PAGE = r"""<!doctype html>
     async function load() {
       renderBoostControls();
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); await loadLiveSpotify(); $('#playlists-panel').hidden=false; await Promise.allSettled([loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
+      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer(); const initialData=await loadLiveSpotify();const degraded=initialData.resilience?.mode==='last_known_good';$('#playlists-panel').hidden=degraded;await Promise.allSettled([degraded?Promise.resolve():loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));

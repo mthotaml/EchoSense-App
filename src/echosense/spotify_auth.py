@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import secrets
 import time
@@ -418,6 +419,73 @@ def spotify_session(
     }
 
 
+def _spotify_data_resource_key(
+    *,
+    moment: str,
+    weather: str | None,
+    region: str | None,
+    road_setting: str | None,
+    activity: str | None,
+    daypart: str | None,
+    boosts: tuple[int, int, int, int],
+) -> str:
+    fingerprint = json.dumps(
+        {
+            "moment": moment,
+            "weather": weather,
+            "region": region,
+            "road_setting": road_setting,
+            "activity": activity,
+            "daypart": daypart,
+            "boosts": boosts,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"recommendations:{hashlib.sha256(fingerprint.encode()).hexdigest()[:24]}"
+
+
+def _provider_cooldown(storage, user_id: str) -> tuple[int, str] | None:
+    state = storage.get_provider_cooldown("spotify", user_id)
+    if state is None or not state.get("cooldown_until"):
+        return None
+    remaining = (
+        datetime.fromisoformat(state["cooldown_until"]) - datetime.now(UTC)
+    ).total_seconds()
+    if remaining <= 0:
+        return None
+    return ceil(remaining), str(state.get("error_code") or "spotify_temporarily_unavailable")
+
+
+def _cached_spotify_data(
+    storage,
+    *,
+    user_id: str,
+    resource_key: str,
+    reason: str,
+    retry_after: int,
+) -> dict[str, object] | None:
+    snapshot = storage.get_provider_snapshot("spotify", user_id, resource_key)
+    if snapshot is None:
+        return None
+    payload = snapshot["payload"]
+    payload["resilience"] = {
+        "mode": "last_known_good",
+        "reason": reason,
+        "captured_at": snapshot["captured_at"],
+        "retry_after_seconds": retry_after,
+        "exact_context_match": snapshot["exact_match"],
+    }
+    payload["context_statement"] = (
+        "Spotify is cooling down. EchoSense is using your last verified playback plan."
+    )
+    payload["moment_impact"] = {
+        **payload.get("moment_impact", {}),
+        "message": "Using the last verified plan until Spotify is available again.",
+    }
+    return payload
+
+
 @router.get("/data")
 def spotify_data(
     moment: ListeningMoment = Query(default="general"),
@@ -434,6 +502,41 @@ def spotify_data(
     session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE),
 ) -> dict[str, object]:
     session = _connected_session(session_id)
+    storage = get_connection_repository().storage
+    resource_key = _spotify_data_resource_key(
+        moment=moment,
+        weather=weather,
+        region=region,
+        road_setting=road_setting,
+        activity=activity,
+        daypart=daypart,
+        boosts=(
+            boost_music_dna,
+            boost_live_context,
+            boost_learned_preference,
+            boost_diversity,
+        ),
+    )
+    cooldown = _provider_cooldown(storage, session.provider_user_id)
+    if cooldown:
+        cooldown_remaining, cooldown_reason = cooldown
+        cached = _cached_spotify_data(
+            storage,
+            user_id=session.provider_user_id,
+            resource_key=resource_key,
+            reason=cooldown_reason,
+            retry_after=cooldown_remaining,
+        )
+        if cached is not None:
+            return cached
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "spotify_rate_limited",
+                "retry_after_seconds": cooldown_remaining,
+            },
+            headers={"Retry-After": str(cooldown_remaining)},
+        )
     try:
         spotify_client = SpotifyClient(session, _refresh_session)
         imported = SpotifyProvider(spotify_client).import_music_data()
@@ -441,7 +544,6 @@ def spotify_data(
         repository.save(session.provider_user_id, imported)
         music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
         repository.save_profile(music_dna)
-        storage = get_connection_repository().storage
         learning = PlaybackLearningService(storage)
         intelligence_store = ListeningIntelligenceStore(storage)
         echo_identity = intelligence_store.resolve_user(
@@ -691,6 +793,22 @@ def spotify_data(
             decision_ids.get(recommendation.provider_id) if recommendation is not None else None
         )
     except SpotifyRateLimited as exc:
+        storage.set_provider_cooldown(
+            provider="spotify",
+            user_id=session.provider_user_id,
+            cooldown_until=datetime.now(UTC) + timedelta(seconds=exc.retry_after),
+            error_code="spotify_rate_limited",
+            error_message="Spotify requested a provider-wide cooldown.",
+        )
+        cached = _cached_spotify_data(
+            storage,
+            user_id=session.provider_user_id,
+            resource_key=resource_key,
+            reason="spotify_rate_limited",
+            retry_after=exc.retry_after,
+        )
+        if cached is not None:
+            return cached
         raise HTTPException(
             status_code=429,
             detail={
@@ -700,6 +818,23 @@ def spotify_data(
             headers={"Retry-After": str(exc.retry_after)},
         ) from exc
     except httpx.TimeoutException as exc:
+        retry_after = 30
+        storage.set_provider_cooldown(
+            provider="spotify",
+            user_id=session.provider_user_id,
+            cooldown_until=datetime.now(UTC) + timedelta(seconds=retry_after),
+            error_code="spotify_temporarily_unavailable",
+            error_message="Spotify timed out.",
+        )
+        cached = _cached_spotify_data(
+            storage,
+            user_id=session.provider_user_id,
+            resource_key=resource_key,
+            reason="spotify_temporarily_unavailable",
+            retry_after=retry_after,
+        )
+        if cached is not None:
+            return cached
         raise HTTPException(
             status_code=503,
             detail={
@@ -711,6 +846,23 @@ def spotify_data(
             },
         ) from exc
     except (httpx.HTTPError, ValueError) as exc:
+        retry_after = 60
+        storage.set_provider_cooldown(
+            provider="spotify",
+            user_id=session.provider_user_id,
+            cooldown_until=datetime.now(UTC) + timedelta(seconds=retry_after),
+            error_code="spotify_api_failed",
+            error_message="Spotify provider request failed.",
+        )
+        cached = _cached_spotify_data(
+            storage,
+            user_id=session.provider_user_id,
+            resource_key=resource_key,
+            reason="spotify_api_failed",
+            retry_after=retry_after,
+        )
+        if cached is not None:
+            return cached
         raise HTTPException(
             status_code=502,
             detail={
@@ -821,6 +973,14 @@ def spotify_data(
     result["recommendation_boosts"] = boosts.as_dict()
     result["effective_weights"] = effective_weights
     result["moment_impact"] = moment_impact
+    result["resilience"] = {"mode": "live"}
+    storage.save_provider_snapshot(
+        provider="spotify",
+        user_id=session.provider_user_id,
+        resource_key=resource_key,
+        payload=result,
+    )
+    storage.clear_provider_cooldown("spotify", session.provider_user_id)
     return result
 
 

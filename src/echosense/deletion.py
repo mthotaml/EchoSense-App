@@ -301,6 +301,8 @@ class DeletionCoordinator:
                 ("recommendation_exposures", "recommendation_exposures"),
                 ("music_data_imports", "music_data_imports"),
                 ("music_dna_profiles", "music_dna_profiles"),
+                ("provider_resilience_state", "provider_resilience_state"),
+                ("provider_response_snapshots", "provider_response_snapshots"),
                 ("music_item_preferences", "music_item_preferences"),
                 ("playback_learning_outcomes", "playback_learning_outcomes"),
                 ("temporal_mood_observations", "temporal_mood_observations"),
