@@ -44,6 +44,26 @@
       ]
     },
     {
+      "id": "spotify-transport-timeout-recovery",
+      "severity": "severity-1",
+      "description": "Safe Spotify reads retry one transport failure, stop after the bounded retry, preserve the saved connection, and never expose TLS or SSL implementation details to the product UI.",
+      "covers": ["spotify-transport-timeout-retried", "spotify-timeout-bounded", "spotify-transport-internals-hidden"],
+      "evidence": [
+        {
+          "source": "tests/test_spotify_provider.py",
+          "pattern": "test_client_retries_one_transport_timeout_for_safe_get"
+        },
+        {
+          "source": "tests/test_spotify_provider.py",
+          "pattern": "test_client_stops_after_two_transport_timeouts"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "test_spotify_data_returns_bounded_message_after_transport_timeout"
+        }
+      ]
+    },
+    {
       "id": "spotify-auth-test-isolation",
       "severity": "severity-1",
       "description": "Spotify authentication contract tests use a fresh client and explicit provider configuration so neither session state nor developer secrets can leak across test order or CI environments.",
@@ -478,6 +498,9 @@
         "oauth-profile-rate-limit-retried",
         "oauth-rate-limit-bounded",
         "oauth-tight-retry-prohibited",
+        "spotify-transport-timeout-retried",
+        "spotify-timeout-bounded",
+        "spotify-transport-internals-hidden",
         "spotify-auth-client-isolated",
         "spotify-test-provider-config-explicit",
         "recommendation-ranked",
