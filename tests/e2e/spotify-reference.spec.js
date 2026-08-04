@@ -496,6 +496,12 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect.poll(() => contextDataRequests.some(url => url.includes('road_setting=coastal'))).toBe(
     true,
   );
+  const requestsBeforeSingleFlight = contextDataRequests.length;
+  await page.evaluate(() => {
+    spotifyDataCache.clear();
+    return Promise.all([loadLiveSpotify(), loadLiveSpotify(), loadLiveSpotify()]);
+  });
+  expect(contextDataRequests).toHaveLength(requestsBeforeSingleFlight + 1);
   await expect(page.locator('#dna-queue-items thead')).toContainText(
     'Music DNA affinity',
   );

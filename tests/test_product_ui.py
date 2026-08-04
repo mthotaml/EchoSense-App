@@ -124,6 +124,12 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "no reconnect needed" in response.text
     assert "Spotify protected · cached" in response.text
     assert "$('#context-statement').hidden=cachedPlan" in response.text
+    assert (
+        "data.resilience={...(data.resilience||{}),...(spotifyProviderCooldownStatus||{}),mode:'last_known_good'}"
+        in response.text
+    )
+    assert "const spotifyDataInFlight = new Map()" in response.text
+    assert "if(spotifyDataInFlight.has(key))" in response.text
     assert "disconnectSpotify" in response.text
     assert "/auth/spotify/logout" in response.text
     assert "setInterval(updateProgressClock,500)" in response.text

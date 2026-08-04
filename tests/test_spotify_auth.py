@@ -1,4 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from threading import Event
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -23,6 +25,8 @@ def connection_repository(tmp_path, monkeypatch) -> ProviderConnectionRepository
     monkeypatch.setattr(spotify_auth, "_connection_repository", repository)
     monkeypatch.setattr(spotify_auth, "_library_status_cache", {})
     monkeypatch.setattr(spotify_auth, "_library_cooldown_until", {})
+    monkeypatch.setattr(spotify_auth, "_provider_read_cache", {})
+    monkeypatch.setattr(spotify_auth, "_provider_read_locks", {})
     return repository
 
 
@@ -37,6 +41,39 @@ def test_spotify_session_is_disconnected_by_default(client: TestClient) -> None:
     response = client.get("/auth/spotify/session")
     assert response.status_code == 200
     assert response.json() == {"connected": False}
+
+
+def test_identical_provider_reads_are_single_flight() -> None:
+    loader_started = Event()
+    release_loader = Event()
+    calls = 0
+
+    def loader() -> dict[str, str]:
+        nonlocal calls
+        calls += 1
+        loader_started.set()
+        release_loader.wait(timeout=1)
+        return {"source": "spotify"}
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(
+            spotify_auth._cached_provider_read,
+            "contract",
+            ("listener", "resource"),
+            loader,
+        )
+        assert loader_started.wait(timeout=1)
+        second = pool.submit(
+            spotify_auth._cached_provider_read,
+            "contract",
+            ("listener", "resource"),
+            loader,
+        )
+        release_loader.set()
+
+    assert first.result() == {"source": "spotify"}
+    assert second.result() == {"source": "spotify"}
+    assert calls == 1
 
 
 def test_spotify_login_builds_authorization_redirect(monkeypatch, client: TestClient) -> None:
@@ -169,7 +206,11 @@ def test_spotify_data_builds_live_music_profile(
         )
     )
 
+    provider_item_calls = []
+    provider_search_calls = []
+
     def fake_items(self, path, params, *, limit):
+        provider_item_calls.append(path)
         if path == "/me/top/artists":
             yield from [
                 {
@@ -200,11 +241,13 @@ def test_spotify_data_builds_live_music_profile(
             }
 
     monkeypatch.setattr(spotify_auth.SpotifyClient, "items", fake_items)
-    monkeypatch.setattr(
-        spotify_auth.SpotifyClient,
-        "request",
-        lambda self, method, path, *, params=None: {"tracks": {"items": []}},
-    )
+
+    def fake_request(self, method, path, *, params=None):
+        if path == "/search":
+            provider_search_calls.append(params["q"])
+        return {"tracks": {"items": []}}
+
+    monkeypatch.setattr(spotify_auth.SpotifyClient, "request", fake_request)
 
     response = client.get(
         "/auth/spotify/data?moment=working",
@@ -259,6 +302,10 @@ def test_spotify_data_builds_live_music_profile(
     assert rotated.status_code == 200
     assert rotated.json()["recommendation"] is None
     assert rotated.json()["recommendations"] == []
+    assert provider_item_calls.count("/me/top/artists") == 1
+    assert provider_item_calls.count("/me/top/tracks") == 1
+    assert provider_item_calls.count("/me/player/recently-played") == 1
+    assert len(provider_search_calls) == len(set(provider_search_calls))
     trace = connection_repository.storage.get_decision_trace(
         payload["recommendation"]["decision_id"]
     )

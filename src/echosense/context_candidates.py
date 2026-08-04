@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -30,6 +32,7 @@ class ContextCandidateService:
         daypart: str | None,
         mood: str | None = None,
         moment: str = "general",
+        search: Callable[[str], Any] | None = None,
     ) -> ContextCandidateResult:
         queries = self.queries(
             weather=weather,
@@ -45,10 +48,14 @@ class ContextCandidateService:
         evidence: dict[str, list[str]] = {}
         for query, label, score in queries:
             try:
-                payload = client.request(
-                    "GET",
-                    "/search",
-                    params={"q": query, "type": "track", "limit": 5},
+                payload = (
+                    search(query)
+                    if search is not None
+                    else client.request(
+                        "GET",
+                        "/search",
+                        params={"q": query, "type": "track", "limit": 5},
+                    )
                 )
             except SpotifyRateLimited:
                 raise

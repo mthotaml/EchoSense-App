@@ -10,7 +10,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from math import ceil
 from threading import Lock
-from typing import Callable, Literal
+from typing import Callable, Literal, TypeVar
 from urllib.parse import urlencode
 from uuid import uuid4
 
@@ -67,6 +67,7 @@ STATE_COOKIE = "echosense_spotify_oauth_state"
 VERIFIER_COOKIE = "echosense_spotify_pkce_verifier"
 SPOTIFY_PROFILE_RETRY_LIMIT_SECONDS = 30
 SPOTIFY_LIBRARY_STATUS_CACHE_SECONDS = 300
+SPOTIFY_PERSONALIZATION_CACHE_SECONDS = 300
 
 
 SpotifySession = ProviderConnection
@@ -74,6 +75,42 @@ _connection_repository: ProviderConnectionRepository | None = None
 _library_status_cache: dict[tuple[str, str], tuple[bool, float]] = {}
 _library_cooldown_until: dict[str, float] = {}
 _library_status_lock = Lock()
+_provider_read_cache: dict[tuple[object, ...], tuple[float, object]] = {}
+_provider_read_locks: dict[tuple[object, ...], Lock] = {}
+_provider_read_cache_lock = Lock()
+ProviderRead = TypeVar("ProviderRead")
+
+
+def _cached_provider_read(
+    namespace: str,
+    key: tuple[object, ...],
+    loader: Callable[[], ProviderRead],
+    *,
+    ttl_seconds: int = SPOTIFY_PERSONALIZATION_CACHE_SECONDS,
+) -> ProviderRead:
+    """Coalesce identical Spotify reads and reuse their verified result briefly."""
+    cache_key = (namespace, *key)
+    with _provider_read_cache_lock:
+        key_lock = _provider_read_locks.setdefault(cache_key, Lock())
+    with key_lock:
+        now = time.monotonic()
+        with _provider_read_cache_lock:
+            cached = _provider_read_cache.get(cache_key)
+            if cached is not None and cached[0] > now:
+                return cached[1]  # type: ignore[return-value]
+        value = loader()
+        with _provider_read_cache_lock:
+            _provider_read_cache[cache_key] = (now + max(1, ttl_seconds), value)
+            if len(_provider_read_cache) > 256:
+                expired = [
+                    item_key
+                    for item_key, (expires_at, _) in _provider_read_cache.items()
+                    if expires_at <= now
+                ]
+                for item_key in expired:
+                    _provider_read_cache.pop(item_key, None)
+                    _provider_read_locks.pop(item_key, None)
+        return value
 
 
 def _spotify_profile_with_backoff(
@@ -584,7 +621,11 @@ def spotify_data(
         )
     try:
         spotify_client = _spotify_client(session)
-        imported = SpotifyProvider(spotify_client).import_music_data()
+        imported = _cached_provider_read(
+            "music-import",
+            (session.provider_user_id,),
+            lambda: SpotifyProvider(spotify_client).import_music_data(),
+        )
         repository = MusicDNARepository(get_connection_repository().storage)
         repository.save(session.provider_user_id, imported)
         music_dna = MusicDNAGenerator().generate(session.provider_user_id, imported)
@@ -607,6 +648,18 @@ def spotify_data(
         ranking_context = context_service.ranking_context(effective_moment)
         top_tracks = {item.track.provider_id: item.track for item in imported.top_tracks}
         recent_tracks = {item.track.provider_id: item.track for item in imported.recent_tracks}
+
+        def cached_context_search(query: str):
+            return _cached_provider_read(
+                "context-search",
+                (session.provider_user_id, query),
+                lambda: spotify_client.request(
+                    "GET",
+                    "/search",
+                    params={"q": query, "type": "track", "limit": 5},
+                ),
+            )
+
         expanded = ContextCandidateService().expand(
             spotify_client,
             weather=weather,
@@ -616,6 +669,7 @@ def spotify_data(
             daypart=daypart,
             mood=temporal_profile.mood,
             moment=effective_moment,
+            search=cached_context_search,
         )
         candidate_tracks = list(
             {

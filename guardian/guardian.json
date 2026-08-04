@@ -474,7 +474,10 @@
         "spotify-player-state-lkg-during-cooldown",
         "spotify-request-telemetry-deleted",
         "spotify-transport-circuit-breaker",
-        "spotify-provider-timeout-bounded"
+        "spotify-provider-timeout-bounded",
+        "spotify-personalization-import-cached",
+        "spotify-context-search-cached",
+        "spotify-data-request-single-flight"
       ],
       "evidence": [
         {
@@ -496,6 +499,18 @@
         {
           "source": "tests/test_provider_resilience.py",
           "pattern": "test_repeated_transport_failures_open_short_provider_circuit"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "test_identical_provider_reads_are_single_flight"
+        },
+        {
+          "source": "tests/test_spotify_auth.py",
+          "pattern": "len(provider_search_calls) == len(set(provider_search_calls))"
+        },
+        {
+          "source": "tests/e2e/spotify-reference.spec.js",
+          "pattern": "requestsBeforeSingleFlight + 1"
         }
       ]
     },
@@ -709,6 +724,9 @@
         "spotify-request-telemetry-deleted",
         "spotify-transport-circuit-breaker",
         "spotify-provider-timeout-bounded",
+        "spotify-personalization-import-cached",
+        "spotify-context-search-cached",
+        "spotify-data-request-single-flight",
         "normalized-match-score-derived",
         "hero-factor-breakdown",
         "memory-inspector-visible",
