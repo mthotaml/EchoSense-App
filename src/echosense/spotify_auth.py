@@ -109,7 +109,6 @@ def _cached_provider_read(
                 ]
                 for item_key in expired:
                     _provider_read_cache.pop(item_key, None)
-                    _provider_read_locks.pop(item_key, None)
         return value
 
 

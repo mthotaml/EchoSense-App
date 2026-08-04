@@ -513,6 +513,10 @@ PAGE = r"""<!doctype html>
       catch(error) { if(error.status!==401)setText('#provider-health','Spotify protection status unavailable'); }
     }
 
+    function invalidateSpotifyRecommendationCache() {
+      spotifyDataCache.clear();
+    }
+
     async function fetchSpotifyData(params) {
       const key=params.toString();
       const cached=spotifyDataCache.get(key);
@@ -1065,17 +1069,20 @@ PAGE = r"""<!doctype html>
       if(!temporalMoodProfile?.mood)return;
       await api('/auth/spotify/temporal-mood/correct',{method:'POST',body:JSON.stringify({daypart:temporalMoodProfile.daypart,mood:temporalMoodProfile.mood})});
       setText('#toast','Pattern corrected. EchoSense will relearn from future qualified listening.');
+      invalidateSpotifyRecommendationCache();
       await loadLiveSpotify();
     }
     async function toggleTemporalMood() {
       const enabled=temporalMoodProfile?.enabled===false;
       await api('/auth/spotify/temporal-mood/settings',{method:'PUT',body:JSON.stringify({enabled})});
       setText('#toast',enabled?'Temporal mood learning enabled.':'Temporal mood learning disabled.');
+      invalidateSpotifyRecommendationCache();
       await loadLiveSpotify();
     }
     async function resetTemporalMood() {
       await api('/auth/spotify/temporal-mood',{method:'DELETE'});
       setText('#toast','Temporal mood patterns reset. Your other Music DNA remains intact.');
+      invalidateSpotifyRecommendationCache();
       await loadLiveSpotify();
     }
     function speedBaseline(speed) {
