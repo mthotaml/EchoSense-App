@@ -24,6 +24,7 @@ class RecommendationCandidate:
     item_id: str
     rationale: str
     base_score: float = 0.0
+    canonical_track_id: str | None = None
 
 
 @dataclass(frozen=True)

@@ -36,6 +36,11 @@ from echosense.providers.spotify import (
     SpotifyRateLimited,
 )
 from echosense.ranking_boosts import RecommendationBoosts, build_context_statement
+from echosense.recommendation_contract import (
+    CanonicalRecommendation,
+    ProviderTrackBinding,
+    binding_as_dict,
+)
 from echosense.recording_identity import RecordingReference
 from echosense.repositories.music_dna import MusicDNARepository
 from echosense.repositories.provider_connections import (
@@ -783,6 +788,9 @@ def spotify_data(
         )
         recommendation = diverse_slate[0].track if diverse_slate else None
         decision_ids: dict[str, str] = {}
+        canonical_track_ids: dict[str, str] = {}
+        provider_bindings: dict[str, ProviderTrackBinding] = {}
+        canonical_recommendations: dict[str, CanonicalRecommendation] = {}
         for slate_item in diverse_slate:
             slate_decision_id = f"dec_{uuid4().hex}"
             decision_ids[slate_item.track.provider_id] = slate_decision_id
@@ -799,9 +807,26 @@ def spotify_data(
                 image_url=slate_item.track.image_url,
                 metadata={"spotify_url": slate_item.track.external_url},
             )
+            canonical_track_ids[slate_item.track.provider_id] = echo_track_id
+            provider_binding = ProviderTrackBinding(
+                provider="spotify",
+                provider_track_id=slate_item.track.provider_id,
+                canonical_track_id=echo_track_id,
+                uri=f"spotify:track:{slate_item.track.provider_id}",
+                external_url=slate_item.track.external_url,
+            )
+            provider_bindings[slate_item.track.provider_id] = provider_binding
             context_evidence = expanded.evidence.get(slate_item.track.provider_id, ())
             ranked_candidate = next(
                 item for item in candidate_slate if item["item_id"] == slate_item.track.provider_id
+            )
+            canonical_recommendations[slate_item.track.provider_id] = CanonicalRecommendation(
+                canonical_track_id=echo_track_id,
+                decision_id=slate_decision_id,
+                rank=slate_item.rank,
+                score=float(ranked_candidate["normalized_score"]) / 100.0,
+                explanation=slate_item.reason,
+                provider_bindings=(provider_binding,),
             )
             inferred_mood = temporal_service.infer_track(
                 slate_item.track,
@@ -828,6 +853,12 @@ def spotify_data(
                 factors={
                     "echo_user_id": echo_identity.echo_user_id,
                     "echo_track_id": echo_track_id,
+                    "canonical_track_id": echo_track_id,
+                    "learning_provider": "echosense",
+                    "provider_binding": binding_as_dict(provider_binding),
+                    "recommendation": canonical_recommendations[
+                        slate_item.track.provider_id
+                    ].as_dict(),
                     "track_snapshot": {
                         "title": slate_item.track.title,
                         "artist": slate_item.track.primary_artist,
@@ -1023,11 +1054,24 @@ def spotify_data(
             else None
         ),
     )
+    if result["recommendation"] is not None and recommendation is not None:
+        result["recommendation"]["canonical_track_id"] = canonical_track_ids[
+            recommendation.provider_id
+        ]
+        result["recommendation"]["provider_binding"] = binding_as_dict(
+            provider_bindings[recommendation.provider_id]
+        )
+        result["recommendation"]["recommendation"] = canonical_recommendations[
+            recommendation.provider_id
+        ].as_dict()
     if recommendation is None:
         result["recommendation"] = None
     result["recommendations"] = [
         {
             **music_dna_service._track_view(item.track),
+            "canonical_track_id": canonical_track_ids[item.track.provider_id],
+            "provider_binding": binding_as_dict(provider_bindings[item.track.provider_id]),
+            "recommendation": canonical_recommendations[item.track.provider_id].as_dict(),
             "rank": item.rank,
             "score": item.score,
             "reason": item.reason,

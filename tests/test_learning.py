@@ -147,6 +147,8 @@ def test_outcome_updates_preference_from_recorded_decision(client: TestClient) -
     assert outcome.status_code == 200
     body = outcome.json()
     assert body["context"] == "rainy_commute"
+    assert body["provider"] == "echosense"
+    assert body["item_id"].startswith("es_recording_")
     assert body["weight"] == 0.12
     assert body["evidence_count"] == 1
 

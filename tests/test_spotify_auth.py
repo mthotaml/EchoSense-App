@@ -289,6 +289,14 @@ def test_spotify_data_builds_live_music_profile(
         "/me/top/tracks",
     ]
     assert payload["recommendation"]["title"] == "A Real Track"
+    assert payload["recommendation"]["id"] == "track-1"
+    assert payload["recommendation"]["canonical_track_id"].startswith("es_recording_")
+    assert payload["recommendation"]["provider_binding"]["provider"] == "spotify"
+    assert payload["recommendation"]["provider_binding"]["provider_track_id"] == "track-1"
+    assert (
+        payload["recommendation"]["recommendation"]["canonical_track_id"]
+        == payload["recommendation"]["canonical_track_id"]
+    )
     assert payload["recommendation"]["match_score"] == 75
     assert payload["recommendations"][0]["why_now"]["overall_score"] == 75
     assert payload["moment_impact"]["moment"] == "working"
@@ -342,6 +350,9 @@ def test_spotify_data_builds_live_music_profile(
     assert trace["factors"]["track_snapshot"]["artist"] == "Artist One"
     assert trace["factors"]["echo_user_id"].startswith("es_user_")
     assert trace["factors"]["echo_track_id"].startswith("es_recording_")
+    assert trace["factors"]["canonical_track_id"] == payload["recommendation"]["canonical_track_id"]
+    assert trace["factors"]["provider_binding"]["provider"] == "spotify"
+    assert trace["factors"]["recommendation"]["provider_binding"]["provider_track_id"] == "track-1"
     intelligence = client.get(
         "/auth/spotify/intelligence",
         cookies={spotify_auth.SESSION_COOKIE: session_id},
