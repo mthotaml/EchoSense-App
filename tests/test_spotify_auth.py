@@ -76,6 +76,30 @@ def test_identical_provider_reads_are_single_flight() -> None:
     assert calls == 1
 
 
+def test_provider_cache_eviction_preserves_single_flight_lock(monkeypatch) -> None:
+    now = 1_000.0
+    monkeypatch.setattr(spotify_auth.time, "monotonic", lambda: now)
+
+    retained_key = ("contract", "listener", "resource")
+    retained_lock = spotify_auth.Lock()
+    spotify_auth._provider_read_locks[retained_key] = retained_lock
+    spotify_auth._provider_read_cache[retained_key] = (now - 1, {"stale": True})
+
+    for index in range(256):
+        key = ("expired", index)
+        spotify_auth._provider_read_cache[key] = (now - 1, index)
+        spotify_auth._provider_read_locks[key] = spotify_auth.Lock()
+
+    result = spotify_auth._cached_provider_read(
+        "contract",
+        ("listener", "resource"),
+        lambda: {"source": "spotify"},
+    )
+
+    assert result == {"source": "spotify"}
+    assert spotify_auth._provider_read_locks[retained_key] is retained_lock
+
+
 def test_spotify_login_builds_authorization_redirect(monkeypatch, client: TestClient) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
     monkeypatch.setenv(

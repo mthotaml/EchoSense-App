@@ -129,6 +129,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
         in response.text
     )
     assert "const spotifyDataInFlight = new Map()" in response.text
+    assert "function invalidateSpotifyRecommendationCache()" in response.text
+    assert response.text.count("invalidateSpotifyRecommendationCache();") >= 3
     assert "if(spotifyDataInFlight.has(key))" in response.text
     assert "disconnectSpotify" in response.text
     assert "/auth/spotify/logout" in response.text
