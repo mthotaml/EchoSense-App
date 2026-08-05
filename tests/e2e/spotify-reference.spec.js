@@ -830,6 +830,19 @@ test('Guardian keeps disconnected playback on the demo surface', async ({page}) 
   await page.route('**/auth/spotify/session', route =>
     route.fulfill({json: {connected: false}}),
   );
+  await page.route('**/auth/spotify/config', route =>
+    route.fulfill({json: {configured: false, missing: ['SPOTIFY_CLIENT_ID']}}),
+  );
+  await page.route('**/auth/spotify/resilience/status', route =>
+    route.fulfill({
+      json: {
+        mode: 'cooldown',
+        reason: 'quota_exceeded',
+        retry_after_seconds: 3600,
+        message: 'This should not show while disconnected.',
+      },
+    }),
+  );
   await page.route('**/auth/spotify/login', route => {
     loginRequests += 1;
     return route.fulfill({
@@ -839,11 +852,22 @@ test('Guardian keeps disconnected playback on the demo surface', async ({page}) 
   });
 
   await page.goto('/');
+  await expect(page.locator('#greeting')).toContainText('Mohan.');
+  await expect(page.locator('#provider-health')).toBeHidden();
+  await expect(page.locator('#provider-resilience')).toBeHidden();
   await expect(page.locator('#pick-heading')).toHaveText('A Walk');
   await page.locator('#play').click();
 
   await expect(page.locator('#toast')).toHaveText(
     'Connect a streaming service before playing this track. Demo recommendations are preview-only until a provider is connected.',
+  );
+  await expect(page).toHaveURL(/\/$/);
+  await page.locator('#connect-button').click();
+  await expect(page.locator('#toast')).toHaveText(
+    'Spotify is not configured yet. Add SPOTIFY_CLIENT_ID before connecting a streaming service.',
+  );
+  await expect(page.locator('#connection-copy')).toHaveText(
+    'The demo is ready, but Spotify sign-in needs app credentials before live streaming can be connected.',
   );
   await expect(page).toHaveURL(/\/$/);
   expect(loginRequests).toBe(0);

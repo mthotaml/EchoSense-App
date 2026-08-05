@@ -19,6 +19,7 @@ def test_product_copy_keeps_recommendations_provider_neutral() -> None:
     assert response.status_code == 200
     assert "A connected provider gives EchoSense the permitted signals" in response.text
     assert "EchoSense recommendation from your Music DNA" in response.text
+    assert "[hidden] { display:none!important; }" in response.text
     assert "available listening evidence did not change this plan" in response.text
     assert "Connect a music provider for your real listening context" in response.text
     assert "more distinct provider candidates" in response.text
@@ -32,6 +33,7 @@ def test_demo_profile_is_ready() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "ready"
+    assert payload["display_name"] == "Mohan"
     assert payload["confidence"] > 0
     assert payload["genres"]
     assert payload["coach"]
@@ -224,6 +226,11 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "let liveRecommendationReady = false" in response.text
     assert "liveRecommendationReady=true" in response.text
     assert "function bindControls()" in response.text
+    assert "function resetProviderStatus()" in response.text
+    assert "function connectStreamingService(event)" in response.text
+    assert "Spotify is not configured yet. Add SPOTIFY_CLIENT_ID" in response.text
+    assert "spotifyConnected?disconnectSpotify(event)" in response.text
+    assert "$('#connect-button').addEventListener('click',connectStreamingService)" in response.text
     assert "function requireStreamingConnection(action='playing this track')" in response.text
     assert "Connect a streaming service before ${action}." in response.text
     assert "Demo recommendations are preview-only until a provider is connected." in response.text

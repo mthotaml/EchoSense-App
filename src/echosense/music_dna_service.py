@@ -119,7 +119,7 @@ class MusicDNAService:
     def get_profile(self) -> dict[str, object]:
         return {
             "user_id": "demo-user",
-            "display_name": "Alex",
+            "display_name": "Mohan",
             "status": "ready",
             "confidence": 0.91,
             "discovery_score": 78,
