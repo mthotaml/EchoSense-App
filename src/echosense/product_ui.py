@@ -510,6 +510,19 @@ PAGE = r"""<!doctype html>
       }
     }
 
+    function showSpotifyCallbackNotice() {
+      const params=new URLSearchParams(window.location.search);
+      const error=params.get('spotify_error');
+      if(!error)return;
+      const messages={
+        invalid_oauth_state:'Spotify sign-in expired or was opened from an old tab. Click Connect Spotify and complete sign-in from this window.',
+        missing_pkce_verifier:'Spotify sign-in expired before it could be verified. Click Connect Spotify and try again.',
+        access_denied:'Spotify sign-in was cancelled. Connect Spotify when you are ready.'
+      };
+      setText('#toast',messages[error]||'Spotify sign-in could not finish. Click Connect Spotify and try again.');
+      history.replaceState(null,'',window.location.pathname);
+    }
+
     async function loadSpotifySession() {
       const response = await fetch('/auth/spotify/session');
       if (!response.ok) return null;
@@ -1439,6 +1452,7 @@ PAGE = r"""<!doctype html>
       bindControls();
       const session=await loadSpotifySession(); if(session){ await loadConnectedSpotifyExperience(session); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
       if(!session)await refreshSpotifySetupState();
+      showSpotifyCallbackNotice();
       progressTimer=setInterval(updateProgressClock,500);
       autopilotTimer=setInterval(()=>maintainAutopilot().catch(()=>{}),10000);
       providerStatusTimer=setInterval(()=>loadProviderStatus(),30000);
