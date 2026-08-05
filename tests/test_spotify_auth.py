@@ -213,15 +213,26 @@ def test_session_requires_encrypted_token_storage_when_cookie_is_present(
     assert response.json()["detail"]["code"] == "spotify_token_storage_not_configured"
 
 
-def test_spotify_callback_rejects_invalid_state(client: TestClient) -> None:
+def test_spotify_callback_redirects_invalid_state_to_recovery(client: TestClient) -> None:
     response = client.get(
         "/auth/spotify/callback?code=test-code&state=unexpected",
         cookies={"echosense_spotify_oauth_state": "expected"},
         follow_redirects=False,
     )
 
-    assert response.status_code == 400
-    assert response.json()["detail"]["code"] == "invalid_oauth_state"
+    assert response.status_code == 302
+    assert response.headers["location"] == "/?spotify_error=invalid_oauth_state"
+
+
+def test_spotify_callback_redirects_missing_verifier_to_recovery(client: TestClient) -> None:
+    response = client.get(
+        "/auth/spotify/callback?code=test-code&state=expected",
+        cookies={"echosense_spotify_oauth_state": "expected"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/?spotify_error=missing_pkce_verifier"
 
 
 def test_spotify_profile_retries_once_after_retry_after() -> None:

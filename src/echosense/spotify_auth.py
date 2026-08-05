@@ -437,9 +437,9 @@ def spotify_callback(
         or not expected_state
         or not secrets.compare_digest(state, expected_state)
     ):
-        raise HTTPException(status_code=400, detail={"code": "invalid_oauth_state"})
+        return RedirectResponse("/?spotify_error=invalid_oauth_state", status_code=302)
     if not verifier:
-        raise HTTPException(status_code=400, detail={"code": "missing_pkce_verifier"})
+        return RedirectResponse("/?spotify_error=missing_pkce_verifier", status_code=302)
 
     client_id = _required_environment("SPOTIFY_CLIENT_ID")
     client_secret = _required_environment("SPOTIFY_CLIENT_SECRET")
