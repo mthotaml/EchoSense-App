@@ -10,6 +10,7 @@ from echosense.recommendation_contract import (
     canonical_track_id_for_provider_item,
     learning_key,
     recording_reference_from_track,
+    resolve_provider_binding,
 )
 from echosense.recording_identity import IdentityResolution
 
@@ -120,6 +121,33 @@ def test_same_canonical_recommendation_can_resolve_to_another_provider() -> None
         spotify_recommendation.provider_binding.provider_track_id
         != apple_recommendation.provider_binding.provider_track_id
     )
+
+
+def test_resolver_selects_preferred_playable_provider_binding() -> None:
+    spotify = ProviderTrackBinding(
+        provider="spotify",
+        provider_track_id="spotify-track-123",
+        canonical_track_id="es_recording_canonical123",
+        playable=False,
+    )
+    apple = ProviderTrackBinding(
+        provider="apple_music",
+        provider_track_id="apple-song-987",
+        canonical_track_id="es_recording_canonical123",
+    )
+    recommendation = CanonicalRecommendation(
+        canonical_track_id="es_recording_canonical123",
+        decision_id="dec_resolver",
+        rank=1,
+        score=0.88,
+        explanation="Canonical EchoSense recommendation.",
+        provider_bindings=(spotify, apple),
+    )
+
+    assert resolve_provider_binding(recommendation, "apple_music") == apple
+    assert resolve_provider_binding(recommendation, "spotify") is None
+    assert resolve_provider_binding(recommendation, "spotify", require_playable=False) == spotify
+    assert resolve_provider_binding(recommendation) == apple
 
 
 def test_recommendation_rejects_binding_for_different_canonical_track() -> None:

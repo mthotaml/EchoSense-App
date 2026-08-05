@@ -24,6 +24,7 @@ from echosense.recommendation_contract import (
     candidate_canonical_track_id,
     learning_key,
     recommendation_from_candidate,
+    resolve_provider_binding,
 )
 from echosense.storage import Storage
 
@@ -497,7 +498,12 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         score=ranking_score,
         explanation=candidate.rationale,
     )
-    binding = binding_from_candidate(candidate)
+    binding = resolve_provider_binding(canonical, candidate.provider)
+    if binding is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "provider_unavailable", "message": "No playable provider binding"},
+        )
     decision_factors["canonical_track_id"] = canonical.canonical_track_id
     decision_factors["learning_provider"] = PROVIDER_NEUTRAL_PROVIDER
     decision_factors["provider_binding"] = binding_as_dict(binding)

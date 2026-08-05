@@ -11,6 +11,7 @@ def test_guardian_provider_neutral_recommendation_contract_exists() -> None:
     assert "provider_bindings: tuple[ProviderTrackBinding, ...]" in contract
     assert "recording_reference_from_track" in contract
     assert "binding_from_resolution" in contract
+    assert "resolve_provider_binding" in contract
 
 
 def test_guardian_recommendation_contract_separates_decision_from_playback() -> None:
