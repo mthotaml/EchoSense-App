@@ -307,8 +307,14 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
         ]
     )
     assert "className='dna-table'" in response.text
-    assert "factorNames" in response.text
     assert "factorExplanations" in response.text
+    assert "function renderScoreRecipe(item)" in response.text
+    assert "className='score-ring'" in response.text
+    assert "className='factor-meter'" in response.text
+    assert "Taste match" in response.text
+    assert "Moment fit" in response.text
+    assert "Learning" in response.text
+    assert "Freshness" in response.text
     assert "Matches this track to the artists, genres, and songs you enjoy" in response.text
     assert "Checks the current time, weather, area, road, and activity" in response.text
     assert "Learns from your plays, completions, saves, and skips" in response.text
@@ -318,6 +324,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "info.setAttribute('aria-label'" in response.text
     assert "EchoSense Recommendation Score: the final normalized result" in response.text
     assert "% EchoSense score" in response.text
+    assert "Final score" in response.text
+    assert "Why this fits" in response.text
     assert "Compare what shaped each pick." not in response.text
     assert 'id="queue-skip"' in response.text
     assert 'id="live-context-panel"' in response.text
@@ -383,7 +391,7 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "Why it matters: your queue stays fresh" in page
     assert "factorInfoButton(label,'Priority')" in page
     assert "factorInfoButton(factor.name,'Current recommendation')" in page
-    assert "factorInfoButton(label,'Queue')" in page
+    assert "factorInfoButton(factor.name,'Queue')" in page
     assert 'id="dna-load-more"' in page
     assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
 
@@ -445,6 +453,7 @@ def test_final_playback_plan_names_the_exact_ranked_dna_sequence() -> None:
     assert 'id="dna-plan-statement"' in page
     assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
     assert "Prepare six more" in page
-    assert "EchoSense score" in page
-    assert "item.why_now?.overall_score" in page
-    assert "Final EchoSense Recommendation Score after all factors and boosts" in page
+    assert "Final score" in page
+    assert "Why this fits" in page
+    assert "item.why_now?.overall_score??item.match_score" in page
+    assert "Final EchoSense score after all signals are combined" in page

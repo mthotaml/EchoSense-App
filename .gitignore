@@ -36,3 +36,4 @@ artifacts/guardian/
 # Logs and runtime files
 *.log
 *.pid
+.echosense/

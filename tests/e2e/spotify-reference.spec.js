@@ -502,12 +502,8 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     return Promise.all([loadLiveSpotify(), loadLiveSpotify(), loadLiveSpotify()]);
   });
   expect(contextDataRequests).toHaveLength(requestsBeforeSingleFlight + 1);
-  await expect(page.locator('#dna-queue-items thead')).toContainText(
-    'Music DNA affinity',
-  );
-  await expect(page.locator('#dna-queue-items thead')).toContainText(
-    'Live context fit',
-  );
+  await expect(page.locator('#dna-queue-items thead')).toContainText('Final score');
+  await expect(page.locator('#dna-queue-items thead')).toContainText('Why this fits');
   await expect(
     page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Music DNA affinity.*Why it matters/}),
   ).toBeVisible();
@@ -526,10 +522,14 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#factor-modal')).toBeVisible();
   await expect(page.locator('#factor-detail')).toContainText('Why it matters: recommendations still feel like your taste.');
   await page.locator('#factor-modal-close').click();
-  await expect(page.locator('#dna-queue-items thead')).toContainText('Time pattern');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Taste match');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Moment fit');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Learning');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Freshness');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('95%');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('88%');
-  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('83%');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('+76%');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Limited');
   await expect(page.locator('#temporal-mood-status')).toContainText(
     'often choose uplifting music during afternoon',
   );

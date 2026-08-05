@@ -201,6 +201,18 @@ PAGE = r"""<!doctype html>
     .dna-table .track-cell span,.dna-table .why-cell { color:var(--muted); }
     .dna-table .why-cell { min-width:210px; line-height:1.35; }
     .dna-table .track-actions { white-space:nowrap; }
+    .recipe-cell { min-width:340px; }
+    .score-recipe { display:grid; grid-template-columns:74px minmax(220px,1fr); gap:14px; align-items:center; }
+    .score-ring { width:66px; height:66px; border-radius:50%; display:grid; place-items:center; background:conic-gradient(var(--green) calc(var(--score)*1%),#202733 0); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
+    .score-ring span { width:50px; height:50px; border-radius:50%; display:grid; place-items:center; background:#0b1018; color:var(--text); font-weight:800; font-size:.92rem; font-variant-numeric:tabular-nums; }
+    .factor-stack { display:grid; gap:7px; }
+    .factor-meter { display:grid; grid-template-columns:minmax(118px,1fr) minmax(82px,1.05fr) auto; gap:9px; align-items:center; color:var(--muted); font-size:.72rem; }
+    .factor-meter .factor-heading { min-width:0; }
+    .factor-meter-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .meter-track { height:7px; border-radius:999px; background:#1d2531; overflow:hidden; }
+    .meter-fill { display:block; height:100%; width:var(--meter); border-radius:inherit; background:linear-gradient(90deg,var(--blue),var(--green)); }
+    .meter-fill.adjustment { background:linear-gradient(90deg,var(--danger),var(--amber)); }
+    .meter-value { min-width:52px; text-align:right; color:var(--text); font-variant-numeric:tabular-nums; }
     .dna-pagination { display:flex; justify-content:center; align-items:center; gap:10px; margin-top:18px; }
     .dna-pagination span { min-width:110px; color:var(--muted); text-align:center; font-size:.86rem; }
     .factor-heading { display:inline-flex; align-items:center; gap:6px; }
@@ -1088,23 +1100,57 @@ PAGE = r"""<!doctype html>
       const contextReason=observations.length?observations.join(' · '):'';
       return item.why_now?.summary||contextReason||item.reason||'Chosen for your current listening plan.';
     }
+    function factorLabel(name) {
+      if(name==='Music DNA affinity')return 'Taste match';
+      if(name==='Live context fit')return 'Moment fit';
+      if(name==='Learned preference')return 'Learning';
+      if(name==='Diversity guard')return 'Freshness';
+      return name;
+    }
+    function factorValueText(name,score) {
+      if(!Number.isFinite(score))return 'No data';
+      if(name==='Diversity guard')return score>=100?'Fresh':'Limited';
+      if(name==='Learned preference')return `${score>0?'+':''}${score}%`;
+      return `${score}%`;
+    }
+    function renderScoreRecipe(item) {
+      const recipe=document.createElement('div');recipe.className='score-recipe';
+      const finalScore=item.why_now?.overall_score??item.match_score;
+      const ring=document.createElement('div');ring.className='score-ring';ring.style.setProperty('--score',String(Math.max(0,Math.min(100,Number(finalScore)||0))));ring.title='Final EchoSense score after taste, moment, learning, freshness, and priority settings are combined.';
+      const ringText=document.createElement('span');ringText.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'--';ring.appendChild(ringText);recipe.appendChild(ring);
+      const stack=document.createElement('div');stack.className='factor-stack';
+      (item.why_now?.factors||[]).filter(factor=>factorExplanations[factor.name]).slice(0,4).forEach(factor=>{
+        const score=Number(factor.score);
+        const row=document.createElement('div');row.className='factor-meter';
+        const heading=document.createElement('span');heading.className='factor-heading';
+        const name=document.createElement('span');name.className='factor-meter-name';name.textContent=factorLabel(factor.name);
+        heading.append(name,factorInfoButton(factor.name,'Queue'));
+        const track=document.createElement('span');track.className='meter-track';
+        const fill=document.createElement('span');fill.className=`meter-fill${factor.name==='Learned preference'?' adjustment':''}`;
+        const magnitude=factor.name==='Learned preference'?Math.abs(score):score;
+        fill.style.setProperty('--meter',`${Math.max(0,Math.min(100,magnitude))}%`);
+        track.appendChild(fill);
+        const value=document.createElement('strong');value.className='meter-value';value.textContent=factorValueText(factor.name,score);
+        row.append(heading,track,value);stack.appendChild(row);
+      });
+      recipe.appendChild(stack);
+      return recipe;
+    }
     function renderDnaQueue() {
       const container=$('#dna-queue-items'); container.replaceChildren();
       const displayedRound=dnaRounds[dnaPageIndex]||recommendationSlate.slice(0,DNA_ROUND_SIZE);
-      const factorNames=[...new Set(displayedRound.flatMap(item=>(item.why_now?.factors||[]).map(factor=>factor.name)))];
       const table=document.createElement('table'); table.className='dna-table';
       const head=document.createElement('thead'); const header=document.createElement('tr');
-      ['#','Track','EchoSense score','Genre',...factorNames,'Why now','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';const explanation=factorExplanations[label];if(explanation){const heading=document.createElement('span');heading.className='factor-heading';heading.append(document.createTextNode(label),factorInfoButton(label,'Queue'));cell.appendChild(heading);}else{cell.textContent=label;}header.appendChild(cell);});
+      ['#','Track','Final score','Genre','Why this fits','Why now','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';cell.textContent=label;header.appendChild(cell);});
       head.appendChild(header); table.appendChild(head);
       const body=document.createElement('tbody');
       displayedRound.forEach(item=>{
         const row=document.createElement('tr');row.setAttribute('aria-current',String(item.id===activePlaybackTrackId));
         const rank=document.createElement('td');rank.className='metric';rank.textContent=item.rank||displayedRound.indexOf(item)+1;row.appendChild(rank);
         const track=document.createElement('td');track.className='track-cell';const identity=document.createElement('div');identity.className='track-identity';const image=document.createElement('img');image.className='queue-cover';image.alt='';image.src=item.image_url||'';const copy=document.createElement('div');const title=document.createElement('strong');title.textContent=item.title;const artist=document.createElement('span');artist.textContent=item.artist;copy.append(title,artist);identity.append(image,copy);track.appendChild(identity);row.appendChild(track);
-        const recommendationScore=document.createElement('td');recommendationScore.className='metric';const finalScore=item.why_now?.overall_score;recommendationScore.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'—';recommendationScore.title='Final EchoSense Recommendation Score after all factors and boosts';row.appendChild(recommendationScore);
+        const recommendationScore=document.createElement('td');recommendationScore.className='metric';const finalScore=item.why_now?.overall_score??item.match_score;recommendationScore.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'--';recommendationScore.title='Final EchoSense score after all signals are combined';row.appendChild(recommendationScore);
         const category=document.createElement('td');const categoryPill=document.createElement('span');categoryPill.className='category-pill';categoryPill.textContent=item.genre||item.category||(item.evidence?.matched_genres||[])[0]||'Music DNA';category.appendChild(categoryPill);row.appendChild(category);
-        const scores=new Map((item.why_now?.factors||[]).map(factor=>[factor.name,factor.score]));
-        factorNames.forEach(name=>{const cell=document.createElement('td');cell.className='metric';const score=scores.get(name);cell.textContent=Number.isFinite(score)?(name==='Diversity guard'?(score>=100?'Passed':'Limited'):`${score}%`):'—';row.appendChild(cell);});
+        const recipeCell=document.createElement('td');recipeCell.className='recipe-cell';recipeCell.appendChild(renderScoreRecipe(item));row.appendChild(recipeCell);
         const why=document.createElement('td');why.className='why-cell';why.textContent=recommendationExplanation(item);row.appendChild(why);
         const actionCell=document.createElement('td');actionCell.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='▶';play.setAttribute('aria-label',`Play ${item.title}`);play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const like=document.createElement('button');like.type='button';like.className='secondary';like.textContent='♥';like.setAttribute('aria-label',`Like ${item.title}`);like.addEventListener('click',()=>feedbackForDecision(item,'love'));const dislike=document.createElement('button');dislike.type='button';dislike.className='secondary';dislike.textContent='×';dislike.setAttribute('aria-label',`Not for me: ${item.title}`);dislike.addEventListener('click',()=>feedbackForDecision(item,'not_for_me'));actionCell.append(play,like,dislike);row.appendChild(actionCell);body.appendChild(row);
       });
