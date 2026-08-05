@@ -59,6 +59,18 @@ class PreferenceMemory(Protocol):
         half_life_days: float = 30.0,
     ) -> dict[tuple[str, str], float]: ...
 
+    def promote_provider_preference(
+        self,
+        *,
+        user_id: str,
+        source_provider: str,
+        source_item_id: str,
+        target_provider: str,
+        target_item_id: str,
+        context: str,
+        epsilon: float = 0.000001,
+    ) -> Preference | None: ...
+
     def decay_preferences(
         self,
         *,
@@ -174,6 +186,39 @@ class InMemoryPreferenceMemory:
                 )
                 changed += 1
         return changed
+
+    def promote_provider_preference(
+        self,
+        *,
+        user_id: str,
+        source_provider: str,
+        source_item_id: str,
+        target_provider: str,
+        target_item_id: str,
+        context: str,
+        epsilon: float = 0.000001,
+    ) -> Preference | None:
+        source_key = (user_id, source_provider, source_item_id, context)
+        target_key = (user_id, target_provider, target_item_id, context)
+        with self._lock:
+            source = self._values.get(source_key)
+            if source is None:
+                return None
+            existing = self._values.get(target_key)
+            if existing is not None and abs(existing.weight) >= epsilon:
+                return existing
+            promoted = Preference(
+                user_id=user_id,
+                provider=target_provider,
+                item_id=target_item_id,
+                context=context,
+                weight=source.weight,
+                evidence_count=source.evidence_count,
+                updated_at=source.updated_at,
+                decay_anchor=source.decay_anchor,
+            )
+            self._values[target_key] = promoted
+            return promoted
 
     def delete_user(self, user_id: str) -> dict[str, int]:
         with self._lock:
@@ -345,6 +390,72 @@ class Neo4jPreferenceMemory:
                     6,
                 )
         return result
+
+    def promote_provider_preference(
+        self,
+        *,
+        user_id: str,
+        source_provider: str,
+        source_item_id: str,
+        target_provider: str,
+        target_item_id: str,
+        context: str,
+        epsilon: float = 0.000001,
+    ) -> Preference | None:
+        query = """
+        MATCH (u:User {user_id: $user_id})-[source:PREFERS {context: $context}]->
+              (:CatalogItem {provider: $source_provider, item_id: $source_item_id})
+        MERGE (target_item:CatalogItem {
+            provider: $target_provider,
+            item_id: $target_item_id
+        })
+        MERGE (u)-[target:PREFERS {context: $context}]->(target_item)
+        ON CREATE SET target.weight = source.weight,
+                      target.evidence_count = source.evidence_count,
+                      target.updated_at = source.updated_at,
+                      target.decay_anchor = source.decay_anchor
+        WITH source, target, abs(coalesce(target.weight, 0.0)) < $epsilon AS should_promote
+        SET target.weight = CASE
+                WHEN should_promote
+                THEN source.weight
+                ELSE target.weight END,
+            target.evidence_count = CASE
+                WHEN should_promote
+                THEN source.evidence_count
+                ELSE target.evidence_count END,
+            target.updated_at = CASE
+                WHEN should_promote
+                THEN source.updated_at
+                ELSE target.updated_at END,
+            target.decay_anchor = CASE
+                WHEN should_promote
+                THEN source.decay_anchor
+                ELSE target.decay_anchor END
+        RETURN target.weight AS weight, target.evidence_count AS evidence_count,
+               target.updated_at AS updated_at, target.decay_anchor AS decay_anchor
+        """
+        with self.driver.session(database=self.database) as session:
+            record = session.run(
+                query,
+                user_id=user_id,
+                source_provider=source_provider,
+                source_item_id=source_item_id,
+                target_provider=target_provider,
+                target_item_id=target_item_id,
+                context=context,
+                epsilon=epsilon,
+            ).single()
+        return (
+            None
+            if record is None
+            else self._preference_from_record(
+                record,
+                user_id,
+                target_provider,
+                target_item_id,
+                context,
+            )
+        )
 
     def decay_preferences(
         self,

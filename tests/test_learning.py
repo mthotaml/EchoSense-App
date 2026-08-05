@@ -138,6 +138,102 @@ def test_canonical_learning_weight_is_shared_across_provider_bindings() -> None:
     }
 
 
+def test_legacy_provider_learning_is_promoted_to_canonical_identity() -> None:
+    memory = InMemoryPreferenceMemory()
+    canonical_track_id = "es_recording_migrated"
+    memory.apply_outcome(
+        user_id="u1",
+        provider="spotify",
+        item_id="spotify-track-1",
+        context="rainy_commute",
+        delta=-0.3,
+        outcome_id="legacy-outcome-1",
+    )
+
+    original = app_module.preference_memory
+    app_module.preference_memory = memory
+    try:
+        first_weights = app_module.transition_learning_weights(
+            user_id="u1",
+            context="rainy_commute",
+            candidates=[
+                RecommendationCandidate(
+                    provider="spotify",
+                    item_id="spotify-track-1",
+                    canonical_track_id=canonical_track_id,
+                    rationale="Spotify binding",
+                )
+            ],
+            half_life_days=30,
+        )
+        second_weights = app_module.transition_learning_weights(
+            user_id="u1",
+            context="rainy_commute",
+            candidates=[
+                RecommendationCandidate(
+                    provider="apple_music",
+                    item_id="apple-song-1",
+                    canonical_track_id=canonical_track_id,
+                    rationale="Apple Music binding",
+                )
+            ],
+            half_life_days=30,
+        )
+    finally:
+        app_module.preference_memory = original
+
+    promoted = memory.get_preference(
+        user_id="u1",
+        provider="echosense",
+        item_id=canonical_track_id,
+        context="rainy_commute",
+    )
+    assert promoted is not None
+    assert promoted.weight == -0.3
+    assert first_weights[("spotify", "spotify-track-1")]["source"] == "legacy_provider_bridge"
+    assert second_weights[("apple_music", "apple-song-1")] == {
+        "provider": "echosense",
+        "item_id": canonical_track_id,
+        "weight": -0.3,
+        "source": "canonical",
+    }
+
+
+def test_legacy_provider_learning_does_not_overwrite_canonical_identity() -> None:
+    memory = InMemoryPreferenceMemory()
+    canonical_track_id = "es_recording_existing"
+    memory.apply_outcome(
+        user_id="u1",
+        provider="echosense",
+        item_id=canonical_track_id,
+        context="rainy_commute",
+        delta=0.4,
+        outcome_id="canonical-outcome-1",
+    )
+    memory.apply_outcome(
+        user_id="u1",
+        provider="spotify",
+        item_id="spotify-track-1",
+        context="rainy_commute",
+        delta=-0.3,
+        outcome_id="legacy-outcome-1",
+    )
+
+    promoted = memory.promote_provider_preference(
+        user_id="u1",
+        source_provider="spotify",
+        source_item_id="spotify-track-1",
+        target_provider="echosense",
+        target_item_id=canonical_track_id,
+        context="rainy_commute",
+    )
+
+    assert promoted is not None
+    assert promoted.provider == "echosense"
+    assert promoted.item_id == canonical_track_id
+    assert promoted.weight == 0.4
+
+
 @pytest.fixture()
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     store = Storage(f"sqlite:///{tmp_path / 'test.db'}")

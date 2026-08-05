@@ -256,13 +256,14 @@ def transition_learning_weights(
     """Read canonical learning first, with a bounded bridge for legacy provider weights."""
 
     canonical_keys = canonical_learning_keys(candidates)
-    canonical_weights = get_preference_memory().rank_weights(
+    memory = get_preference_memory()
+    canonical_weights = memory.rank_weights(
         user_id=user_id,
         context=context,
         candidates=list(canonical_keys.values()),
         half_life_days=half_life_days,
     )
-    legacy_provider_weights = get_preference_memory().rank_weights(
+    legacy_provider_weights = memory.rank_weights(
         user_id=user_id,
         context=context,
         candidates=[(candidate.provider, candidate.item_id) for candidate in candidates],
@@ -288,6 +289,14 @@ def transition_learning_weights(
                 "weight": legacy_weight,
                 "source": "legacy_provider_bridge",
             }
+            memory.promote_provider_preference(
+                user_id=user_id,
+                source_provider=candidate.provider,
+                source_item_id=candidate.item_id,
+                target_provider=canonical_key[0],
+                target_item_id=canonical_key[1],
+                context=context,
+            )
         else:
             resolved[provider_key] = {
                 "provider": canonical_key[0],
