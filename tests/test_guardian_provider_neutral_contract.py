@@ -32,6 +32,7 @@ def test_guardian_spotify_is_only_a_provider_binding() -> None:
 
     assert "learning_key(" in core_api
     assert "candidate_canonical_track_id(candidate)" in core_api
+    assert "legacy_provider_bridge" in core_api
     assert '"canonical_track_id": echo_track_id' in spotify_boundary
     assert "ProviderTrackBinding(" in spotify_boundary
     assert "provider_track_id=slate_item.track.provider_id" in spotify_boundary

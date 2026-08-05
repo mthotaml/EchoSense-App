@@ -96,6 +96,7 @@ def test_rainy_commute_recommendation_is_grounded_and_traceable(client: TestClie
     assert factors["candidate_slate"][0]["selected"] is True
     assert factors["candidate_slate"][0]["canonical_track_id"] == body["canonical_track_id"]
     assert factors["candidate_slate"][0]["learning_provider"] == "echosense"
+    assert factors["candidate_slate"][0]["learning_source"] == "canonical"
     assert factors["candidate_slate"][0]["provider_binding"] == body["provider_binding"]
     assert factors["candidate_slate"][0]["rank"] == 1
     assert factors["candidate_slate"][0]["novelty_score"] == 1.0

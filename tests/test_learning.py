@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 import echosense.app as app_module
 from echosense.memory import InMemoryPreferenceMemory
-from echosense.providers import FixtureMusicProvider
+from echosense.providers import FixtureMusicProvider, RecommendationCandidate
 from echosense.storage import Storage
 
 
@@ -85,6 +85,57 @@ def test_preference_weight_halves_after_one_half_life() -> None:
     assert stored is not None
     assert stored.weight == 0.5
     assert stored.evidence_count == 1
+
+
+def test_canonical_learning_weight_is_shared_across_provider_bindings() -> None:
+    memory = InMemoryPreferenceMemory()
+    canonical_track_id = "es_recording_shared"
+    memory.apply_outcome(
+        user_id="u1",
+        provider="echosense",
+        item_id=canonical_track_id,
+        context="rainy_commute",
+        delta=0.4,
+        outcome_id="canonical-outcome-1",
+    )
+
+    original = app_module.preference_memory
+    app_module.preference_memory = memory
+    try:
+        weights = app_module.transition_learning_weights(
+            user_id="u1",
+            context="rainy_commute",
+            candidates=[
+                RecommendationCandidate(
+                    provider="spotify",
+                    item_id="spotify-track-1",
+                    canonical_track_id=canonical_track_id,
+                    rationale="Spotify binding",
+                ),
+                RecommendationCandidate(
+                    provider="apple_music",
+                    item_id="apple-song-1",
+                    canonical_track_id=canonical_track_id,
+                    rationale="Apple Music binding",
+                ),
+            ],
+            half_life_days=30,
+        )
+    finally:
+        app_module.preference_memory = original
+
+    assert weights[("spotify", "spotify-track-1")] == {
+        "provider": "echosense",
+        "item_id": canonical_track_id,
+        "weight": 0.4,
+        "source": "canonical",
+    }
+    assert weights[("apple_music", "apple-song-1")] == {
+        "provider": "echosense",
+        "item_id": canonical_track_id,
+        "weight": 0.4,
+        "source": "canonical",
+    }
 
 
 @pytest.fixture()
@@ -183,6 +234,9 @@ def test_negative_preference_can_demote_provider_favorite(client: TestClient) ->
     assert recommendation.status_code == 200
     assert recommendation.json()["item_id"] == "fixture-rain-002"
     trace = client.get(f"/v1/decision-traces/{recommendation.json()['decision_id']}").json()
+    slate = {item["item_id"]: item for item in trace["factors"]["candidate_slate"]}
     assert trace["factors"]["candidate_count"] == 3
+    assert slate["fixture-rain-001"]["learning_provider"] == "echosense"
+    assert slate["fixture-rain-001"]["learning_source"] == "legacy_provider_bridge"
     assert trace["factors"]["preference_weight"] == 0.0
     assert trace["factors"]["ranking_score"] == 0.75
