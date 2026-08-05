@@ -822,6 +822,33 @@ for (const status of [401, 403, 429, 503]) {
   });
 }
 
+test('Guardian keeps disconnected playback on the demo surface', async ({page}) => {
+  let loginRequests = 0;
+  await page.route('https://sdk.scdn.co/spotify-player.js', route =>
+    route.fulfill({contentType: 'application/javascript', body: ''}),
+  );
+  await page.route('**/auth/spotify/session', route =>
+    route.fulfill({json: {connected: false}}),
+  );
+  await page.route('**/auth/spotify/login', route => {
+    loginRequests += 1;
+    return route.fulfill({
+      status: 503,
+      json: {detail: {code: 'spotify_not_configured', missing: 'SPOTIFY_CLIENT_ID'}},
+    });
+  });
+
+  await page.goto('/');
+  await expect(page.locator('#pick-heading')).toHaveText('A Walk');
+  await page.locator('#play').click();
+
+  await expect(page.locator('#toast')).toHaveText(
+    'Connect a streaming service before playing this track. Demo recommendations are preview-only until a provider is connected.',
+  );
+  await expect(page).toHaveURL(/\/$/);
+  expect(loginRequests).toBe(0);
+});
+
 test('Guardian isolates a Spotify playlist outage from core listening', async ({page}) => {
   await page.route('https://sdk.scdn.co/spotify-player.js', route =>
     route.fulfill({contentType: 'application/javascript', body: ''}),

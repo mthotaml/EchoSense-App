@@ -224,6 +224,9 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "let liveRecommendationReady = false" in response.text
     assert "liveRecommendationReady=true" in response.text
     assert "function bindControls()" in response.text
+    assert "function requireStreamingConnection(action='playing this track')" in response.text
+    assert "Connect a streaming service before ${action}." in response.text
+    assert "Demo recommendations are preview-only until a provider is connected." in response.text
     assert "async function loadConnectedSpotifyExperience(session)" in response.text
     assert "Demo mode is ready while Spotify recovers." in response.text
     assert "Spotify connected · recommendation data unavailable" in response.text
@@ -248,6 +251,8 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "skipAndPlayNext" in response.text
     assert "skipInFlight" in response.text
     assert "Spotify did not start the selected EchoSense recommendation" in response.text
+    assert "if(!requireStreamingConnection('playing this track'))return;" in response.text
+    assert "if(!requireStreamingConnection('controlling playback'))return;" in response.text
     assert (
         "Spotify recommendations are temporarily unavailable. Refresh EchoSense to retry."
         in response.text
