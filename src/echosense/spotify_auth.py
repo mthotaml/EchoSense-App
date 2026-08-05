@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 from uuid import uuid4
 
 import httpx
+from cryptography.fernet import Fernet
 from fastapi import APIRouter, Cookie, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
@@ -230,6 +231,19 @@ def _redirect_uri(request: Request | None = None) -> str:
     return DEFAULT_REDIRECT_URI
 
 
+def _token_storage_configured() -> bool:
+    return bool(
+        os.getenv("ECHOSENSE_TOKEN_ENCRYPTION_KEY", "").strip()
+        or os.getenv("ECHOSENSE_TOKEN_ENCRYPTION_KEYS", "").strip()
+    )
+
+
+def _ensure_runtime_token_storage_key() -> None:
+    if _token_storage_configured():
+        return
+    os.environ["ECHOSENSE_TOKEN_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+
+
 def _scopes() -> str:
     return os.getenv("SPOTIFY_SCOPES", DEFAULT_SCOPES).strip()
 
@@ -403,6 +417,7 @@ def spotify_config(request: Request) -> dict[str, object]:
         "redirect_uri": _redirect_uri(request),
         "client_id_configured": bool(os.getenv("SPOTIFY_CLIENT_ID", "").strip()),
         "client_secret_configured": bool(os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()),
+        "token_storage_configured": _token_storage_configured(),
     }
 
 
@@ -411,12 +426,14 @@ def save_spotify_config(request: SpotifyRuntimeConfigRequest) -> dict[str, objec
     os.environ["SPOTIFY_CLIENT_ID"] = request.client_id.strip()
     os.environ["SPOTIFY_CLIENT_SECRET"] = request.client_secret.strip()
     os.environ["SPOTIFY_REDIRECT_URI"] = request.redirect_uri.strip()
+    _ensure_runtime_token_storage_key()
     return {
         "configured": True,
         "missing": [],
         "redirect_uri": _redirect_uri(),
         "client_id_configured": True,
         "client_secret_configured": True,
+        "token_storage_configured": True,
     }
 
 
@@ -479,7 +496,13 @@ def spotify_callback(
         expires_at=datetime.now(UTC) + timedelta(seconds=expires_in),
         profile=profile,
     )
-    get_connection_repository().save(connection)
+    try:
+        get_connection_repository().save(connection)
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        if detail.get("code") == "spotify_token_storage_not_configured":
+            return RedirectResponse("/?spotify_error=token_storage_not_configured", status_code=302)
+        raise
     response = RedirectResponse("/?spotify=connected", status_code=302)
     response.delete_cookie(STATE_COOKIE)
     response.delete_cookie(VERIFIER_COOKIE)

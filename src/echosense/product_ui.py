@@ -517,6 +517,7 @@ PAGE = r"""<!doctype html>
       const messages={
         invalid_oauth_state:'Spotify sign-in expired or was opened from an old tab. Click Connect Spotify and complete sign-in from this window.',
         missing_pkce_verifier:'Spotify sign-in expired before it could be verified. Click Connect Spotify and try again.',
+        token_storage_not_configured:'Spotify sign-in needs local token storage setup first. Save the Spotify setup details, then sign in again.',
         access_denied:'Spotify sign-in was cancelled. Connect Spotify when you are ready.'
       };
       setText('#toast',messages[error]||'Spotify sign-in could not finish. Click Connect Spotify and try again.');
