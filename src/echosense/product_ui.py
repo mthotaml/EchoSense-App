@@ -321,6 +321,7 @@ PAGE = r"""<!doctype html>
     let playbackCommandInFlight = 0;
     let activePlaybackTrackId = null;
     let activePlaybackDecisionId = null;
+    let liveRecommendationReady = false;
     const decisionByTrackId = new Map();
     let liveContext = null;
     let temporalMoodProfile = null;
@@ -583,7 +584,7 @@ PAGE = r"""<!doctype html>
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
       renderBoostControls(data.effective_weights||{});renderMomentImpact(data.moment_impact);const cachedPlan=data.resilience?.mode==='last_known_good';$('#context-statement').hidden=cachedPlan;if(!cachedPlan)setText('#context-statement',data.context_statement||'Music DNA and the current listening moment are shaping the next track.');setText('#dna-plan-statement',`${data.moment_impact?.message||''} ${data.context_statement||'Music DNA and the current listening moment shaped this final playback order.'}`.trim());
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · EchoSense recommendation from your Music DNA`); setText('#match',`${pick.match_score}% EchoSense score`);$('#match').title='EchoSense Recommendation Score: the final normalized result after Music DNA affinity, live context, learned preference, diversity, and boosts are applied.';$('#match').setAttribute('aria-label',`${pick.match_score}% EchoSense Recommendation Score. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected as an EchoSense recommendation'}`);renderMomentImpact(data.moment_impact,explained);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your Music DNA. Choose Driving, Working, Exercising, Relaxing, or Social for recommendations tailored to that moment and your taste.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense used moment-specific catalog evidence and your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
+      if (pick) { liveRecommendationReady=true; const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · EchoSense recommendation from your Music DNA`); setText('#match',`${pick.match_score}% EchoSense score`);$('#match').title='EchoSense Recommendation Score: the final normalized result after Music DNA affinity, live context, learned preference, diversity, and boosts are applied.';$('#match').setAttribute('aria-label',`${pick.match_score}% EchoSense Recommendation Score. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected as an EchoSense recommendation'}`);renderMomentImpact(data.moment_impact,explained);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your Music DNA. Choose Driving, Working, Exercising, Relaxing, or Social for recommendations tailored to that moment and your taste.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense used moment-specific catalog evidence and your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderMemory(profile,data); renderDnaQueue();
@@ -1147,6 +1148,7 @@ PAGE = r"""<!doctype html>
     async function playRecommendation() {
       if(!spotifyConnected){location.href='/auth/spotify/login';return;}
       if(!deviceId) throw new Error('Player is not ready yet.');
+      if(!liveRecommendationReady) throw new Error('Spotify recommendations are temporarily unavailable. Refresh EchoSense to retry.');
       if(!currentRecommendationId||!currentPlayOutcomeId) throw new Error('Recommendation is not ready yet.');
       playbackCommandInFlight+=1;
       try {
@@ -1337,10 +1339,38 @@ PAGE = r"""<!doctype html>
       }
     }
 
+    async function loadConnectedSpotifyExperience(session) {
+      initializeSpotifyPlayer();
+      await loadProviderStatus();
+      try {
+        const initialData=await loadLiveSpotify();
+        const degraded=initialData.resilience?.mode==='last_known_good';
+        $('#playlists-panel').hidden=degraded;
+        await Promise.allSettled([degraded?Promise.resolve():loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]);
+      } catch(error) {
+        liveRecommendationReady=false;
+        $('#playlists-panel').hidden=true;
+        await loadDemo();
+        await Promise.allSettled([loadDevices(),loadListeningIntelligence()]);
+        setText('#player-status','Spotify connected · recommendation data unavailable');
+        setText('#toast',`${error.message} Demo mode is ready while Spotify recovers.`);
+      }
+    }
+
     async function load() {
       renderBoostControls();
+      bindControls();
+      const session=await loadSpotifySession(); if(session){ await loadConnectedSpotifyExperience(session); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
+      progressTimer=setInterval(updateProgressClock,500);
+      autopilotTimer=setInterval(()=>maintainAutopilot().catch(()=>{}),10000);
+      providerStatusTimer=setInterval(()=>loadProviderStatus(),30000);
+      document.addEventListener('visibilitychange',()=>{if(!document.hidden) restorePlaybackState();});
+      window.addEventListener('focus',restorePlaybackState);
+      if(session) { await restorePlaybackState(); await maintainAutopilot(); }
+      if(localStorage.getItem('echosenseContextConsent')==='granted'){$('#consent-context').setAttribute('aria-pressed','true');enableLiveContext();}
+    }
+    function bindControls() {
       $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
-      const session=await loadSpotifySession(); if(session){ initializeSpotifyPlayer();await loadProviderStatus(); const initialData=await loadLiveSpotify();const degraded=initialData.resilience?.mode==='last_known_good';$('#playlists-panel').hidden=degraded;await Promise.allSettled([degraded?Promise.resolve():loadPlaylistsSafely(),loadDevices(),loadListeningIntelligence()]); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
@@ -1372,13 +1402,6 @@ PAGE = r"""<!doctype html>
       $('#volume').addEventListener('input',()=>api('/v1/player/volume',{method:'PUT',body:JSON.stringify({device_id:deviceId,volume_percent:Number($('#volume').value)})}).catch(e=>setText('#toast',e.message)));
       $('#shuffle').addEventListener('click',()=>toggleShuffle().catch(e=>setText('#toast',e.message)));
       $('#repeat').addEventListener('change',()=>setRepeat().catch(e=>setText('#toast',e.message)));
-      progressTimer=setInterval(updateProgressClock,500);
-      autopilotTimer=setInterval(()=>maintainAutopilot().catch(()=>{}),10000);
-      providerStatusTimer=setInterval(()=>loadProviderStatus(),30000);
-      document.addEventListener('visibilitychange',()=>{if(!document.hidden) restorePlaybackState();});
-      window.addEventListener('focus',restorePlaybackState);
-      if(session) { await restorePlaybackState(); await maintainAutopilot(); }
-      if(localStorage.getItem('echosenseContextConsent')==='granted'){$('#consent-context').setAttribute('aria-pressed','true');enableLiveContext();}
     }
     load().catch(e=>setText('#toast',e.message||'EchoSense could not load.'));
   </script>
