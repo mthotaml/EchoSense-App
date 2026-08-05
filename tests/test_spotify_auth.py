@@ -1,3 +1,4 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from threading import Event
@@ -137,23 +138,52 @@ def test_spotify_login_requires_client_id(monkeypatch, client: TestClient) -> No
 
 def test_spotify_config_reports_missing_client_id(monkeypatch, client: TestClient) -> None:
     monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
+    monkeypatch.delenv("SPOTIFY_CLIENT_SECRET", raising=False)
 
     response = client.get("/auth/spotify/config")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "configured": False,
-        "missing": ["SPOTIFY_CLIENT_ID"],
-    }
+    payload = response.json()
+    assert payload["configured"] is False
+    assert payload["missing"] == ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"]
+    assert payload["redirect_uri"] == "http://127.0.0.1:8001/auth/spotify/callback"
+    assert payload["client_id_configured"] is False
+    assert payload["client_secret_configured"] is False
 
 
-def test_spotify_config_reports_ready_client_id(monkeypatch, client: TestClient) -> None:
+def test_spotify_config_reports_ready_credentials(monkeypatch, client: TestClient) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test-client-secret")
 
     response = client.get("/auth/spotify/config")
 
     assert response.status_code == 200
-    assert response.json() == {"configured": True, "missing": []}
+    payload = response.json()
+    assert payload["configured"] is True
+    assert payload["missing"] == []
+    assert payload["client_id_configured"] is True
+    assert payload["client_secret_configured"] is True
+
+
+def test_spotify_config_can_be_saved_for_runtime(monkeypatch, client: TestClient) -> None:
+    monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
+    monkeypatch.delenv("SPOTIFY_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("SPOTIFY_REDIRECT_URI", raising=False)
+
+    response = client.post(
+        "/auth/spotify/config",
+        json={
+            "client_id": " runtime-client-id ",
+            "client_secret": " runtime-client-secret ",
+            "redirect_uri": " http://127.0.0.1:9999/auth/spotify/callback ",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["configured"] is True
+    assert os.environ["SPOTIFY_CLIENT_ID"] == "runtime-client-id"
+    assert os.environ["SPOTIFY_CLIENT_SECRET"] == "runtime-client-secret"
+    assert os.environ["SPOTIFY_REDIRECT_URI"] == ("http://127.0.0.1:9999/auth/spotify/callback")
 
 
 def test_session_requires_encrypted_token_storage_when_cookie_is_present(

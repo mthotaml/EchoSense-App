@@ -824,15 +824,36 @@ for (const status of [401, 403, 429, 503]) {
 
 test('Guardian keeps disconnected playback on the demo surface', async ({page}) => {
   let loginRequests = 0;
+  let configSaved = false;
   await page.route('https://sdk.scdn.co/spotify-player.js', route =>
     route.fulfill({contentType: 'application/javascript', body: ''}),
   );
   await page.route('**/auth/spotify/session', route =>
     route.fulfill({json: {connected: false}}),
   );
-  await page.route('**/auth/spotify/config', route =>
-    route.fulfill({json: {configured: false, missing: ['SPOTIFY_CLIENT_ID']}}),
-  );
+  await page.route('**/auth/spotify/config', async route => {
+    if (route.request().method() === 'POST') {
+      configSaved = true;
+      return route.fulfill({
+        json: {
+          configured: true,
+          missing: [],
+          redirect_uri: 'http://127.0.0.1:8765/auth/spotify/callback',
+          client_id_configured: true,
+          client_secret_configured: true,
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        configured: configSaved,
+        missing: configSaved ? [] : ['SPOTIFY_CLIENT_ID', 'SPOTIFY_CLIENT_SECRET'],
+        redirect_uri: 'http://127.0.0.1:8765/auth/spotify/callback',
+        client_id_configured: configSaved,
+        client_secret_configured: configSaved,
+      },
+    });
+  });
   await page.route('**/auth/spotify/resilience/status', route =>
     route.fulfill({
       json: {
@@ -846,8 +867,7 @@ test('Guardian keeps disconnected playback on the demo surface', async ({page}) 
   await page.route('**/auth/spotify/login', route => {
     loginRequests += 1;
     return route.fulfill({
-      status: 503,
-      json: {detail: {code: 'spotify_not_configured', missing: 'SPOTIFY_CLIENT_ID'}},
+      status: 204,
     });
   });
 
@@ -855,6 +875,11 @@ test('Guardian keeps disconnected playback on the demo surface', async ({page}) 
   await expect(page.locator('#greeting')).toContainText('Mohan.');
   await expect(page.locator('#provider-health')).toBeHidden();
   await expect(page.locator('#provider-resilience')).toBeHidden();
+  await expect(page.locator('#connection-title')).toHaveText('Set up Spotify sign-in');
+  await expect(page.locator('#spotify-setup-panel')).toBeVisible();
+  await expect(page.locator('#spotify-redirect-uri')).toHaveValue(
+    'http://127.0.0.1:8765/auth/spotify/callback',
+  );
   await expect(page.locator('#pick-heading')).toHaveText('A Walk');
   await page.locator('#play').click();
 
@@ -864,17 +889,26 @@ test('Guardian keeps disconnected playback on the demo surface', async ({page}) 
   await expect(page).toHaveURL(/\/$/);
   await page.locator('#connect-button').click();
   await expect(page.locator('#connection-title')).toHaveText(
-    'Spotify sign-in is not set up yet',
+    'Set up Spotify sign-in',
   );
   await expect(page.locator('#connect-button')).toHaveText('Setup needed');
   await expect(page.locator('#toast')).toHaveText(
-    'Spotify sign-in needs app setup first. EchoSense cannot collect your Spotify password directly.',
+    'Spotify sign-in needs app setup first. Add the Client ID and Client Secret from your Spotify app below.',
   );
   await expect(page.locator('#connection-copy')).toHaveText(
-    'Once SPOTIFY_CLIENT_ID is configured, this button will open Spotify’s own sign-in page for your username and password. EchoSense never asks for or stores your Spotify password.',
+    'Enter the Spotify app Client ID and Client Secret once for this local demo session. Then EchoSense opens Spotify’s own sign-in page for your Spotify username and password.',
   );
   await expect(page).toHaveURL(/\/$/);
   expect(loginRequests).toBe(0);
+  await page.locator('#spotify-client-id').fill('client-id-from-dashboard');
+  await page.locator('#spotify-client-secret').fill('client-secret-from-dashboard');
+  await page.locator('#spotify-setup-form').evaluate(form => {
+    form.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+  });
+  await expect(page.locator('#spotify-setup-status')).toHaveText(
+    'Setup saved for this local session. Opening Spotify sign-in...',
+  );
+  await expect.poll(() => loginRequests).toBe(1);
 });
 
 test('Guardian isolates a Spotify playlist outage from core listening', async ({page}) => {

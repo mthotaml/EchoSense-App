@@ -176,6 +176,12 @@ class TemporalMoodSettingRequest(BaseModel):
     enabled: bool
 
 
+class SpotifyRuntimeConfigRequest(BaseModel):
+    client_id: str = Field(min_length=1)
+    client_secret: str = Field(min_length=1)
+    redirect_uri: str = Field(default=DEFAULT_REDIRECT_URI, min_length=1)
+
+
 def get_connection_repository() -> ProviderConnectionRepository:
     global _connection_repository
     if _connection_repository is None:
@@ -381,8 +387,32 @@ def spotify_login(request: Request) -> RedirectResponse:
 
 @router.get("/config")
 def spotify_config() -> dict[str, object]:
-    missing = [name for name in ("SPOTIFY_CLIENT_ID",) if not os.getenv(name, "").strip()]
-    return {"configured": not missing, "missing": missing}
+    missing = [
+        name
+        for name in ("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")
+        if not os.getenv(name, "").strip()
+    ]
+    return {
+        "configured": not missing,
+        "missing": missing,
+        "redirect_uri": _redirect_uri(),
+        "client_id_configured": bool(os.getenv("SPOTIFY_CLIENT_ID", "").strip()),
+        "client_secret_configured": bool(os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()),
+    }
+
+
+@router.post("/config")
+def save_spotify_config(request: SpotifyRuntimeConfigRequest) -> dict[str, object]:
+    os.environ["SPOTIFY_CLIENT_ID"] = request.client_id.strip()
+    os.environ["SPOTIFY_CLIENT_SECRET"] = request.client_secret.strip()
+    os.environ["SPOTIFY_REDIRECT_URI"] = request.redirect_uri.strip()
+    return {
+        "configured": True,
+        "missing": [],
+        "redirect_uri": _redirect_uri(),
+        "client_id_configured": True,
+        "client_secret_configured": True,
+    }
 
 
 @router.get("/callback")

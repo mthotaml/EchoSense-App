@@ -21,6 +21,12 @@ def test_product_copy_keeps_recommendations_provider_neutral() -> None:
     assert "EchoSense will send you to Spotify to sign in" in response.text
     assert "your Spotify password is never entered here" in response.text
     assert "Sign in with Spotify" in response.text
+    assert 'id="spotify-setup-panel"' in response.text
+    assert "Spotify Client ID" in response.text
+    assert "Spotify Client Secret" in response.text
+    assert "Redirect URI" in response.text
+    assert "Save setup and open Spotify sign-in" in response.text
+    assert "These are Spotify app credentials" in response.text
     assert "EchoSense recommendation from your Music DNA" in response.text
     assert "[hidden] { display:none!important; }" in response.text
     assert "available listening evidence did not change this plan" in response.text
@@ -230,13 +236,16 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "liveRecommendationReady=true" in response.text
     assert "function bindControls()" in response.text
     assert "function resetProviderStatus()" in response.text
+    assert "function showSpotifySetup(config={})" in response.text
+    assert "function refreshSpotifySetupState()" in response.text
     assert "function connectStreamingService(event)" in response.text
-    assert "Spotify sign-in is not set up yet" in response.text
-    assert "EchoSense cannot collect your Spotify password directly." in response.text
-    assert "Once SPOTIFY_CLIENT_ID is configured" in response.text
-    assert "EchoSense never asks for or stores your Spotify password." in response.text
+    assert "function saveSpotifySetup(event)" in response.text
+    assert "Enter the Spotify app Client ID and Client Secret" in response.text
+    assert "Client ID, Client Secret, and Redirect URI are all required." in response.text
+    assert "Setup saved for this local session. Opening Spotify sign-in..." in response.text
     assert "spotifyConnected?disconnectSpotify(event)" in response.text
     assert "$('#connect-button').addEventListener('click',connectStreamingService)" in response.text
+    assert "$('#spotify-setup-form').addEventListener('submit'" in response.text
     assert "function requireStreamingConnection(action='playing this track')" in response.text
     assert "Connect a streaming service before ${action}." in response.text
     assert "Demo recommendations are preview-only until a provider is connected." in response.text
