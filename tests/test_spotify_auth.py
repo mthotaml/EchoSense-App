@@ -127,6 +127,17 @@ def test_spotify_login_builds_authorization_redirect(monkeypatch, client: TestCl
     assert "echosense_spotify_pkce_verifier" in response.cookies
 
 
+def test_spotify_login_defaults_redirect_to_current_demo_origin(monkeypatch) -> None:
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+    monkeypatch.delenv("SPOTIFY_REDIRECT_URI", raising=False)
+
+    with TestClient(app, base_url="http://127.0.0.1:8011") as demo_client:
+        response = demo_client.get("/auth/spotify/login", follow_redirects=False)
+
+    query = parse_qs(urlparse(response.headers["location"]).query)
+    assert query["redirect_uri"] == ["http://127.0.0.1:8011/auth/spotify/callback"]
+
+
 def test_spotify_login_requires_client_id(monkeypatch, client: TestClient) -> None:
     monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
 
@@ -146,7 +157,7 @@ def test_spotify_config_reports_missing_client_id(monkeypatch, client: TestClien
     payload = response.json()
     assert payload["configured"] is False
     assert payload["missing"] == ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"]
-    assert payload["redirect_uri"] == "http://127.0.0.1:8001/auth/spotify/callback"
+    assert payload["redirect_uri"] == "http://testserver/auth/spotify/callback"
     assert payload["client_id_configured"] is False
     assert payload["client_secret_configured"] is False
 
