@@ -221,8 +221,13 @@ def _required_environment(name: str) -> str:
     return value
 
 
-def _redirect_uri() -> str:
-    return os.getenv("SPOTIFY_REDIRECT_URI", DEFAULT_REDIRECT_URI).strip()
+def _redirect_uri(request: Request | None = None) -> str:
+    configured_uri = os.getenv("SPOTIFY_REDIRECT_URI", "").strip()
+    if configured_uri:
+        return configured_uri
+    if request is not None:
+        return str(request.url_for("spotify_callback"))
+    return DEFAULT_REDIRECT_URI
 
 
 def _scopes() -> str:
@@ -366,7 +371,7 @@ def spotify_login(request: Request) -> RedirectResponse:
         {
             "client_id": client_id,
             "response_type": "code",
-            "redirect_uri": _redirect_uri(),
+            "redirect_uri": _redirect_uri(request),
             "scope": _scopes(),
             "state": state,
             "code_challenge_method": "S256",
@@ -386,7 +391,7 @@ def spotify_login(request: Request) -> RedirectResponse:
 
 
 @router.get("/config")
-def spotify_config() -> dict[str, object]:
+def spotify_config(request: Request) -> dict[str, object]:
     missing = [
         name
         for name in ("SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET")
@@ -395,7 +400,7 @@ def spotify_config() -> dict[str, object]:
     return {
         "configured": not missing,
         "missing": missing,
-        "redirect_uri": _redirect_uri(),
+        "redirect_uri": _redirect_uri(request),
         "client_id_configured": bool(os.getenv("SPOTIFY_CLIENT_ID", "").strip()),
         "client_secret_configured": bool(os.getenv("SPOTIFY_CLIENT_SECRET", "").strip()),
     }
@@ -445,7 +450,7 @@ def spotify_callback(
                 data={
                     "grant_type": "authorization_code",
                     "code": code,
-                    "redirect_uri": _redirect_uri(),
+                    "redirect_uri": _redirect_uri(request),
                     "code_verifier": verifier,
                 },
                 headers={
