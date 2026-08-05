@@ -160,11 +160,14 @@ def test_spotify_config_reports_missing_client_id(monkeypatch, client: TestClien
     assert payload["redirect_uri"] == "http://testserver/auth/spotify/callback"
     assert payload["client_id_configured"] is False
     assert payload["client_secret_configured"] is False
+    assert payload["token_storage_configured"] is False
 
 
 def test_spotify_config_reports_ready_credentials(monkeypatch, client: TestClient) -> None:
     monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
     monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test-client-secret")
+    monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEYS", raising=False)
 
     response = client.get("/auth/spotify/config")
 
@@ -174,12 +177,15 @@ def test_spotify_config_reports_ready_credentials(monkeypatch, client: TestClien
     assert payload["missing"] == []
     assert payload["client_id_configured"] is True
     assert payload["client_secret_configured"] is True
+    assert payload["token_storage_configured"] is False
 
 
 def test_spotify_config_can_be_saved_for_runtime(monkeypatch, client: TestClient) -> None:
     monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
     monkeypatch.delenv("SPOTIFY_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("SPOTIFY_REDIRECT_URI", raising=False)
+    monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEYS", raising=False)
 
     response = client.post(
         "/auth/spotify/config",
@@ -195,6 +201,8 @@ def test_spotify_config_can_be_saved_for_runtime(monkeypatch, client: TestClient
     assert os.environ["SPOTIFY_CLIENT_ID"] == "runtime-client-id"
     assert os.environ["SPOTIFY_CLIENT_SECRET"] == "runtime-client-secret"
     assert os.environ["SPOTIFY_REDIRECT_URI"] == ("http://127.0.0.1:9999/auth/spotify/callback")
+    assert os.environ["ECHOSENSE_TOKEN_ENCRYPTION_KEY"]
+    assert response.json()["token_storage_configured"] is True
 
 
 def test_session_requires_encrypted_token_storage_when_cookie_is_present(
@@ -233,6 +241,64 @@ def test_spotify_callback_redirects_missing_verifier_to_recovery(client: TestCli
 
     assert response.status_code == 302
     assert response.headers["location"] == "/?spotify_error=missing_pkce_verifier"
+
+
+def test_spotify_callback_redirects_missing_token_storage_to_recovery(
+    monkeypatch, client: TestClient
+) -> None:
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test-client-secret")
+
+    class FakeSpotifyOAuthClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, *args, **kwargs):
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", spotify_auth.SPOTIFY_TOKEN_URL),
+                json={
+                    "access_token": "access-token",
+                    "refresh_token": "refresh-token",
+                    "expires_in": 3600,
+                },
+            )
+
+        def get(self, *args, **kwargs):
+            return httpx.Response(
+                200,
+                request=httpx.Request("GET", spotify_auth.SPOTIFY_PROFILE_URL),
+                json={"id": "spotify-user", "display_name": "Mohan"},
+            )
+
+    def missing_repository():
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "spotify_token_storage_not_configured",
+                "missing": "ECHOSENSE_TOKEN_ENCRYPTION_KEY",
+            },
+        )
+
+    monkeypatch.setattr(
+        spotify_auth.httpx, "Client", lambda *args, **kwargs: FakeSpotifyOAuthClient()
+    )
+    monkeypatch.setattr(spotify_auth, "get_connection_repository", missing_repository)
+
+    response = client.get(
+        "/auth/spotify/callback?code=test-code&state=expected",
+        cookies={
+            "echosense_spotify_oauth_state": "expected",
+            "echosense_spotify_pkce_verifier": "verifier",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/?spotify_error=token_storage_not_configured"
 
 
 def test_spotify_profile_retries_once_after_retry_after() -> None:
