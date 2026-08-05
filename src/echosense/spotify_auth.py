@@ -9,6 +9,7 @@ import time
 from dataclasses import asdict
 from datetime import UTC, datetime, timedelta
 from math import ceil
+from pathlib import Path
 from threading import Lock
 from typing import Callable, Literal, TypeVar
 from urllib.parse import urlencode
@@ -196,6 +197,14 @@ def get_connection_repository() -> ProviderConnectionRepository:
                     "missing": "ECHOSENSE_TOKEN_ENCRYPTION_KEY",
                 },
             ) from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "spotify_token_storage_unavailable",
+                    "message": "EchoSense could not open local token storage.",
+                },
+            ) from exc
     return _connection_repository
 
 
@@ -242,6 +251,13 @@ def _ensure_runtime_token_storage_key() -> None:
     if _token_storage_configured():
         return
     os.environ["ECHOSENSE_TOKEN_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
+
+
+def _ensure_runtime_demo_database() -> None:
+    if os.getenv("ECHOSENSE_DATABASE_URL", "").strip():
+        return
+    database_path = Path.cwd() / ".echosense" / "local-demo.db"
+    os.environ["ECHOSENSE_DATABASE_URL"] = f"sqlite:///{database_path}"
 
 
 def _scopes() -> str:
@@ -427,6 +443,7 @@ def save_spotify_config(request: SpotifyRuntimeConfigRequest) -> dict[str, objec
     os.environ["SPOTIFY_CLIENT_SECRET"] = request.client_secret.strip()
     os.environ["SPOTIFY_REDIRECT_URI"] = request.redirect_uri.strip()
     _ensure_runtime_token_storage_key()
+    _ensure_runtime_demo_database()
     return {
         "configured": True,
         "missing": [],
@@ -502,6 +519,8 @@ def spotify_callback(
         detail = exc.detail if isinstance(exc.detail, dict) else {}
         if detail.get("code") == "spotify_token_storage_not_configured":
             return RedirectResponse("/?spotify_error=token_storage_not_configured", status_code=302)
+        if detail.get("code") == "spotify_token_storage_unavailable":
+            return RedirectResponse("/?spotify_error=token_storage_unavailable", status_code=302)
         raise
     response = RedirectResponse("/?spotify=connected", status_code=302)
     response.delete_cookie(STATE_COOKIE)
