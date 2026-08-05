@@ -243,6 +243,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "function showSpotifyCallbackNotice()" in response.text
     assert "Spotify sign-in expired or was opened from an old tab." in response.text
     assert "Spotify sign-in needs local token storage setup first." in response.text
+    assert "EchoSense could not open local token storage." in response.text
     assert "showSpotifyCallbackNotice();" in response.text
     assert "Enter the Spotify app Client ID and Client Secret" in response.text
     assert "Client ID, Client Secret, and Redirect URI are all required." in response.text

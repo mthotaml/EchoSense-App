@@ -180,12 +180,14 @@ def test_spotify_config_reports_ready_credentials(monkeypatch, client: TestClien
     assert payload["token_storage_configured"] is False
 
 
-def test_spotify_config_can_be_saved_for_runtime(monkeypatch, client: TestClient) -> None:
+def test_spotify_config_can_be_saved_for_runtime(tmp_path, monkeypatch, client: TestClient) -> None:
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
     monkeypatch.delenv("SPOTIFY_CLIENT_SECRET", raising=False)
     monkeypatch.delenv("SPOTIFY_REDIRECT_URI", raising=False)
     monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEY", raising=False)
     monkeypatch.delenv("ECHOSENSE_TOKEN_ENCRYPTION_KEYS", raising=False)
+    monkeypatch.delenv("ECHOSENSE_DATABASE_URL", raising=False)
 
     response = client.post(
         "/auth/spotify/config",
@@ -202,6 +204,9 @@ def test_spotify_config_can_be_saved_for_runtime(monkeypatch, client: TestClient
     assert os.environ["SPOTIFY_CLIENT_SECRET"] == "runtime-client-secret"
     assert os.environ["SPOTIFY_REDIRECT_URI"] == ("http://127.0.0.1:9999/auth/spotify/callback")
     assert os.environ["ECHOSENSE_TOKEN_ENCRYPTION_KEY"]
+    assert (
+        os.environ["ECHOSENSE_DATABASE_URL"] == f"sqlite:///{tmp_path / '.echosense/local-demo.db'}"
+    )
     assert response.json()["token_storage_configured"] is True
 
 
@@ -299,6 +304,64 @@ def test_spotify_callback_redirects_missing_token_storage_to_recovery(
 
     assert response.status_code == 302
     assert response.headers["location"] == "/?spotify_error=token_storage_not_configured"
+
+
+def test_spotify_callback_redirects_unavailable_token_storage_to_recovery(
+    monkeypatch, client: TestClient
+) -> None:
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("SPOTIFY_CLIENT_SECRET", "test-client-secret")
+
+    class FakeSpotifyOAuthClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, *args, **kwargs):
+            return httpx.Response(
+                200,
+                request=httpx.Request("POST", spotify_auth.SPOTIFY_TOKEN_URL),
+                json={
+                    "access_token": "access-token",
+                    "refresh_token": "refresh-token",
+                    "expires_in": 3600,
+                },
+            )
+
+        def get(self, *args, **kwargs):
+            return httpx.Response(
+                200,
+                request=httpx.Request("GET", spotify_auth.SPOTIFY_PROFILE_URL),
+                json={"id": "spotify-user", "display_name": "Mohan"},
+            )
+
+    def unavailable_repository():
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "spotify_token_storage_unavailable",
+                "message": "EchoSense could not open local token storage.",
+            },
+        )
+
+    monkeypatch.setattr(
+        spotify_auth.httpx, "Client", lambda *args, **kwargs: FakeSpotifyOAuthClient()
+    )
+    monkeypatch.setattr(spotify_auth, "get_connection_repository", unavailable_repository)
+
+    response = client.get(
+        "/auth/spotify/callback?code=test-code&state=expected",
+        cookies={
+            "echosense_spotify_oauth_state": "expected",
+            "echosense_spotify_pkce_verifier": "verifier",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["location"] == "/?spotify_error=token_storage_unavailable"
 
 
 def test_spotify_profile_retries_once_after_retry_after() -> None:
