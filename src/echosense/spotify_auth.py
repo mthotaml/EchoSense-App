@@ -828,6 +828,14 @@ def spotify_data(
                 explanation=slate_item.reason,
                 provider_bindings=(provider_binding,),
             )
+            trace_candidate_slate = []
+            for candidate in candidate_slate:
+                traced_candidate = dict(candidate)
+                if traced_candidate["item_id"] == slate_item.track.provider_id:
+                    traced_candidate["canonical_track_id"] = echo_track_id
+                    traced_candidate["learning_provider"] = "echosense"
+                    traced_candidate["provider_binding"] = binding_as_dict(provider_binding)
+                trace_candidate_slate.append(traced_candidate)
             inferred_mood = temporal_service.infer_track(
                 slate_item.track,
                 context_evidence,
@@ -869,7 +877,7 @@ def spotify_data(
                         "duration_ms": slate_item.track.duration_ms,
                     },
                     "recommendation_score": ranked_candidate["normalized_score"],
-                    "candidate_slate": candidate_slate,
+                    "candidate_slate": trace_candidate_slate,
                     "music_dna_confidence": music_dna.confidence,
                     "evidence_count": music_dna.evidence_count,
                     "listening_moment": effective_moment,
