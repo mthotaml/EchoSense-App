@@ -783,7 +783,13 @@ test('Guardian renders Spotify data failures without leaking JavaScript errors',
 
   await page.goto('/');
 
-  await expect(page.locator('#toast')).toHaveText('Provider unavailable');
+  await expect(page.locator('#toast')).toHaveText(
+    'Provider unavailable Demo mode is ready while Spotify recovers.',
+  );
+  await expect(page.locator('#pick-heading')).toHaveText('A Walk');
+  await expect(page.locator('#player-status')).toHaveText(
+    'Spotify connected · recommendation data unavailable',
+  );
   await expect(page.locator('#toast')).not.toContainText('display_name');
 });
 
@@ -808,7 +814,10 @@ for (const status of [401, 403, 429, 503]) {
 
     await page.goto('/');
 
-    await expect(page.locator('#toast')).toHaveText('Spotify is temporarily unavailable');
+    await expect(page.locator('#toast')).toHaveText(
+      'Spotify is temporarily unavailable Demo mode is ready while Spotify recovers.',
+    );
+    await expect(page.locator('#pick-heading')).toHaveText('A Walk');
     expect(pageErrors).toEqual([]);
   });
 }
