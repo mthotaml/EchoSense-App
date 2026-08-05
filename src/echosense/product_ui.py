@@ -81,6 +81,7 @@ PAGE = r"""<!doctype html>
   <style>
     :root { color-scheme:dark; --bg:#07090d; --surface:#11151d; --soft:#0c1017; --text:#f5f7fb; --muted:#929caf; --line:#242b38; --accent:#d8ffea; }
     * { box-sizing:border-box; }
+    [hidden] { display:none!important; }
     .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
     body { margin:0; min-height:100vh; font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:radial-gradient(circle at 50% -12%,#172133 0,#07090d 38%); color:var(--text); padding-bottom:112px; }
     nav { max-width:920px; margin:auto; padding:24px; display:flex; justify-content:space-between; align-items:center; gap:20px; }
@@ -441,11 +442,29 @@ PAGE = r"""<!doctype html>
       return response;
     }
 
+    function resetProviderStatus() {
+      spotifyProviderCooldownUntil=0; spotifyProviderCooldownStatus=null;
+      const health=$('#provider-health');health.hidden=true;health.classList.remove('cooldown');setText('#provider-health','Spotify protected');
+      $('#provider-resilience').hidden=true;
+    }
+
+    async function connectStreamingService(event) {
+      event.preventDefault();
+      try {
+        const config=await (await api('/auth/spotify/config')).json();
+        if(config.configured){location.href='/auth/spotify/login';return;}
+        setText('#toast','Spotify is not configured yet. Add SPOTIFY_CLIENT_ID before connecting a streaming service.');
+        setText('#connection-copy','The demo is ready, but Spotify sign-in needs app credentials before live streaming can be connected.');
+      } catch(error) {
+        setText('#toast','EchoSense could not check Spotify setup. Try again before the demo.');
+      }
+    }
+
     async function loadSpotifySession() {
       const response = await fetch('/auth/spotify/session');
       if (!response.ok) return null;
       const session = await response.json(); spotifyConnected = session.connected;
-      if (!session.connected) return null;
+      if (!session.connected) { resetProviderStatus(); return null; }
       const name = session.profile.display_name || 'Spotify listener';
       setText('#account-status', `Connected as ${name}`); setText('#account-action','Disconnect'); $('#account-action').href='#'; $('#account').classList.add('connected');
       setText('#connection-title', `Spotify connected as ${name}`); setText('#connection-copy','Your Spotify history and browser player are powering EchoSense.');
@@ -488,6 +507,7 @@ PAGE = r"""<!doctype html>
     }
 
     function renderProviderStatus(status={mode:'live'}) {
+      if(!spotifyConnected){resetProviderStatus();return;}
       const health=$('#provider-health');health.hidden=false;
       const cooldown=status.mode==='cooldown';
       health.classList.toggle('cooldown',cooldown);
@@ -509,7 +529,7 @@ PAGE = r"""<!doctype html>
     }
 
     async function loadProviderStatus() {
-      if(!spotifyConnected)return;
+      if(!spotifyConnected){resetProviderStatus();return;}
       try { const response=await api('/auth/spotify/resilience/status');renderProviderStatus(await response.json()); }
       catch(error) { if(error.status!==401)setText('#provider-health','Spotify protection status unavailable'); }
     }
@@ -1377,7 +1397,8 @@ PAGE = r"""<!doctype html>
       if(localStorage.getItem('echosenseContextConsent')==='granted'){$('#consent-context').setAttribute('aria-pressed','true');enableLiveContext();}
     }
     function bindControls() {
-      $('#account-action').addEventListener('click',event=>disconnectSpotify(event).catch(e=>setText('#toast',e.message)));
+      $('#account-action').addEventListener('click',event=>spotifyConnected?disconnectSpotify(event).catch(e=>setText('#toast',e.message)):connectStreamingService(event));
+      $('#connect-button').addEventListener('click',connectStreamingService);
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));

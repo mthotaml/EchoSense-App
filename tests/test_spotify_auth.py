@@ -135,6 +135,27 @@ def test_spotify_login_requires_client_id(monkeypatch, client: TestClient) -> No
     assert response.json()["detail"]["code"] == "spotify_not_configured"
 
 
+def test_spotify_config_reports_missing_client_id(monkeypatch, client: TestClient) -> None:
+    monkeypatch.delenv("SPOTIFY_CLIENT_ID", raising=False)
+
+    response = client.get("/auth/spotify/config")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "configured": False,
+        "missing": ["SPOTIFY_CLIENT_ID"],
+    }
+
+
+def test_spotify_config_reports_ready_client_id(monkeypatch, client: TestClient) -> None:
+    monkeypatch.setenv("SPOTIFY_CLIENT_ID", "test-client-id")
+
+    response = client.get("/auth/spotify/config")
+
+    assert response.status_code == 200
+    assert response.json() == {"configured": True, "missing": []}
+
+
 def test_session_requires_encrypted_token_storage_when_cookie_is_present(
     monkeypatch, client: TestClient
 ) -> None:

@@ -379,6 +379,12 @@ def spotify_login(request: Request) -> RedirectResponse:
     return response
 
 
+@router.get("/config")
+def spotify_config() -> dict[str, object]:
+    missing = [name for name in ("SPOTIFY_CLIENT_ID",) if not os.getenv(name, "").strip()]
+    return {"configured": not missing, "missing": missing}
+
+
 @router.get("/callback")
 def spotify_callback(
     request: Request,
