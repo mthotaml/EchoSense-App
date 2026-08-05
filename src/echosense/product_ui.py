@@ -102,6 +102,15 @@ PAGE = r"""<!doctype html>
     .provider-health { color:#bfffd5; border-color:rgba(30,215,96,.25); }
     .provider-health.cooldown { color:#ffe0ad; border-color:rgba(255,183,77,.35); }
     .connection,.pick-top { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; }
+    .connection-main { flex:1; min-width:0; }
+    .setup-panel { margin-top:20px; display:grid; gap:14px; max-width:720px; }
+    .setup-steps { margin:0; padding-left:20px; color:var(--muted); line-height:1.6; }
+    .setup-form { display:grid; gap:12px; padding:16px; border:1px solid var(--line); border-radius:14px; background:rgba(7,10,15,.44); }
+    .setup-form label { display:grid; gap:7px; color:var(--muted); font-size:.84rem; font-weight:650; }
+    .setup-form input { width:100%; border:1px solid #343d4f; border-radius:10px; padding:11px 12px; background:#080d14; color:var(--text); font:inherit; }
+    .setup-form small { color:var(--muted); line-height:1.4; }
+    .setup-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .setup-note { color:var(--muted); font-size:.8rem; line-height:1.5; }
     .track { margin:16px 0 4px; font-size:clamp(2.2rem,6vw,4.4rem); letter-spacing:-.055em; line-height:1; }
     .artist { color:var(--muted); font-size:1.15rem; }
     .match { color:var(--accent); font-weight:700; white-space:nowrap; margin-top:18px; }
@@ -274,7 +283,7 @@ PAGE = r"""<!doctype html>
   <nav><div class="brand"><span class="brand-mark">≋</span>EchoSense</div><div id="account" class="account"><span class="status-dot" aria-hidden="true"></span><span id="account-status">Spotify not connected</span><span id="provider-health" class="scope-badge provider-health" hidden>Spotify protected</span><button id="settings-trigger" class="secondary" type="button">Settings</button><a id="account-action" class="button-link secondary" href="/auth/spotify/login">Connect Spotify</a></div></nav>
   <main>
     <section class="intro"><div class="eyebrow">Your daily listening companion</div><h1 id="greeting">Good evening.</h1><p class="lead">EchoSense listens to you. Music selected from your DNA, your context, and what it learns—with every decision explained.</p></section>
-    <section id="connection-panel" class="panel connection"><div><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">A connected provider gives EchoSense the permitted signals needed to begin building your real Music DNA. EchoSense will send you to Spotify to sign in; your Spotify password is never entered here.</p></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Sign in with Spotify</a></section>
+    <section id="connection-panel" class="panel connection"><div class="connection-main"><div class="eyebrow">Train once. Listen everywhere.</div><h2 id="connection-title">Connect your first music provider</h2><p id="connection-copy" class="connection-copy">A connected provider gives EchoSense the permitted signals needed to begin building your real Music DNA. EchoSense will send you to Spotify to sign in; your Spotify password is never entered here.</p><div id="spotify-setup-panel" class="setup-panel" hidden><ol class="setup-steps"><li>Create or open a Spotify app in the Spotify Developer Dashboard.</li><li>Add the redirect URI shown below to that Spotify app.</li><li>Paste the app Client ID and Client Secret here, then continue to Spotify sign-in.</li></ol><form id="spotify-setup-form" class="setup-form"><label>Spotify Client ID<input id="spotify-client-id" autocomplete="off" placeholder="Paste Client ID from your Spotify app"></label><label>Spotify Client Secret<input id="spotify-client-secret" type="password" autocomplete="off" placeholder="Paste Client Secret from your Spotify app"></label><label>Redirect URI<input id="spotify-redirect-uri" autocomplete="off"></label><small>Use this same Redirect URI in the Spotify app settings.</small><div class="setup-actions"><button id="spotify-setup-submit" class="primary" type="submit">Save setup and open Spotify sign-in</button><span id="spotify-setup-status" class="setup-note" aria-live="polite"></span></div></form><p class="setup-note">These are Spotify app credentials for this local demo server, not your Spotify account password.</p></div></div><a id="connect-button" class="button-link primary" href="/auth/spotify/login">Sign in with Spotify</a></section>
     <aside id="provider-resilience" class="resilience-banner" role="status" aria-live="polite" hidden><div><strong id="provider-resilience-title">Spotify is cooling down</strong><span id="provider-resilience-copy">EchoSense is using your last verified playback plan.</span></div><div><span id="provider-resilience-timer"></span><details><summary>Request protection details</summary><span id="provider-resilience-details">Loading request budget…</span></details></div></aside>
     <section id="listening-controls" class="panel control-center"><div class="control-center-header"><div><div class="eyebrow blue">Listening controls</div><h2>Shape what plays next</h2></div></div><div class="control-groups"><section id="moment-panel" class="control-group"><div class="eyebrow">Listening moment</div><h3>What are you doing?</h3><label class="sr-only" for="moment">Listening moment</label><select id="moment" class="secondary moment-select" aria-label="Listening moment"><option value="general">Any moment</option><option value="driving">Driving</option><option value="working">Working</option><option value="exercising">Exercising</option><option value="relaxing">Relaxing</option><option value="social">Social</option></select><p id="moment-impact" class="moment-impact" aria-live="polite">Choose an activity to tune the order.</p></section><section id="boost-panel" class="control-group"><div class="eyebrow blue">Recommendation priorities</div><h3>What should matter more?</h3><div id="boost-controls" class="boost-grid"></div></section><section id="live-context-panel" class="control-group context-group"><div><div class="eyebrow">Live context</div><h3>Add situational signals</h3><p id="context-status" class="connection-copy">Optional: weather, area, road, and movement.</p><div id="context-chips" class="context-chips"></div><details class="privacy-note"><summary>Privacy</summary>Location resolves current conditions; raw coordinates are not stored.</details></div><button id="context-toggle" class="secondary" type="button">Enable context</button></section></div><p id="context-statement" class="context-statement" aria-live="polite">Preparing your next-track context…</p></section>
     <section id="temporal-mood-panel" class="panel connection"><div><div class="eyebrow">Learned listening rhythm</div><h2>Mood patterns, with your control</h2><p id="temporal-mood-status" class="connection-copy">EchoSense needs repeated qualified listening before it claims a time-based mood pattern.</p><div id="temporal-mood-chips" class="context-chips"></div><p class="evidence">Listening trends describe music choices, never your mental or medical state.</p></div><div class="actions"><button id="temporal-mood-correct" class="secondary" type="button" disabled>Not my pattern</button><button id="temporal-mood-toggle" class="secondary" type="button">Disable learning</button><button id="temporal-mood-reset" class="secondary" type="button">Reset patterns</button></div></section>
@@ -448,17 +457,56 @@ PAGE = r"""<!doctype html>
       $('#provider-resilience').hidden=true;
     }
 
+    function showSpotifySetup(config={}) {
+      $('#spotify-setup-panel').hidden=false;
+      $('#spotify-redirect-uri').value=config.redirect_uri||'http://127.0.0.1:8001/auth/spotify/callback';
+      setText('#connection-title','Set up Spotify sign-in');
+      setText('#connect-button','Setup needed');
+      setText('#connection-copy','Enter the Spotify app Client ID and Client Secret once for this local demo session. Then EchoSense opens Spotify’s own sign-in page for your Spotify username and password.');
+      setText('#spotify-setup-status','');
+    }
+
+    async function refreshSpotifySetupState() {
+      try {
+        const config=await (await api('/auth/spotify/config')).json();
+        if(!config.configured)showSpotifySetup(config);
+        else { $('#spotify-setup-panel').hidden=true; setText('#connect-button','Sign in with Spotify'); }
+        return config;
+      } catch(error) {
+        setText('#spotify-setup-status','Could not check Spotify setup.');
+        return null;
+      }
+    }
+
     async function connectStreamingService(event) {
       event.preventDefault();
       try {
         const config=await (await api('/auth/spotify/config')).json();
         if(config.configured){location.href='/auth/spotify/login';return;}
-        setText('#connection-title','Spotify sign-in is not set up yet');
-        setText('#connect-button','Setup needed');
-        setText('#toast','Spotify sign-in needs app setup first. EchoSense cannot collect your Spotify password directly.');
-        setText('#connection-copy','Once SPOTIFY_CLIENT_ID is configured, this button will open Spotify’s own sign-in page for your username and password. EchoSense never asks for or stores your Spotify password.');
+        showSpotifySetup(config);
+        setText('#toast','Spotify sign-in needs app setup first. Add the Client ID and Client Secret from your Spotify app below.');
       } catch(error) {
         setText('#toast','EchoSense could not check Spotify setup. Try again before the demo.');
+      }
+    }
+
+    async function saveSpotifySetup(event) {
+      event.preventDefault();
+      const clientId=$('#spotify-client-id').value.trim();
+      const clientSecret=$('#spotify-client-secret').value.trim();
+      const redirectUri=$('#spotify-redirect-uri').value.trim();
+      if(!clientId||!clientSecret||!redirectUri) {
+        setText('#spotify-setup-status','Client ID, Client Secret, and Redirect URI are all required.');
+        return;
+      }
+      $('#spotify-setup-submit').disabled=true;
+      try {
+        await api('/auth/spotify/config',{method:'POST',body:JSON.stringify({client_id:clientId,client_secret:clientSecret,redirect_uri:redirectUri})});
+        setText('#spotify-setup-status','Setup saved for this local session. Opening Spotify sign-in...');
+        location.href='/auth/spotify/login';
+      } catch(error) {
+        $('#spotify-setup-submit').disabled=false;
+        setText('#spotify-setup-status',error.message||'Could not save Spotify setup.');
       }
     }
 
@@ -1390,6 +1438,7 @@ PAGE = r"""<!doctype html>
       renderBoostControls();
       bindControls();
       const session=await loadSpotifySession(); if(session){ await loadConnectedSpotifyExperience(session); } else {await loadDemo();renderListeningIntelligence({data_status:'learning',summary:{},moments:[],trend:[],history:[]});}
+      if(!session)await refreshSpotifySetupState();
       progressTimer=setInterval(updateProgressClock,500);
       autopilotTimer=setInterval(()=>maintainAutopilot().catch(()=>{}),10000);
       providerStatusTimer=setInterval(()=>loadProviderStatus(),30000);
@@ -1401,6 +1450,7 @@ PAGE = r"""<!doctype html>
     function bindControls() {
       $('#account-action').addEventListener('click',event=>spotifyConnected?disconnectSpotify(event).catch(e=>setText('#toast',e.message)):connectStreamingService(event));
       $('#connect-button').addEventListener('click',connectStreamingService);
+      $('#spotify-setup-form').addEventListener('submit',event=>saveSpotifySetup(event).catch(e=>setText('#spotify-setup-status',e.message)));
       $('#play').addEventListener('click',()=>playRecommendation().catch(e=>setText('#toast',e.message)));
       $('#save').addEventListener('click',()=>toggleSaved().catch(e=>{renderSavedState(currentTrackSaved);setText('#toast',e.message);}));
       $('#queue-refresh').addEventListener('click',()=>loadQueue().catch(e=>setText('#toast',e.message)));
