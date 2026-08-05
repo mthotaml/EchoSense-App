@@ -18,6 +18,9 @@ def test_product_copy_keeps_recommendations_provider_neutral() -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "A connected provider gives EchoSense the permitted signals" in response.text
+    assert "EchoSense will send you to Spotify to sign in" in response.text
+    assert "your Spotify password is never entered here" in response.text
+    assert "Sign in with Spotify" in response.text
     assert "EchoSense recommendation from your Music DNA" in response.text
     assert "[hidden] { display:none!important; }" in response.text
     assert "available listening evidence did not change this plan" in response.text
@@ -228,7 +231,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "function bindControls()" in response.text
     assert "function resetProviderStatus()" in response.text
     assert "function connectStreamingService(event)" in response.text
-    assert "Spotify is not configured yet. Add SPOTIFY_CLIENT_ID" in response.text
+    assert "Spotify sign-in is not set up yet" in response.text
+    assert "EchoSense cannot collect your Spotify password directly." in response.text
+    assert "Once SPOTIFY_CLIENT_ID is configured" in response.text
+    assert "EchoSense never asks for or stores your Spotify password." in response.text
     assert "spotifyConnected?disconnectSpotify(event)" in response.text
     assert "$('#connect-button').addEventListener('click',connectStreamingService)" in response.text
     assert "function requireStreamingConnection(action='playing this track')" in response.text
