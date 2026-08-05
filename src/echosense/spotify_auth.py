@@ -40,6 +40,7 @@ from echosense.recommendation_contract import (
     CanonicalRecommendation,
     ProviderTrackBinding,
     binding_as_dict,
+    resolve_provider_binding,
 )
 from echosense.recording_identity import RecordingReference
 from echosense.repositories.music_dna import MusicDNARepository
@@ -1063,22 +1064,30 @@ def spotify_data(
         ),
     )
     if result["recommendation"] is not None and recommendation is not None:
+        selected_contract = canonical_recommendations[recommendation.provider_id]
+        selected_binding = resolve_provider_binding(selected_contract, "spotify")
+        if selected_binding is None:
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "spotify_playback_binding_unavailable"},
+            )
         result["recommendation"]["canonical_track_id"] = canonical_track_ids[
             recommendation.provider_id
         ]
-        result["recommendation"]["provider_binding"] = binding_as_dict(
-            provider_bindings[recommendation.provider_id]
-        )
-        result["recommendation"]["recommendation"] = canonical_recommendations[
-            recommendation.provider_id
-        ].as_dict()
+        result["recommendation"]["provider_binding"] = binding_as_dict(selected_binding)
+        result["recommendation"]["recommendation"] = selected_contract.as_dict()
     if recommendation is None:
         result["recommendation"] = None
     result["recommendations"] = [
         {
             **music_dna_service._track_view(item.track),
             "canonical_track_id": canonical_track_ids[item.track.provider_id],
-            "provider_binding": binding_as_dict(provider_bindings[item.track.provider_id]),
+            "provider_binding": binding_as_dict(
+                resolve_provider_binding(
+                    canonical_recommendations[item.track.provider_id], "spotify"
+                )
+                or provider_bindings[item.track.provider_id]
+            ),
             "recommendation": canonical_recommendations[item.track.provider_id].as_dict(),
             "rank": item.rank,
             "score": item.score,

@@ -91,6 +91,31 @@ def binding_as_dict(binding: ProviderTrackBinding) -> dict[str, object]:
     }
 
 
+def resolve_provider_binding(
+    recommendation: CanonicalRecommendation,
+    preferred_provider: str | None = None,
+    *,
+    require_playable: bool = True,
+) -> ProviderTrackBinding | None:
+    """Resolve a canonical recommendation to a provider-specific playback binding."""
+
+    bindings = recommendation.provider_bindings
+    if preferred_provider:
+        return next(
+            (
+                binding
+                for binding in bindings
+                if binding.provider == preferred_provider
+                and (binding.playable or not require_playable)
+            ),
+            None,
+        )
+    return next(
+        (binding for binding in bindings if binding.playable or not require_playable),
+        None,
+    )
+
+
 def learning_key(canonical_track_id: str) -> tuple[str, str]:
     return (PROVIDER_NEUTRAL_PROVIDER, canonical_track_id)
 
