@@ -14,6 +14,19 @@ def test_landing_page_is_available() -> None:
     assert "Your Music DNA" in response.text
 
 
+def test_product_copy_keeps_recommendations_provider_neutral() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "A connected provider gives EchoSense the permitted signals" in response.text
+    assert "EchoSense recommendation from your Music DNA" in response.text
+    assert "available listening evidence did not change this plan" in response.text
+    assert "Connect a music provider for your real listening context" in response.text
+    assert "more distinct provider candidates" in response.text
+    assert "based on your Spotify taste" not in response.text
+    assert "available Spotify evidence did not change this plan" not in response.text
+    assert "more distinct Spotify candidates" not in response.text
+
+
 def test_demo_profile_is_ready() -> None:
     response = client.get("/v1/demo/taste-profile")
     assert response.status_code == 200
