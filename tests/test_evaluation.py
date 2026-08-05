@@ -24,6 +24,15 @@ def test_counterfactual_report_is_read_only_and_deterministic() -> None:
             {
                 "provider": "apple_music",
                 "item_id": "selected",
+                "canonical_track_id": "es_recording_selected",
+                "provider_binding": {
+                    "provider": "apple_music",
+                    "provider_track_id": "selected",
+                    "canonical_track_id": "es_recording_selected",
+                    "playable": True,
+                    "uri": None,
+                    "external_url": None,
+                },
                 "provider_base_score": 0.8,
                 "preference_weight": 0.1,
                 "ranking_score": 0.825,
@@ -31,6 +40,7 @@ def test_counterfactual_report_is_read_only_and_deterministic() -> None:
             {
                 "provider": "apple_music",
                 "item_id": "alternative",
+                "canonical_track_id": "es_recording_alternative",
                 "provider_base_score": 0.79,
                 "preference_weight": 0.3,
                 "ranking_score": 0.865,
@@ -38,12 +48,13 @@ def test_counterfactual_report_is_read_only_and_deterministic() -> None:
             {
                 "provider": "apple_music",
                 "item_id": "third",
+                "canonical_track_id": "es_recording_third",
                 "provider_base_score": 0.7,
                 "preference_weight": 0.0,
                 "ranking_score": 0.7,
             },
         ],
-        selected_item_id="selected",
+        selected_item_id="es_recording_selected",
     )
     outcome = AttributedOutcome(
         outcome_id="out_01",
@@ -57,8 +68,12 @@ def test_counterfactual_report_is_read_only_and_deterministic() -> None:
 
     report = evaluate_counterfactual(decision_id="dec_01", outcome=outcome, candidates=slate)
 
+    assert report.selected_canonical_track_id == "es_recording_selected"
     assert report.selected_item_id == "selected"
+    assert report.selected_provider_binding is not None
+    assert report.selected_provider_binding["provider_track_id"] == "selected"
     assert report.best_alternative is not None
+    assert report.best_alternative.canonical_track_id == "es_recording_alternative"
     assert report.best_alternative.item_id == "alternative"
     assert report.best_alternative.estimated_lift == 0.04
     assert report.estimated_regret == 0.04
@@ -72,9 +87,47 @@ def test_slate_requires_exactly_one_selected_candidate() -> None:
                 {
                     "provider": "apple_music",
                     "item_id": "one",
+                    "canonical_track_id": "es_recording_one",
                     "provider_base_score": 0.8,
                     "ranking_score": 0.8,
                 }
             ],
-            selected_item_id="missing",
+            selected_item_id="es_recording_missing",
         )
+
+
+def test_snapshot_selection_is_provider_neutral_when_bindings_differ() -> None:
+    slate = snapshot_candidates(
+        [
+            {
+                "provider": "spotify",
+                "item_id": "spotify-track-1",
+                "canonical_track_id": "es_recording_shared",
+                "provider_binding": {
+                    "provider": "spotify",
+                    "provider_track_id": "spotify-track-1",
+                    "canonical_track_id": "es_recording_shared",
+                    "playable": True,
+                    "uri": "spotify:track:spotify-track-1",
+                    "external_url": None,
+                },
+                "provider_base_score": 0.9,
+                "ranking_score": 0.9,
+            },
+            {
+                "provider": "apple_music",
+                "item_id": "apple-song-1",
+                "canonical_track_id": "es_recording_other",
+                "provider_base_score": 0.8,
+                "ranking_score": 0.8,
+            },
+        ],
+        selected_item_id="es_recording_shared",
+    )
+
+    assert slate[0].selected is True
+    assert slate[0].provider == "spotify"
+    assert slate[0].item_id == "spotify-track-1"
+    assert slate[0].canonical_track_id == "es_recording_shared"
+    assert slate[0].provider_binding is not None
+    assert slate[0].provider_binding["provider"] == "spotify"

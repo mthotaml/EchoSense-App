@@ -68,10 +68,13 @@ class EvaluationService:
                 raise RuntimeError("Outcome already exists without an evaluation report")
             return self._report_from_dict(existing)
 
+        selected_canonical_track_id = str(
+            trace["factors"].get("canonical_track_id") or trace["item_id"]
+        )
         report = evaluate_counterfactual(
             decision_id=decision_id,
             outcome=attributed,
-            candidates=snapshot_candidates(candidate_slate, trace["item_id"]),
+            candidates=snapshot_candidates(candidate_slate, selected_canonical_track_id),
         )
         self.store.save_report(report)
         return report
@@ -85,7 +88,11 @@ class EvaluationService:
             decision_id=payload["decision_id"],
             outcome_id=payload["outcome_id"],
             observed_reward=float(payload["observed_reward"]),
+            selected_canonical_track_id=payload.get(
+                "selected_canonical_track_id", payload["selected_item_id"]
+            ),
             selected_item_id=payload["selected_item_id"],
+            selected_provider_binding=payload.get("selected_provider_binding"),
             best_alternative=(CounterfactualCandidate(**alternative) if alternative else None),
             estimated_regret=float(payload["estimated_regret"]),
             confidence=payload["confidence"],

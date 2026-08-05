@@ -16,10 +16,20 @@ def save_trace(storage: Storage) -> None:
         provider="apple_music",
         item_id="selected",
         factors={
+            "canonical_track_id": "es_recording_selected",
             "candidate_slate": [
                 {
                     "provider": "apple_music",
                     "item_id": "selected",
+                    "canonical_track_id": "es_recording_selected",
+                    "provider_binding": {
+                        "provider": "apple_music",
+                        "provider_track_id": "selected",
+                        "canonical_track_id": "es_recording_selected",
+                        "playable": True,
+                        "uri": None,
+                        "external_url": None,
+                    },
                     "rank": 1,
                     "provider_base_score": 0.8,
                     "preference_weight": 0.1,
@@ -28,6 +38,7 @@ def save_trace(storage: Storage) -> None:
                 {
                     "provider": "apple_music",
                     "item_id": "alternative",
+                    "canonical_track_id": "es_recording_alternative",
                     "rank": 2,
                     "provider_base_score": 0.79,
                     "preference_weight": 0.3,
@@ -36,12 +47,13 @@ def save_trace(storage: Storage) -> None:
                 {
                     "provider": "apple_music",
                     "item_id": "third",
+                    "canonical_track_id": "es_recording_third",
                     "rank": 3,
                     "provider_base_score": 0.7,
                     "preference_weight": 0.0,
                     "ranking_score": 0.7,
                 },
-            ]
+            ],
         },
     )
 
@@ -67,6 +79,11 @@ def test_attribution_and_report_are_persisted_idempotently(tmp_path: Path) -> No
     )
 
     assert report.best_alternative is not None
+    assert report.selected_canonical_track_id == "es_recording_selected"
+    assert report.selected_item_id == "selected"
+    assert report.selected_provider_binding is not None
+    assert report.selected_provider_binding["provider_track_id"] == "selected"
+    assert report.best_alternative.canonical_track_id == "es_recording_alternative"
     assert report.best_alternative.item_id == "alternative"
     assert duplicate == report
     assert service.store.get_report("out_eval_01") is not None

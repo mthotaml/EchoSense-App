@@ -166,16 +166,20 @@ class EvaluationOutcomeRequest(BaseModel):
 class CounterfactualCandidateResponse(BaseModel):
     provider: str
     item_id: str
+    canonical_track_id: str
     rank: int
     estimated_reward: float
     estimated_lift: float
+    provider_binding: dict[str, object] | None = None
 
 
 class CounterfactualReportResponse(BaseModel):
     decision_id: str
     outcome_id: str
     observed_reward: float
+    selected_canonical_track_id: str
     selected_item_id: str
+    selected_provider_binding: dict[str, object] | None = None
     best_alternative: CounterfactualCandidateResponse | None
     estimated_regret: float
     confidence: str
@@ -291,6 +295,15 @@ def rank_candidates(
             ),
             "canonical_track_id": item.item_id,
             "learning_provider": item.provider,
+            "provider_binding": binding_as_dict(
+                binding_from_candidate(
+                    next(
+                        candidate
+                        for candidate in candidates
+                        if candidate_canonical_track_id(candidate) == item.item_id
+                    )
+                )
+            ),
             "rank": item.rank,
             "provider_base_score": item.base_score,
             "preference_weight": round(item.preference_weight, 6),

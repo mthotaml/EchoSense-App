@@ -28,20 +28,24 @@ class AttributedOutcome:
 class CandidateSnapshot:
     provider: str
     item_id: str
+    canonical_track_id: str
     rank: int
     provider_base_score: float
     preference_weight: float
     ranking_score: float
     selected: bool
+    provider_binding: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
 class CounterfactualCandidate:
     provider: str
     item_id: str
+    canonical_track_id: str
     rank: int
     estimated_reward: float
     estimated_lift: float
+    provider_binding: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,9 @@ class CounterfactualReport:
     decision_id: str
     outcome_id: str
     observed_reward: float
+    selected_canonical_track_id: str
     selected_item_id: str
+    selected_provider_binding: dict[str, Any] | None
     best_alternative: CounterfactualCandidate | None
     estimated_regret: float
     confidence: str
@@ -82,15 +88,19 @@ def snapshot_candidates(
 ) -> list[CandidateSnapshot]:
     snapshots: list[CandidateSnapshot] = []
     for index, candidate in enumerate(candidates, start=1):
+        canonical_track_id = str(candidate.get("canonical_track_id") or candidate["item_id"])
         snapshots.append(
             CandidateSnapshot(
                 provider=str(candidate["provider"]),
                 item_id=str(candidate["item_id"]),
+                canonical_track_id=canonical_track_id,
                 rank=int(candidate.get("rank", index)),
                 provider_base_score=float(candidate["provider_base_score"]),
                 preference_weight=float(candidate.get("preference_weight", 0.0)),
                 ranking_score=float(candidate["ranking_score"]),
-                selected=str(candidate["item_id"]) == selected_item_id,
+                selected=canonical_track_id == selected_item_id
+                or str(candidate["item_id"]) == selected_item_id,
+                provider_binding=candidate.get("provider_binding"),
             )
         )
     if not snapshots:
@@ -122,9 +132,11 @@ def evaluate_counterfactual(
         best = CounterfactualCandidate(
             provider=strongest.provider,
             item_id=strongest.item_id,
+            canonical_track_id=strongest.canonical_track_id,
             rank=strongest.rank,
             estimated_reward=round(estimated_reward, 6),
             estimated_lift=round(estimated_reward - outcome.reward, 6),
+            provider_binding=strongest.provider_binding,
         )
 
     regret = max(0.0, best.estimated_lift) if best else 0.0
@@ -142,7 +154,9 @@ def evaluate_counterfactual(
         decision_id=decision_id,
         outcome_id=outcome.outcome_id,
         observed_reward=outcome.reward,
+        selected_canonical_track_id=selected.canonical_track_id,
         selected_item_id=selected.item_id,
+        selected_provider_binding=selected.provider_binding,
         best_alternative=best,
         estimated_regret=round(regret, 6),
         confidence=confidence,
