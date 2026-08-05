@@ -68,6 +68,17 @@ def test_rainy_commute_recommendation_is_grounded_and_traceable(client: TestClie
     body = response.json()
     assert body["context"] == "rainy_commute"
     assert body["provider"] == "apple_music"
+    assert body["item_id"] == "fixture-rain-001"
+    assert body["canonical_track_id"].startswith("es_recording_")
+    assert body["provider_binding"] == {
+        "provider": "apple_music",
+        "provider_track_id": "fixture-rain-001",
+        "canonical_track_id": body["canonical_track_id"],
+        "playable": True,
+        "uri": None,
+        "external_url": None,
+    }
+    assert body["recommendation"]["canonical_track_id"] == body["canonical_track_id"]
     assert "rainy drive" in body["explanation"]
     assert body["decision_id"].startswith("dec_")
 
@@ -83,6 +94,8 @@ def test_rainy_commute_recommendation_is_grounded_and_traceable(client: TestClie
     assert factors["ranking_policy"]["explored"] is False
     assert len(factors["candidate_slate"]) == 3
     assert factors["candidate_slate"][0]["selected"] is True
+    assert factors["candidate_slate"][0]["canonical_track_id"] == body["canonical_track_id"]
+    assert factors["candidate_slate"][0]["learning_provider"] == "echosense"
     assert factors["candidate_slate"][0]["rank"] == 1
     assert factors["candidate_slate"][0]["novelty_score"] == 1.0
     assert factors["candidate_slate"][0]["exposure_count"] == 0

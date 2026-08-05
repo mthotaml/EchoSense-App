@@ -17,6 +17,14 @@ from echosense.exposure_store import ExposureStore
 from echosense.memory import PreferenceMemory, memory_from_environment
 from echosense.providers import MusicProvider, RecommendationCandidate, provider_from_environment
 from echosense.ranking_policy import PolicyCandidate, RankingPolicy, rank_with_policy
+from echosense.recommendation_contract import (
+    PROVIDER_NEUTRAL_PROVIDER,
+    binding_as_dict,
+    binding_from_candidate,
+    candidate_canonical_track_id,
+    learning_key,
+    recommendation_from_candidate,
+)
 from echosense.storage import Storage
 
 # Core routes are collected independently from any deployable FastAPI
@@ -108,6 +116,9 @@ class RecommendationResponse(BaseModel):
     context_confidence: float
     provider: str
     item_id: str
+    canonical_track_id: str
+    provider_binding: dict[str, object]
+    recommendation: dict[str, object]
     explanation: str
     generated_at: datetime
 
@@ -221,24 +232,37 @@ def rank_candidates(
         raise LookupError("Provider returned no recommendation candidates")
     half_life_days = float(os.getenv("ECHOSENSE_PREFERENCE_HALF_LIFE_DAYS", "30"))
     influence = min(0.5, max(0.0, float(os.getenv("ECHOSENSE_PREFERENCE_INFLUENCE", "0.25"))))
-    weights = get_preference_memory().rank_weights(
+    canonical_keys = {
+        (candidate.provider, candidate.item_id): learning_key(
+            candidate_canonical_track_id(candidate)
+        )
+        for candidate in candidates
+    }
+    canonical_weights = get_preference_memory().rank_weights(
+        user_id=user_id,
+        context=context,
+        candidates=list(canonical_keys.values()),
+        half_life_days=half_life_days,
+    )
+    provider_weights = get_preference_memory().rank_weights(
         user_id=user_id,
         context=context,
         candidates=[(candidate.provider, candidate.item_id) for candidate in candidates],
         half_life_days=half_life_days,
     )
-    exposures = get_exposure_store().counts_for(
-        user_id, [(candidate.provider, candidate.item_id) for candidate in candidates]
-    )
+    exposures = get_exposure_store().counts_for(user_id, list(canonical_keys.values()))
     policy = ranking_policy_from_environment()
     ranked = rank_with_policy(
         [
             PolicyCandidate(
-                provider=candidate.provider,
-                item_id=candidate.item_id,
+                provider=PROVIDER_NEUTRAL_PROVIDER,
+                item_id=candidate_canonical_track_id(candidate),
                 base_score=candidate.base_score,
-                preference_weight=weights[(candidate.provider, candidate.item_id)],
-                exposure_count=exposures[(candidate.provider, candidate.item_id)],
+                preference_weight=(
+                    canonical_weights[canonical_keys[(candidate.provider, candidate.item_id)]]
+                    or provider_weights[(candidate.provider, candidate.item_id)]
+                ),
+                exposure_count=exposures[canonical_keys[(candidate.provider, candidate.item_id)]],
                 group=candidate.provider,
             )
             for candidate in candidates
@@ -251,13 +275,22 @@ def rank_candidates(
     selected = next(
         candidate
         for candidate in candidates
-        if candidate.provider == selected_ranked.provider
-        and candidate.item_id == selected_ranked.item_id
+        if candidate_canonical_track_id(candidate) == selected_ranked.item_id
     )
     slate = [
         {
-            "provider": item.provider,
-            "item_id": item.item_id,
+            "provider": next(
+                candidate.provider
+                for candidate in candidates
+                if candidate_canonical_track_id(candidate) == item.item_id
+            ),
+            "item_id": next(
+                candidate.item_id
+                for candidate in candidates
+                if candidate_canonical_track_id(candidate) == item.item_id
+            ),
+            "canonical_track_id": item.item_id,
+            "learning_provider": item.provider,
             "rank": item.rank,
             "provider_base_score": item.base_score,
             "preference_weight": round(item.preference_weight, 6),
@@ -444,6 +477,18 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         "ranking_policy": policy_factors,
         "candidate_slate": candidate_slate,
     }
+    canonical = recommendation_from_candidate(
+        candidate,
+        decision_id=decision_id,
+        rank=1,
+        score=ranking_score,
+        explanation=candidate.rationale,
+    )
+    binding = binding_from_candidate(candidate)
+    decision_factors["canonical_track_id"] = canonical.canonical_track_id
+    decision_factors["learning_provider"] = PROVIDER_NEUTRAL_PROVIDER
+    decision_factors["provider_binding"] = binding_as_dict(binding)
+    decision_factors["recommendation"] = canonical.as_dict()
     trace_id = f"trc_{uuid4().hex}"
     store.save_decision_trace(
         decision_id=decision_id,
@@ -455,7 +500,7 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         factors=decision_factors,
     )
     exposure_count = get_exposure_store().record_selection(
-        request.user_id, candidate.provider, candidate.item_id
+        request.user_id, PROVIDER_NEUTRAL_PROVIDER, canonical.canonical_track_id
     )
     decision_factors["selected_exposure_count_after"] = exposure_count
     store.append_event(
@@ -468,7 +513,9 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
             "context": context,
             "context_confidence": confidence,
             "selected_item_id": candidate.item_id,
+            "canonical_track_id": canonical.canonical_track_id,
             "provider": candidate.provider,
+            "provider_binding": binding_as_dict(binding),
             "factors": decision_factors,
         },
     )
@@ -480,6 +527,9 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         context_confidence=confidence,
         provider=candidate.provider,
         item_id=candidate.item_id,
+        canonical_track_id=canonical.canonical_track_id,
+        provider_binding=binding_as_dict(binding),
+        recommendation=canonical.as_dict(),
         explanation=(
             f"We selected {candidate.rationale} based on the current context"
             f"{preference_phrase}{policy_phrase}."
@@ -496,11 +546,14 @@ def submit_outcome(request: OutcomeRequest) -> PreferenceResponse:
     if trace is None or trace["user_id"] != request.user_id:
         raise HTTPException(status_code=404, detail="Decision trace not found")
     delta = OUTCOME_DELTAS[request.outcome]
+    factors = trace.get("factors", {})
+    canonical_track_id = str(factors.get("canonical_track_id") or trace["item_id"])
+    preference_provider, preference_item_id = learning_key(canonical_track_id)
     try:
         preference = get_preference_memory().apply_outcome(
             user_id=request.user_id,
-            provider=trace["provider"],
-            item_id=trace["item_id"],
+            provider=preference_provider,
+            item_id=preference_item_id,
             context=trace["context"],
             delta=delta,
             outcome_id=request.outcome_id,
@@ -521,6 +574,9 @@ def submit_outcome(request: OutcomeRequest) -> PreferenceResponse:
             "outcome": request.outcome,
             "provider": preference.provider,
             "item_id": preference.item_id,
+            "playback_provider": trace["provider"],
+            "provider_item_id": trace["item_id"],
+            "canonical_track_id": canonical_track_id,
             "context": preference.context,
             "delta": delta,
             "weight": preference.weight,

@@ -55,11 +55,16 @@ def test_grounded_api_falls_back_without_memory_consent(client: TestClient) -> N
     assert response.status_code == 200
     body = response.json()
     assert body["context"] == "rainy_commute"
+    assert body["canonical_track_id"].startswith("es_recording_")
+    assert body["provider_binding"]["provider"] == "apple_music"
+    assert body["provider_binding"]["provider_track_id"] == body["item_id"]
     assert body["cited_memory_ids"] == []
     assert 0.0 <= body["decision_confidence"] <= 1.0
     trace = storage.get_decision_trace(body["decision_id"])
     assert trace is not None
     assert trace["factors"]["memory_consent"] is False
+    assert trace["factors"]["learning_provider"] == "echosense"
+    assert trace["factors"]["recommendation"]["canonical_track_id"] == body["canonical_track_id"]
     assert trace["factors"]["understanding"]["memories"] == []
 
 

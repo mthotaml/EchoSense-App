@@ -17,6 +17,13 @@ from echosense.app import (
 )
 from echosense.cognitive_memory import CognitiveMemoryStore
 from echosense.grounded_decision import GroundedDecisionService, SelectedAction
+from echosense.recommendation_contract import (
+    PROVIDER_NEUTRAL_PROVIDER,
+    binding_as_dict,
+    binding_from_candidate,
+    candidate_canonical_track_id,
+    recommendation_from_candidate,
+)
 from echosense.understanding import ObservationEvidence, UnderstandingEngine
 
 app = FastAPI(title="EchoSense Grounded Recommendations", version="0.22.0")
@@ -42,6 +49,9 @@ class RecommendationResponse(BaseModel):
     decision_confidence: float
     provider: str
     item_id: str
+    canonical_track_id: str
+    provider_binding: dict[str, object]
+    recommendation: dict[str, object]
     explanation: str
     cited_memory_ids: list[str]
     generated_at: datetime
@@ -104,6 +114,18 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         "candidate_slate": candidate_slate,
         "memory_consent": store.has_active_consent(request.user_id, MEMORY_PURPOSE),
     }
+    canonical = recommendation_from_candidate(
+        candidate,
+        decision_id=decision_id,
+        rank=1,
+        score=ranking_score,
+        explanation=candidate.rationale,
+    )
+    binding = binding_from_candidate(candidate)
+    factors["canonical_track_id"] = candidate_canonical_track_id(candidate)
+    factors["learning_provider"] = PROVIDER_NEUTRAL_PROVIDER
+    factors["provider_binding"] = binding_as_dict(binding)
+    factors["recommendation"] = canonical.as_dict()
     grounded = _decision_service(request.user_id).finalize(
         decision_id=decision_id,
         user_id=request.user_id,
@@ -127,8 +149,10 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         payload={
             "decision_id": decision_id,
             "context": context,
+            "canonical_track_id": canonical.canonical_track_id,
             "provider": candidate.provider,
             "item_id": candidate.item_id,
+            "provider_binding": binding_as_dict(binding),
             "decision_confidence": grounded.explanation.confidence,
             "memory_ids": list(grounded.explanation.memory_ids),
         },
@@ -140,6 +164,9 @@ def recommend(request: RecommendationRequest) -> RecommendationResponse:
         decision_confidence=grounded.explanation.confidence,
         provider=candidate.provider,
         item_id=candidate.item_id,
+        canonical_track_id=canonical.canonical_track_id,
+        provider_binding=binding_as_dict(binding),
+        recommendation=canonical.as_dict(),
         explanation=grounded.explanation.text,
         cited_memory_ids=list(grounded.explanation.memory_ids),
         generated_at=datetime.now(timezone.utc),
