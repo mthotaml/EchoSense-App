@@ -16,7 +16,12 @@ from echosense.evaluation_service import EvaluationService
 from echosense.exposure_store import ExposureStore
 from echosense.memory import PreferenceMemory, memory_from_environment
 from echosense.providers import MusicProvider, RecommendationCandidate, provider_from_environment
-from echosense.ranking_policy import PolicyCandidate, RankingPolicy, rank_with_policy
+from echosense.ranking_policy import (
+    PolicyCandidate,
+    RankedCandidate,
+    RankingPolicy,
+    rank_with_policy,
+)
 from echosense.recommendation_contract import (
     PROVIDER_NEUTRAL_PROVIDER,
     binding_as_dict,
@@ -230,6 +235,69 @@ def ranking_policy_from_environment() -> RankingPolicy:
     )
 
 
+def canonical_learning_keys(
+    candidates: list[RecommendationCandidate],
+) -> dict[tuple[str, str], tuple[str, str]]:
+    return {
+        (candidate.provider, candidate.item_id): learning_key(
+            candidate_canonical_track_id(candidate)
+        )
+        for candidate in candidates
+    }
+
+
+def transition_learning_weights(
+    *,
+    user_id: str,
+    context: str,
+    candidates: list[RecommendationCandidate],
+    half_life_days: float,
+) -> dict[tuple[str, str], dict[str, object]]:
+    """Read canonical learning first, with a bounded bridge for legacy provider weights."""
+
+    canonical_keys = canonical_learning_keys(candidates)
+    canonical_weights = get_preference_memory().rank_weights(
+        user_id=user_id,
+        context=context,
+        candidates=list(canonical_keys.values()),
+        half_life_days=half_life_days,
+    )
+    legacy_provider_weights = get_preference_memory().rank_weights(
+        user_id=user_id,
+        context=context,
+        candidates=[(candidate.provider, candidate.item_id) for candidate in candidates],
+        half_life_days=half_life_days,
+    )
+    resolved: dict[tuple[str, str], dict[str, object]] = {}
+    for candidate in candidates:
+        provider_key = (candidate.provider, candidate.item_id)
+        canonical_key = canonical_keys[provider_key]
+        canonical_weight = canonical_weights[canonical_key]
+        legacy_weight = legacy_provider_weights[provider_key]
+        if abs(canonical_weight) >= 0.000001:
+            resolved[provider_key] = {
+                "provider": canonical_key[0],
+                "item_id": canonical_key[1],
+                "weight": canonical_weight,
+                "source": "canonical",
+            }
+        elif abs(legacy_weight) >= 0.000001:
+            resolved[provider_key] = {
+                "provider": canonical_key[0],
+                "item_id": canonical_key[1],
+                "weight": legacy_weight,
+                "source": "legacy_provider_bridge",
+            }
+        else:
+            resolved[provider_key] = {
+                "provider": canonical_key[0],
+                "item_id": canonical_key[1],
+                "weight": 0.0,
+                "source": "canonical",
+            }
+    return resolved
+
+
 def rank_candidates(
     *, user_id: str, context: str, decision_id: str, candidates: list[RecommendationCandidate]
 ) -> tuple[RecommendationCandidate, float, float, list[dict[str, object]], dict[str, object]]:
@@ -237,22 +305,11 @@ def rank_candidates(
         raise LookupError("Provider returned no recommendation candidates")
     half_life_days = float(os.getenv("ECHOSENSE_PREFERENCE_HALF_LIFE_DAYS", "30"))
     influence = min(0.5, max(0.0, float(os.getenv("ECHOSENSE_PREFERENCE_INFLUENCE", "0.25"))))
-    canonical_keys = {
-        (candidate.provider, candidate.item_id): learning_key(
-            candidate_canonical_track_id(candidate)
-        )
-        for candidate in candidates
-    }
-    canonical_weights = get_preference_memory().rank_weights(
+    canonical_keys = canonical_learning_keys(candidates)
+    learning_weights = transition_learning_weights(
         user_id=user_id,
         context=context,
-        candidates=list(canonical_keys.values()),
-        half_life_days=half_life_days,
-    )
-    provider_weights = get_preference_memory().rank_weights(
-        user_id=user_id,
-        context=context,
-        candidates=[(candidate.provider, candidate.item_id) for candidate in candidates],
+        candidates=candidates,
         half_life_days=half_life_days,
     )
     exposures = get_exposure_store().counts_for(user_id, list(canonical_keys.values()))
@@ -263,9 +320,8 @@ def rank_candidates(
                 provider=PROVIDER_NEUTRAL_PROVIDER,
                 item_id=candidate_canonical_track_id(candidate),
                 base_score=candidate.base_score,
-                preference_weight=(
-                    canonical_weights[canonical_keys[(candidate.provider, candidate.item_id)]]
-                    or provider_weights[(candidate.provider, candidate.item_id)]
+                preference_weight=float(
+                    learning_weights[(candidate.provider, candidate.item_id)]["weight"]
                 ),
                 exposure_count=exposures[canonical_keys[(candidate.provider, candidate.item_id)]],
                 group=candidate.provider,
@@ -277,34 +333,26 @@ def rank_candidates(
         seed_material=f"{user_id}:{context}:{decision_id}",
     )
     selected_ranked = ranked[0]
-    selected = next(
-        candidate
-        for candidate in candidates
-        if candidate_canonical_track_id(candidate) == selected_ranked.item_id
-    )
+
+    def candidate_for_ranked(item: RankedCandidate) -> RecommendationCandidate:
+        return next(
+            candidate
+            for candidate in candidates
+            if candidate.provider == item.group
+            and candidate_canonical_track_id(candidate) == item.item_id
+        )
+
+    selected = candidate_for_ranked(selected_ranked)
     slate = [
         {
-            "provider": next(
-                candidate.provider
-                for candidate in candidates
-                if candidate_canonical_track_id(candidate) == item.item_id
-            ),
-            "item_id": next(
-                candidate.item_id
-                for candidate in candidates
-                if candidate_canonical_track_id(candidate) == item.item_id
-            ),
+            "provider": candidate_for_ranked(item).provider,
+            "item_id": candidate_for_ranked(item).item_id,
             "canonical_track_id": item.item_id,
             "learning_provider": item.provider,
-            "provider_binding": binding_as_dict(
-                binding_from_candidate(
-                    next(
-                        candidate
-                        for candidate in candidates
-                        if candidate_canonical_track_id(candidate) == item.item_id
-                    )
-                )
-            ),
+            "learning_source": learning_weights[
+                (candidate_for_ranked(item).provider, candidate_for_ranked(item).item_id)
+            ]["source"],
+            "provider_binding": binding_as_dict(binding_from_candidate(candidate_for_ranked(item))),
             "rank": item.rank,
             "provider_base_score": item.base_score,
             "preference_weight": round(item.preference_weight, 6),
