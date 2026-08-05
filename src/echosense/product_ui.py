@@ -1113,7 +1113,14 @@ PAGE = r"""<!doctype html>
     function toggleLiveContext() {
       if(contextWatchId!==null||localStorage.getItem('echosenseContextConsent')==='granted')disableLiveContext();else enableLiveContext();
     }
+    function requireStreamingConnection(action='playing this track') {
+      if(spotifyConnected)return true;
+      setText('#toast',`Connect a streaming service before ${action}. Demo recommendations are preview-only until a provider is connected.`);
+      $('#connection-panel').scrollIntoView({behavior:'smooth',block:'center'});
+      return false;
+    }
     async function playDnaTrack(item) {
+      if(!requireStreamingConnection('playing this track'))return;
       if(!deviceId)throw new Error('Player is not ready yet.');
       playbackCommandInFlight+=1;
       try {
@@ -1146,7 +1153,7 @@ PAGE = r"""<!doctype html>
     };
 
     async function playRecommendation() {
-      if(!spotifyConnected){location.href='/auth/spotify/login';return;}
+      if(!requireStreamingConnection('playing this track'))return;
       if(!deviceId) throw new Error('Player is not ready yet.');
       if(!liveRecommendationReady) throw new Error('Spotify recommendations are temporarily unavailable. Refresh EchoSense to retry.');
       if(!currentRecommendationId||!currentPlayOutcomeId) throw new Error('Recommendation is not ready yet.');
@@ -1250,7 +1257,7 @@ PAGE = r"""<!doctype html>
       await restorePlaybackState();
     }
     async function togglePlayback() {
-      if(!spotifyConnected) { location.href='/auth/spotify/login'; return; }
+      if(!requireStreamingConnection('controlling playback'))return;
       if(!deviceId) throw new Error('Player is not ready yet.');
       const latest=await lifecycle.player?.getCurrentState();
       if(latest) renderPlayer(latest); else await restorePlaybackState();
