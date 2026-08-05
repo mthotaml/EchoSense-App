@@ -863,11 +863,15 @@ test('Guardian keeps disconnected playback on the demo surface', async ({page}) 
   );
   await expect(page).toHaveURL(/\/$/);
   await page.locator('#connect-button').click();
+  await expect(page.locator('#connection-title')).toHaveText(
+    'Spotify sign-in is not set up yet',
+  );
+  await expect(page.locator('#connect-button')).toHaveText('Setup needed');
   await expect(page.locator('#toast')).toHaveText(
-    'Spotify is not configured yet. Add SPOTIFY_CLIENT_ID before connecting a streaming service.',
+    'Spotify sign-in needs app setup first. EchoSense cannot collect your Spotify password directly.',
   );
   await expect(page.locator('#connection-copy')).toHaveText(
-    'The demo is ready, but Spotify sign-in needs app credentials before live streaming can be connected.',
+    'Once SPOTIFY_CLIENT_ID is configured, this button will open Spotify’s own sign-in page for your username and password. EchoSense never asks for or stores your Spotify password.',
   );
   await expect(page).toHaveURL(/\/$/);
   expect(loginRequests).toBe(0);
