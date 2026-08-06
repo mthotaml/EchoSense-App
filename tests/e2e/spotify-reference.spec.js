@@ -92,13 +92,15 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
     contextDataRequests.push(route.request().url());
     const requestParams = new URL(route.request().url()).searchParams;
     const moment = requestParams.get('moment');
+    const excluded = requestParams.getAll('exclude');
     const musicDnaBoosted = Number(requestParams.get('boost_music_dna') || 0) > 0;
     const working = moment === 'working';
     const social = moment === 'social';
     const contextual = moment !== 'general';
-    const selectedId = musicDnaBoosted ? 'boost-track-1' : social ? 'social-track-1' : skippedToNext ? 'post-skip-track' : working ? 'working-track' : 'general-track';
-    const selectedTitle = musicDnaBoosted ? 'DNA Lift' : social ? 'Open Road' : skippedToNext ? 'Fresh Horizon' : working ? 'Focused Motion' : 'Open Road';
-    const selectedDecision = musicDnaBoosted ? 'decision-boost-1' : social ? 'decision-social-1' : skippedToNext ? 'decision-post-skip' : working ? 'decision-working' : 'decision-general';
+    const manualMore = !musicDnaBoosted && !social && !working && excluded.includes('general-track');
+    const selectedId = manualMore ? 'manual-more-1' : musicDnaBoosted ? 'boost-track-1' : social ? 'social-track-1' : skippedToNext ? 'post-skip-track' : working ? 'working-track' : 'general-track';
+    const selectedTitle = manualMore ? 'More Road' : musicDnaBoosted ? 'DNA Lift' : social ? 'Open Road' : skippedToNext ? 'Fresh Horizon' : working ? 'Focused Motion' : 'Open Road';
+    const selectedDecision = manualMore ? 'decision-manual-more-1' : musicDnaBoosted ? 'decision-boost-1' : social ? 'decision-social-1' : skippedToNext ? 'decision-post-skip' : working ? 'decision-working' : 'decision-general';
     const momentImpact = contextual
       ? {
           moment, requested_moment: moment, source: 'selected', applied: true,
@@ -154,40 +156,40 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
             },
           },
           {
-            id: musicDnaBoosted ? 'boost-track-2' : social ? 'social-track-2' : working ? 'distinct-track' : 'alternate-track',
-            decision_id: musicDnaBoosted ? 'decision-boost-2' : social ? 'decision-social-2' : working ? 'decision-distinct' : 'decision-alternate',
+            id: manualMore ? 'manual-more-2' : musicDnaBoosted ? 'boost-track-2' : social ? 'social-track-2' : working ? 'distinct-track' : 'alternate-track',
+            decision_id: manualMore ? 'decision-manual-more-2' : musicDnaBoosted ? 'decision-boost-2' : social ? 'decision-social-2' : working ? 'decision-distinct' : 'decision-alternate',
             rank: 2,
-            title: working ? 'Distinct Motion' : 'Open Sky',
+            title: manualMore ? 'More Sky' : working ? 'Distinct Motion' : 'Open Sky',
             artist: 'Another Artist',
             reason: 'Adds artist diversity.',
           },
           {
-            id: musicDnaBoosted ? 'boost-track-3' : social ? 'social-track-3' : 'autopilot-3',
-            decision_id: musicDnaBoosted ? 'decision-boost-3' : social ? 'decision-social-3' : 'decision-autopilot-3',
+            id: manualMore ? 'manual-more-3' : musicDnaBoosted ? 'boost-track-3' : social ? 'social-track-3' : 'autopilot-3',
+            decision_id: manualMore ? 'decision-manual-more-3' : musicDnaBoosted ? 'decision-boost-3' : social ? 'decision-social-3' : 'decision-autopilot-3',
             rank: 3,
             title: 'Open Current',
             artist: 'Third Artist',
             reason: 'Extends the listening flow.',
           },
           {
-            id: musicDnaBoosted ? 'boost-track-4' : social ? 'social-track-4' : 'autopilot-4',
-            decision_id: musicDnaBoosted ? 'decision-boost-4' : social ? 'decision-social-4' : 'decision-autopilot-4',
+            id: manualMore ? 'manual-more-4' : musicDnaBoosted ? 'boost-track-4' : social ? 'social-track-4' : 'autopilot-4',
+            decision_id: manualMore ? 'decision-manual-more-4' : musicDnaBoosted ? 'decision-boost-4' : social ? 'decision-social-4' : 'decision-autopilot-4',
             rank: 4,
             title: 'Night Lines',
             artist: 'Fourth Artist',
             reason: 'Balances familiarity and discovery.',
           },
           {
-            id: musicDnaBoosted ? 'boost-track-5' : social ? 'social-track-5' : 'autopilot-5',
-            decision_id: musicDnaBoosted ? 'decision-boost-5' : social ? 'decision-social-5' : 'decision-autopilot-5',
+            id: manualMore ? 'manual-more-5' : musicDnaBoosted ? 'boost-track-5' : social ? 'social-track-5' : 'autopilot-5',
+            decision_id: manualMore ? 'decision-manual-more-5' : musicDnaBoosted ? 'decision-boost-5' : social ? 'decision-social-5' : 'decision-autopilot-5',
             rank: 5,
             title: 'Coastal Signal',
             artist: 'Fifth Artist',
             reason: 'Keeps the queue diverse.',
           },
           {
-            id: musicDnaBoosted ? 'boost-track-6' : social ? 'social-track-6' : 'autopilot-6',
-            decision_id: musicDnaBoosted ? 'decision-boost-6' : social ? 'decision-social-6' : 'decision-autopilot-6',
+            id: manualMore ? 'manual-more-6' : musicDnaBoosted ? 'boost-track-6' : social ? 'social-track-6' : 'autopilot-6',
+            decision_id: manualMore ? 'decision-manual-more-6' : musicDnaBoosted ? 'decision-boost-6' : social ? 'decision-social-6' : 'decision-autopilot-6',
             rank: 6,
             title: 'Pacific Light',
             artist: 'Sixth Artist',
@@ -503,7 +505,9 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   });
   expect(contextDataRequests).toHaveLength(requestsBeforeSingleFlight + 1);
   await expect(page.locator('#dna-queue-items thead')).toContainText('Final score');
+  await expect(page.locator('#dna-queue-items thead')).toContainText('Score recipe');
   await expect(page.locator('#dna-queue-items thead')).toContainText('Why this fits');
+  await expect(page.locator('#dna-queue-items thead')).not.toContainText('Genre');
   await expect(
     page.locator('#hero-factors').getByRole('button', {name: /Current recommendation factor: Music DNA affinity.*Why it matters/}),
   ).toBeVisible();
@@ -530,6 +534,13 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('88%');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('+76%');
   await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('Limited');
+  await page.locator('#dna-load-more').click();
+  await expect(page.locator('#dna-page-status')).toHaveText('Plan 2 of 2');
+  await expect(page.locator('#autopilot-status')).toContainText('Plan 2 ready · 6 new EchoSense recommendations');
+  await expect(page.locator('#dna-queue-items tbody tr').first()).toContainText('More Road');
+  expect(contextDataRequests.at(-1)).toContain('exclude=general-track');
+  await page.locator('#dna-page-previous').click();
+  await expect(page.locator('#dna-page-status')).toHaveText('Plan 1 of 2');
   await expect(page.locator('#temporal-mood-status')).toContainText(
     'often choose uplifting music during afternoon',
   );
@@ -589,7 +600,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#dna-queue-items tbody tr')).toHaveCount(6);
   await expect(page.locator('#autopilot-status')).toContainText('4 planned tracks ready ahead');
   await expect(page.locator('#dna-queue-items tbody tr').first().locator('.why-cell')).toContainText(
-    'Selected from your Music DNA with live-context fit.',
+    'Taste 95%',
   );
 
   await page.locator('#save').click();

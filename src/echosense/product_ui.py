@@ -190,7 +190,7 @@ PAGE = r"""<!doctype html>
     .privacy-note { color:var(--muted); font-size:.78rem; margin-top:10px; }
     .privacy-note summary { cursor:pointer; width:max-content; }
     .table-wrap { overflow-x:auto; margin-top:20px; border:1px solid var(--line); border-radius:16px; }
-    .dna-table { width:100%; min-width:840px; border-collapse:collapse; font-size:.86rem; }
+    .dna-table { width:100%; min-width:920px; border-collapse:collapse; font-size:.86rem; }
     .dna-table th { padding:11px 12px; color:var(--muted); background:var(--soft); text-align:left; font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
     .dna-table td { padding:14px 12px; border-top:1px solid var(--line); vertical-align:middle; }
     .dna-table tr[aria-current="true"] { background:linear-gradient(90deg,rgba(30,215,96,.13),rgba(100,181,246,.05)); box-shadow:inset 3px 0 0 var(--green); }
@@ -199,9 +199,9 @@ PAGE = r"""<!doctype html>
     .dna-table .track-cell { min-width:210px; }
     .dna-table .track-cell strong,.dna-table .track-cell span { display:block; }
     .dna-table .track-cell span,.dna-table .why-cell { color:var(--muted); }
-    .dna-table .why-cell { min-width:210px; line-height:1.35; }
+    .dna-table .why-cell { min-width:240px; line-height:1.35; }
     .dna-table .track-actions { white-space:nowrap; }
-    .recipe-cell { min-width:340px; }
+    .recipe-cell { min-width:360px; }
     .score-recipe { display:grid; grid-template-columns:74px minmax(220px,1fr); gap:14px; align-items:center; }
     .score-ring { width:66px; height:66px; border-radius:50%; display:grid; place-items:center; background:conic-gradient(var(--green) calc(var(--score)*1%),#202733 0); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); }
     .score-ring span { width:50px; height:50px; border-radius:50%; display:grid; place-items:center; background:#0b1018; color:var(--text); font-weight:800; font-size:.92rem; font-variant-numeric:tabular-nums; }
@@ -213,6 +213,8 @@ PAGE = r"""<!doctype html>
     .meter-fill { display:block; height:100%; width:var(--meter); border-radius:inherit; background:linear-gradient(90deg,var(--blue),var(--green)); }
     .meter-fill.adjustment { background:linear-gradient(90deg,var(--danger),var(--amber)); }
     .meter-value { min-width:52px; text-align:right; color:var(--text); font-variant-numeric:tabular-nums; }
+    .why-points { display:flex; flex-wrap:wrap; gap:7px; }
+    .why-point { display:inline-flex; align-items:center; padding:6px 9px; border-radius:999px; color:#d9ecff; background:rgba(100,181,246,.1); border:1px solid rgba(100,181,246,.25); white-space:nowrap; }
     .dna-pagination { display:flex; justify-content:center; align-items:center; gap:10px; margin-top:18px; }
     .dna-pagination span { min-width:110px; color:var(--muted); text-align:center; font-size:.86rem; }
     .factor-heading { display:inline-flex; align-items:center; gap:6px; }
@@ -968,14 +970,28 @@ PAGE = r"""<!doctype html>
     async function generateNextDnaRound(reason='skip') {
       if(roundGenerationInFlight)return roundGenerationInFlight;
       roundGenerationInFlight=(async()=>{
+        const loadMore=$('#dna-load-more');
+        const previousText=loadMore.textContent;
+        loadMore.disabled=true;
+        loadMore.textContent='Preparing…';
+        setText('#autopilot-status','Preparing a fresh six-track playback plan…');
         const exclusions=[...autopilotHistory,...allGeneratedDnaIds()];
-        const data=await loadLiveSpotify($('#moment').value,exclusions,true,true);
-        const next=(data.recommendations||[]).find(
-          item=>item?.id&&item?.decision_id&&item.id!==activePlaybackTrackId
-        );
-        if(!next)throw new Error('EchoSense needs more distinct provider candidates before preparing another playback plan.');
-        setText('#autopilot-status',`Plan ${dnaRounds.length} ready · ${Math.min(DNA_ROUND_SIZE,data.recommendations.length)} EchoSense recommendations`);
-        return next;
+        try {
+          const data=await loadLiveSpotify($('#moment').value,exclusions,false,true);
+          const newestRound=dnaRounds.at(-1)||[];
+          dnaPageIndex=Math.max(0,dnaRounds.length-1);
+          renderDnaQueue();
+          const next=newestRound.find(
+            item=>item?.id&&item?.decision_id&&item.id!==activePlaybackTrackId
+          );
+          if(!next)throw new Error('EchoSense needs more distinct provider candidates before preparing another playback plan.');
+          setText('#autopilot-status',`Plan ${dnaRounds.length} ready · ${newestRound.length} new EchoSense recommendations`);
+          setText('#toast',`Prepared plan ${dnaRounds.length}.`);
+          return next;
+        } finally {
+          loadMore.disabled=false;
+          loadMore.textContent=previousText;
+        }
       })();
       try {
         return await roundGenerationInFlight;
@@ -1123,6 +1139,22 @@ PAGE = r"""<!doctype html>
       const contextReason=observations.length?observations.join(' · '):'';
       return item.why_now?.summary||contextReason||item.reason||'Chosen for your current listening plan.';
     }
+    function factorByName(item,name) {
+      return (item.why_now?.factors||[]).find(factor=>factor.name===name);
+    }
+    function recommendationKeyPoints(item) {
+      const points=[];
+      const taste=Number(factorByName(item,'Music DNA affinity')?.score);
+      const moment=Number(factorByName(item,'Live context fit')?.score);
+      const learning=Number(factorByName(item,'Learned preference')?.score);
+      const freshness=Number(factorByName(item,'Diversity guard')?.score);
+      if(Number.isFinite(taste))points.push(`Taste ${taste}%`);
+      if(Number.isFinite(moment))points.push(`Moment ${moment}%`);
+      if(Number.isFinite(learning)&&learning!==0)points.push(`Learning ${learning>0?'+':''}${learning}%`);
+      if(Number.isFinite(freshness))points.push(freshness>=100?'Fresh':'Less fresh');
+      if(!points.length)points.push(recommendationExplanation(item));
+      return points.slice(0,4);
+    }
     function factorLabel(name) {
       if(name==='Music DNA affinity')return 'Taste match';
       if(name==='Live context fit')return 'Moment fit';
@@ -1136,11 +1168,13 @@ PAGE = r"""<!doctype html>
       if(name==='Learned preference')return `${score>0?'+':''}${score}%`;
       return `${score}%`;
     }
-    function renderScoreRecipe(item) {
-      const recipe=document.createElement('div');recipe.className='score-recipe';
+    function renderScoreRing(item) {
       const finalScore=item.why_now?.overall_score??item.match_score;
       const ring=document.createElement('div');ring.className='score-ring';ring.style.setProperty('--score',String(Math.max(0,Math.min(100,Number(finalScore)||0))));ring.title='Final EchoSense score after taste, moment, learning, freshness, and priority settings are combined.';
-      const ringText=document.createElement('span');ringText.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'--';ring.appendChild(ringText);recipe.appendChild(ring);
+      const ringText=document.createElement('span');ringText.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'--';ring.appendChild(ringText);
+      return ring;
+    }
+    function renderFactorStack(item) {
       const stack=document.createElement('div');stack.className='factor-stack';
       (item.why_now?.factors||[]).filter(factor=>factorExplanations[factor.name]).slice(0,4).forEach(factor=>{
         const score=Number(factor.score);
@@ -1156,6 +1190,12 @@ PAGE = r"""<!doctype html>
         const value=document.createElement('strong');value.className='meter-value';value.textContent=factorValueText(factor.name,score);
         row.append(heading,track,value);stack.appendChild(row);
       });
+      return stack;
+    }
+    function renderScoreRecipe(item) {
+      const recipe=document.createElement('div');recipe.className='score-recipe';
+      recipe.appendChild(renderScoreRing(item));
+      const stack=renderFactorStack(item);
       recipe.appendChild(stack);
       return recipe;
     }
@@ -1164,17 +1204,16 @@ PAGE = r"""<!doctype html>
       const displayedRound=dnaRounds[dnaPageIndex]||recommendationSlate.slice(0,DNA_ROUND_SIZE);
       const table=document.createElement('table'); table.className='dna-table';
       const head=document.createElement('thead'); const header=document.createElement('tr');
-      ['#','Track','Final score','Genre','Why this fits','Why now','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';cell.textContent=label;header.appendChild(cell);});
+      ['#','Track','Final score','Score recipe','Why this fits','Actions'].forEach(label=>{const cell=document.createElement('th');cell.scope='col';cell.textContent=label;header.appendChild(cell);});
       head.appendChild(header); table.appendChild(head);
       const body=document.createElement('tbody');
       displayedRound.forEach(item=>{
         const row=document.createElement('tr');row.setAttribute('aria-current',String(item.id===activePlaybackTrackId));
         const rank=document.createElement('td');rank.className='metric';rank.textContent=item.rank||displayedRound.indexOf(item)+1;row.appendChild(rank);
         const track=document.createElement('td');track.className='track-cell';const identity=document.createElement('div');identity.className='track-identity';const image=document.createElement('img');image.className='queue-cover';image.alt='';image.src=item.image_url||'';const copy=document.createElement('div');const title=document.createElement('strong');title.textContent=item.title;const artist=document.createElement('span');artist.textContent=item.artist;copy.append(title,artist);identity.append(image,copy);track.appendChild(identity);row.appendChild(track);
-        const recommendationScore=document.createElement('td');recommendationScore.className='metric';const finalScore=item.why_now?.overall_score??item.match_score;recommendationScore.textContent=Number.isFinite(finalScore)?`${finalScore}%`:'--';recommendationScore.title='Final EchoSense score after all signals are combined';row.appendChild(recommendationScore);
-        const category=document.createElement('td');const categoryPill=document.createElement('span');categoryPill.className='category-pill';categoryPill.textContent=item.genre||item.category||(item.evidence?.matched_genres||[])[0]||'Music DNA';category.appendChild(categoryPill);row.appendChild(category);
-        const recipeCell=document.createElement('td');recipeCell.className='recipe-cell';recipeCell.appendChild(renderScoreRecipe(item));row.appendChild(recipeCell);
-        const why=document.createElement('td');why.className='why-cell';why.textContent=recommendationExplanation(item);row.appendChild(why);
+        const recommendationScore=document.createElement('td');recommendationScore.className='metric';recommendationScore.appendChild(renderScoreRing(item));row.appendChild(recommendationScore);
+        const recipeCell=document.createElement('td');recipeCell.className='recipe-cell';recipeCell.appendChild(renderFactorStack(item));row.appendChild(recipeCell);
+        const why=document.createElement('td');why.className='why-cell';const whyPoints=document.createElement('div');whyPoints.className='why-points';recommendationKeyPoints(item).forEach(point=>{const chip=document.createElement('span');chip.className='why-point';chip.textContent=point;whyPoints.appendChild(chip);});why.appendChild(whyPoints);row.appendChild(why);
         const actionCell=document.createElement('td');actionCell.className='track-actions';const play=document.createElement('button');play.type='button';play.className='primary';play.textContent='▶';play.setAttribute('aria-label',`Play ${item.title}`);play.addEventListener('click',()=>playDnaTrack(item).catch(e=>setText('#toast',e.message)));const like=document.createElement('button');like.type='button';like.className='secondary';like.textContent='♥';like.setAttribute('aria-label',`Like ${item.title}`);like.addEventListener('click',()=>feedbackForDecision(item,'love'));const dislike=document.createElement('button');dislike.type='button';dislike.className='secondary';dislike.textContent='×';dislike.setAttribute('aria-label',`Not for me: ${item.title}`);dislike.addEventListener('click',()=>feedbackForDecision(item,'not_for_me'));actionCell.append(play,like,dislike);row.appendChild(actionCell);body.appendChild(row);
       });
       table.appendChild(body);container.appendChild(table);
