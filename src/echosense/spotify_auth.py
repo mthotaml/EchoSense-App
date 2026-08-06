@@ -596,6 +596,7 @@ def _spotify_data_resource_key(
     activity: str | None,
     daypart: str | None,
     boosts: tuple[int, int, int, int],
+    exclude: tuple[str, ...] = (),
 ) -> str:
     fingerprint = json.dumps(
         {
@@ -606,6 +607,7 @@ def _spotify_data_resource_key(
             "activity": activity,
             "daypart": daypart,
             "boosts": boosts,
+            "exclude": sorted({item_id for item_id in exclude if item_id})[:50],
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -686,6 +688,7 @@ def spotify_data(
             boost_learned_preference,
             boost_diversity,
         ),
+        exclude=tuple(exclude[:50]),
     )
     cooldown = _provider_cooldown(storage, session.provider_user_id)
     if cooldown:

@@ -458,6 +458,14 @@ def test_final_playback_plan_names_the_exact_ranked_dna_sequence() -> None:
     assert "Plan ${dnaPageIndex+1} of ${dnaRounds.length}" in page
     assert "Prepare six more" in page
     assert "Final score" in page
+    assert "Score recipe" in page
     assert "Why this fits" in page
+    assert "Genre" not in page
+    assert "renderScoreRing(item)" in page
+    assert "recommendationScore.appendChild(renderScoreRing(item))" in page
+    assert "recipeCell.appendChild(renderFactorStack(item))" in page
+    assert "recommendationKeyPoints(item)" in page
+    assert "loadMore.textContent='Preparing…'" in page
+    assert "loadLiveSpotify($('#moment').value,exclusions,false,true)" in page
     assert "item.why_now?.overall_score??item.match_score" in page
-    assert "Final EchoSense score after all signals are combined" in page
+    assert "Final EchoSense score after taste, moment, learning, freshness" in page

@@ -44,6 +44,31 @@ def test_spotify_session_is_disconnected_by_default(client: TestClient) -> None:
     assert response.json() == {"connected": False}
 
 
+def test_spotify_data_resource_key_includes_excluded_tracks() -> None:
+    base = {
+        "moment": "driving",
+        "weather": "sunny",
+        "region": "Southern California",
+        "road_setting": "coastal",
+        "activity": "unknown",
+        "daypart": "evening",
+        "boosts": (0, 50, 0, 0),
+    }
+
+    first = spotify_auth._spotify_data_resource_key(**base, exclude=("track-1",))
+    second = spotify_auth._spotify_data_resource_key(**base, exclude=("track-2",))
+    same_set_different_order = spotify_auth._spotify_data_resource_key(
+        **base,
+        exclude=("track-2", "track-1"),
+    )
+
+    assert first != second
+    assert same_set_different_order == spotify_auth._spotify_data_resource_key(
+        **base,
+        exclude=("track-1", "track-2"),
+    )
+
+
 def test_identical_provider_reads_are_single_flight() -> None:
     loader_started = Event()
     release_loader = Event()
