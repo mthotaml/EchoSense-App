@@ -634,7 +634,7 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   await expect(page.locator('#player-title')).toHaveText('Open Current');
   await expect(page.locator('#pick-heading')).toHaveText('Open Current');
   await expect(page.locator('#dna-queue-items tbody tr[aria-current="true"]')).toContainText('Open Current');
-  await expect(page.locator('#pick-label')).toHaveText('Current EchoSense recommendation');
+  await expect(page.locator('#pick-label')).toHaveText('Now playing from EchoSense');
   await expect(page.locator('#toast')).toContainText(
     'selected the next planned recommendation and verified Open Current is playing',
   );
@@ -711,6 +711,13 @@ test('Guardian certifies the Spotify reference journey', async ({ page }) => {
   );
 
   restoreFromSnapshot = true;
+  providerTrack = {id: 'external-session-track', name: 'Talking to Ben'};
+  await page.reload();
+  await expect(page.locator('#player-title')).toHaveText('Talking to Ben');
+  await expect(page.locator('#pick-label')).toHaveText('Recommended next');
+  await expect(page.locator('#play')).toHaveText('▶ Play this recommendation');
+
+  providerTrack = {id: 'autopilot-5', name: 'Coastal Signal'};
   await page.reload();
   await expect(page.locator('#player-title')).toHaveText('Coastal Signal');
   await expect(page.locator('#player-status')).toContainText('Last session restored');

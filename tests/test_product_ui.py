@@ -223,6 +223,10 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Skip current song" in response.text
     assert 'id="pick-label"' in response.text
     assert "Current EchoSense recommendation" in response.text
+    assert "function isExternalSpotifyPlayback()" in response.text
+    assert "setText('#pick-label','Recommended next')" in response.text
+    assert "setText('#pick-label','Now playing from EchoSense')" in response.text
+    assert "▶ Play this recommendation" in response.text
     assert "activePlaybackDecisionId" in response.text
     assert "decisionByTrackId" in response.text
     assert "function syncRecommendationSurfaces(trackId)" in response.text
