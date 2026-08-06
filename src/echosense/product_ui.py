@@ -811,8 +811,28 @@ PAGE = r"""<!doctype html>
       };
     }
 
+    function activeSpotifyTrackId() {
+      return playerState?.track_window?.current_track?.id||null;
+    }
+
+    function isExternalSpotifyPlayback() {
+      const trackId=activeSpotifyTrackId();
+      return Boolean(spotifyConnected&&trackId&&trackId!==currentTrackId&&!decisionByTrackId.has(trackId));
+    }
+
     function syncPickLabel() {
+      if(isExternalSpotifyPlayback()) {
+        setText('#pick-label','Recommended next');
+        setText('#play','▶ Play this recommendation');
+        return;
+      }
+      if(spotifyConnected&&activePlaybackTrackId&&activePlaybackTrackId===currentTrackId) {
+        setText('#pick-label','Now playing from EchoSense');
+        setText('#play','▶ Play');
+        return;
+      }
       setText('#pick-label','Current EchoSense recommendation');
+      setText('#play','▶ Play');
     }
 
     function recommendationForTrack(trackId) {
@@ -899,6 +919,9 @@ PAGE = r"""<!doctype html>
           activePlaybackTrackId=track.id;
           activePlaybackDecisionId=observedDecisionId;
           syncRecommendationSurfaces(track.id);
+        } else {
+          activePlaybackTrackId=null;
+          activePlaybackDecisionId=null;
         }
       } else {
         activePlaybackTrackId=null;
