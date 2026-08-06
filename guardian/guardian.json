@@ -309,11 +309,11 @@
         },
         {
           "source": "tests/e2e/spotify-reference.spec.js",
-          "pattern": "Priority factor: Music DNA affinity"
+          "pattern": "Priority factor: Taste match"
         },
         {
           "source": "tests/e2e/spotify-reference.spec.js",
-          "pattern": "Why it matters"
+          "pattern": "How closely this track matches"
         },
         {
           "source": "tests/test_playback_learning.py",
@@ -599,7 +599,7 @@
         },
         {
           "source": "tests/e2e/spotify-reference.spec.js",
-          "pattern": "Music DNA affinity boost plan applied"
+          "pattern": "Taste match boost plan applied"
         },
         {
           "source": "tests/test_spotify_auth.py",
