@@ -27,7 +27,7 @@ def test_product_copy_keeps_recommendations_provider_neutral() -> None:
     assert "Redirect URI" in response.text
     assert "Save setup and open Spotify sign-in" in response.text
     assert "These are Spotify app credentials" in response.text
-    assert "EchoSense recommendation from your Music DNA" in response.text
+    assert "EchoSense pick" in response.text
     assert "[hidden] { display:none!important; }" in response.text
     assert "available listening evidence did not change this plan" in response.text
     assert "Connect a music provider for your real listening context" in response.text
@@ -133,7 +133,7 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert response.text.index('id="moment-panel"') < response.text.index('id="boost-panel"')
     assert response.text.index('id="boost-panel"') < response.text.index('id="live-context-panel"')
     assert "/auth/spotify/data?" in response.text
-    assert "Context evidence:" in response.text
+    assert "Moment fit" in response.text
     assert 'id="provider-resilience"' in response.text
     assert "Spotify is cooling down" in response.text
     assert "lastSpotifyData" in response.text
@@ -319,14 +319,13 @@ def test_browser_player_uses_explicit_playback_commands() -> None:
     assert "Moment fit" in response.text
     assert "Learning" in response.text
     assert "Freshness" in response.text
-    assert "Matches this track to the artists, genres, and songs you enjoy" in response.text
-    assert "Checks the current time, weather, area, road, and activity" in response.text
-    assert "Learns from your plays, completions, saves, and skips" in response.text
-    assert "Limits recently repeated tracks and artists" in response.text
-    assert response.text.count("Why it matters:") == 4
+    assert "How closely this track matches the artists, songs, and styles" in response.text
+    assert "How well this track fits this moment" in response.text
+    assert "What EchoSense has learned from your plays" in response.text
+    assert "Whether this feels new enough" in response.text
     assert "className='factor-info'" in response.text
     assert "info.setAttribute('aria-label'" in response.text
-    assert "EchoSense Recommendation Score: the final normalized result" in response.text
+    assert "EchoSense Recommendation Score: final score after Taste match" in response.text
     assert "% EchoSense score" in response.text
     assert "Final score" in response.text
     assert "Why this fits" in response.text
@@ -369,7 +368,7 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "renderHeroFactors" in page
     assert 'id="factor-modal"' in page
     assert "factorFormulas" in page
-    assert "DNA affinity = (0.60 × artist/track affinity) + (0.40 × category fit)" in page
+    assert "Taste match = familiar artists/songs + similar styles" in page
 
     assert 'id="episodic-memory"' in page
     assert 'id="semantic-memory"' in page
@@ -387,12 +386,12 @@ def test_explainable_product_surface_is_complete_and_governance_is_honest() -> N
     assert "Server-side enforcement requires the governance API." in page
     assert "Any moment is selected" in page
     assert "Choose Driving, Working, Exercising, Relaxing, or Social" in page
-    assert "factor.name==='Diversity guard'" in page
-    assert "?'Passed':'Limited'" in page
+    assert "freshnessLabel(item,Number(factor.score))" in page
+    assert "Fresh artist" in page
     assert "function factorInfoButton(name,location='Recommendation')" in page
-    assert "`${location} factor: ${name}. ${factorExplanations[name]}`" in page
+    assert "`${location} factor: ${factorLabel(name)}. ${factorDescription(name)}`" in page
     assert "You selected general" not in page
-    assert "Why it matters: your queue stays fresh" in page
+    assert "renderHeroWhy" in page
     assert "factorInfoButton(label,'Priority')" in page
     assert "factorInfoButton(factor.name,'Current recommendation')" in page
     assert "factorInfoButton(factor.name,'Queue')" in page
@@ -409,7 +408,7 @@ def test_recommendation_boosters_drive_every_spotify_recommendation_request() ->
     assert "echosenseRecommendationBoosts" in page
     assert "data.context_statement" in page
     assert "async function changeRecommendationBoost(label)" in page
-    assert "changeRecommendationBoost(label)" in page
+    assert "changeRecommendationBoost(factorLabel(label))" in page
     assert "`${label} boost`" in page
     assert "pendingPlanTransitionLabel" in page
 

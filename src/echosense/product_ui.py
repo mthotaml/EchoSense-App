@@ -262,8 +262,10 @@ PAGE = r"""<!doctype html>
     .hero-art:not([src]) { visibility:hidden; }
     .track { margin-top:10px; font-size:clamp(2.2rem,5vw,4rem); }
     .reason { margin:18px 0 14px; }
-    .reason-pill,.genre-pill { display:inline-flex; width:max-content; max-width:100%; padding:8px 11px; border:1px solid rgba(30,215,96,.24); border-radius:999px; color:#cffff0; background:rgba(30,215,96,.07); font-size:.78rem; font-weight:650; }
+    .reason-pill,.genre-pill { display:inline-flex; flex-wrap:wrap; gap:7px; width:max-content; max-width:100%; padding:8px 11px; border:1px solid rgba(30,215,96,.24); border-radius:999px; color:#cffff0; background:rgba(30,215,96,.07); font-size:.78rem; font-weight:650; }
     .genre-pill { border-color:rgba(100,181,246,.25); color:#cbe8ff; background:rgba(100,181,246,.08); margin-top:10px; }
+    .hero-chip { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+    .hero-chip::before { content:""; width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 12px rgba(30,215,96,.55); }
     .factor-bars { display:grid; grid-template-columns:repeat(2,minmax(180px,1fr)); gap:12px 18px; margin:22px 0; }
     .factor-label { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:.78rem; }
     .bar-track { height:6px; margin-top:7px; overflow:hidden; border-radius:99px; background:rgba(255,255,255,.07); }
@@ -382,20 +384,60 @@ PAGE = r"""<!doctype html>
     const recommendationBoosts=JSON.parse(localStorage.getItem('echosenseRecommendationBoosts')||'{}');
     let boostRefreshTimer=null;
     let pendingPlanTransitionLabel=null;
+    let recentTrackIds = new Set();
+    let recentTrackNames = new Set();
+    let recentArtistNames = new Set();
     const factorExplanations={
-      'Music DNA affinity':'Matches this track to the artists, genres, and songs you enjoy. Why it matters: recommendations still feel like your taste.',
-      'Live context fit':'Checks the current time, weather, area, road, and activity when available. Why it matters: the music better fits what you are doing now.',
-      'Learned preference':'Learns from your plays, completions, saves, and skips in similar moments. Why it matters: EchoSense improves from your actual choices.',
-      'Diversity guard':'Limits recently repeated tracks and artists. Why it matters: your queue stays fresh and avoids listening fatigue.',
+      'Music DNA affinity':'How closely this track matches the artists, songs, and styles you usually like.',
+      'Live context fit':'How well this track fits this moment, using time, weather, area, road, and activity when available.',
+      'Learned preference':'What EchoSense has learned from your plays, completions, saves, and skips.',
+      'Diversity guard':'Whether this feels new enough, or repeats a track or artist you recently heard.',
       'Time pattern':'Evidence that you repeatedly choose similar music around this time or daypart.'
     };
     const factorFormulas={
-      'Music DNA affinity':'DNA affinity = (0.60 × artist/track affinity) + (0.40 × category fit)',
-      'Live context fit':'Context fit = bounded(daypart + weather + location + activity), capped at 35%',
-      'Learned preference':'Preference adjustment = clamp(feedback evidence, −0.20, +0.20)',
-      'Diversity guard':'Diversity = artist cap + duplicate prevention + recent-history exclusion',
+      'Music DNA affinity':'Taste match = familiar artists/songs + similar styles',
+      'Live context fit':'Moment fit = time + weather + area + road + activity',
+      'Learned preference':'Learning = recent plays + completions + saves + skips',
+      'Diversity guard':'Freshness = recent track repeat + recent artist repeat',
       'Time pattern':'Time pattern = confidence × recency decay × repeated-evidence strength'
     };
+    function factorLabel(name) {
+      if(name==='Music DNA affinity')return 'Taste match';
+      if(name==='Live context fit')return 'Moment fit';
+      if(name==='Learned preference')return 'Learning';
+      if(name==='Diversity guard')return 'Freshness';
+      return name;
+    }
+    function factorDescription(name) {
+      return factorExplanations[name]||'This factor contributes bounded evidence to the recommendation decision.';
+    }
+    function normalizedText(value) {
+      return String(value||'').trim().toLowerCase();
+    }
+    function rememberRecentListening(profile={}) {
+      recentTrackIds=new Set();
+      recentTrackNames=new Set();
+      recentArtistNames=new Set();
+      (profile.recent_tracks||[]).forEach(track=>{
+        if(track.id)recentTrackIds.add(String(track.id));
+        if(track.provider_id)recentTrackIds.add(String(track.provider_id));
+        if(track.title)recentTrackNames.add(normalizedText(track.title));
+        if(track.artist)recentArtistNames.add(normalizedText(track.artist));
+        (track.artists||[]).forEach(artist=>recentArtistNames.add(normalizedText(artist)));
+      });
+    }
+    function freshnessLabel(item={},score=null) {
+      const trackSeen=Boolean(
+        (item.id&&recentTrackIds.has(String(item.id)))||
+        (item.provider_id&&recentTrackIds.has(String(item.provider_id)))||
+        (item.title&&recentTrackNames.has(normalizedText(item.title)))
+      );
+      const artistSeen=Boolean(item.artist&&recentArtistNames.has(normalizedText(item.artist)));
+      if(trackSeen)return artistSeen?'Repeat track':'Repeat track · new artist';
+      if(artistSeen)return 'New track · repeat artist';
+      if(Number.isFinite(score)&&score<100)return 'Less fresh';
+      return 'Fresh artist';
+    }
     const lifecycle = new EchoSensePlayerLifecycle.PlayerLifecycle({
       createPlayer: SpotifyApi => new SpotifyApi.Player({name:'EchoSense Browser',volume:.7,getOAuthToken:async cb=>{try{const token=await (await api('/v1/player/token')).json();cb(token.access_token);}catch(e){setText('#toast',e.message);}}}),
       onReady: async ({device_id}) => {
@@ -428,24 +470,30 @@ PAGE = r"""<!doctype html>
       const container=$('#boost-controls');container.replaceChildren();
       boostDefinitions.forEach(([key,label])=>{
         const card=document.createElement('div');card.className='boost-control';
-        const heading=document.createElement('div');heading.className='boost-heading';const name=document.createElement('label');name.htmlFor=`boost-${key}`;name.textContent=label;heading.append(name,factorInfoButton(label,'Priority'));
+        const heading=document.createElement('div');heading.className='boost-heading';const name=document.createElement('label');name.htmlFor=`boost-${key}`;name.textContent=factorLabel(label);heading.append(name,factorInfoButton(label,'Priority'));
         const amount=document.createElement('strong');amount.textContent=`+${Number(recommendationBoosts[key]||0)}%`;heading.appendChild(amount);
-        const slider=document.createElement('input');slider.id=`boost-${key}`;slider.type='range';slider.min='0';slider.max='100';slider.step='10';slider.value=String(recommendationBoosts[key]||0);slider.setAttribute('aria-label',`Boost ${label}`);
+        const slider=document.createElement('input');slider.id=`boost-${key}`;slider.type='range';slider.min='0';slider.max='100';slider.step='10';slider.value=String(recommendationBoosts[key]||0);slider.setAttribute('aria-label',`Boost ${factorLabel(label)}`);
         const weight=document.createElement('div');weight.className='boost-value';weight.textContent=Number.isFinite(effectiveWeights[key])?`Effective weight ${Math.round(effectiveWeights[key]*100)}%`:'Balanced baseline';
-        slider.addEventListener('input',()=>{recommendationBoosts[key]=Number(slider.value);amount.textContent=`+${slider.value}%`;localStorage.setItem('echosenseRecommendationBoosts',JSON.stringify(recommendationBoosts));clearTimeout(boostRefreshTimer);boostRefreshTimer=setTimeout(()=>{if(spotifyConnected)changeRecommendationBoost(label).catch(e=>setText('#toast',e.message));},350);});
+        slider.addEventListener('input',()=>{recommendationBoosts[key]=Number(slider.value);amount.textContent=`+${slider.value}%`;localStorage.setItem('echosenseRecommendationBoosts',JSON.stringify(recommendationBoosts));clearTimeout(boostRefreshTimer);boostRefreshTimer=setTimeout(()=>{if(spotifyConnected)changeRecommendationBoost(factorLabel(label)).catch(e=>setText('#toast',e.message));},350);});
         card.append(heading,slider,weight);container.appendChild(card);
       });
     }
 
     function dnaLine(label, value) { const row=document.createElement('div'); row.className='dna-line'; const key=document.createElement('span'); key.textContent=label; const strong=document.createElement('strong'); strong.textContent=value; row.append(key,strong); return row; }
     function renderTimeline(items) { const c=$('#timeline'); c.replaceChildren(); items.forEach((label,index)=>{ if(index){const a=document.createElement('span');a.className='arrow';a.textContent='→';c.appendChild(a);} const s=document.createElement('span');s.className='journey-step';s.textContent=label;c.appendChild(s); }); }
-    function openFactorModal(name) { setText('#factor-modal-title',name);setText('#factor-formula',factorFormulas[name]||'Score = normalized evidence contribution to the final rank');setText('#factor-detail',factorExplanations[name]||'This factor contributes bounded evidence to the recommendation decision.');$('#factor-modal').hidden=false; }
+    function openFactorModal(name) { setText('#factor-modal-title',factorLabel(name));setText('#factor-formula',factorFormulas[name]||'Score = normalized evidence contribution to the final rank');setText('#factor-detail',factorDescription(name));$('#factor-modal').hidden=false; }
     function closeFactorModal() { $('#factor-modal').hidden=true; }
-    function factorInfoButton(name,location='Recommendation') { const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=factorExplanations[name];info.setAttribute('aria-label',`${location} factor: ${name}. ${factorExplanations[name]}`);info.addEventListener('click',event=>{event.preventDefault();openFactorModal(name);});return info; }
+    function factorInfoButton(name,location='Recommendation') { const info=document.createElement('button');info.type='button';info.className='factor-info';info.textContent='i';info.dataset.tooltip=factorDescription(name);info.setAttribute('aria-label',`${location} factor: ${factorLabel(name)}. ${factorDescription(name)}`);info.addEventListener('click',event=>{event.preventDefault();openFactorModal(name);});return info; }
+    function renderHeroWhy(item) {
+      const container=$('#why-pill');container.replaceChildren();
+      recommendationKeyPoints(item).slice(0,4).forEach(point=>{
+        const chip=document.createElement('span');chip.className='hero-chip';chip.textContent=point;container.appendChild(chip);
+      });
+    }
     function renderHeroFactors(item) {
       const container=$('#hero-factors');container.replaceChildren();
       const factors=(item?.why_now?.factors||[]).filter(factor=>factorExplanations[factor.name]).slice(0,4);
-      factors.forEach(factor=>{const wrapper=document.createElement('div');wrapper.className='factor-bar';const label=document.createElement('div');label.className='factor-label';const title=document.createElement('span');title.className='factor-heading';title.append(document.createTextNode(factor.name),factorInfoButton(factor.name,'Current recommendation'));const score=document.createElement('strong');score.textContent=factor.name==='Diversity guard'?(factor.score>=100?'Passed':'Limited'):`${factor.score}%`;label.append(title,score);const track=document.createElement('div');track.className='bar-track';const fill=document.createElement('div');fill.className='bar-fill';fill.style.width=`${Math.max(0,Math.min(100,factor.score))}%`;track.appendChild(fill);wrapper.append(label,track);container.appendChild(wrapper);});
+      factors.forEach(factor=>{const wrapper=document.createElement('div');wrapper.className='factor-bar';const label=document.createElement('div');label.className='factor-label';const title=document.createElement('span');title.className='factor-heading';title.append(document.createTextNode(factorLabel(factor.name)),factorInfoButton(factor.name,'Current recommendation'));const score=document.createElement('strong');score.textContent=factor.name==='Diversity guard'?freshnessLabel(item,Number(factor.score)):`${factor.score}%`;label.append(title,score);const track=document.createElement('div');track.className='bar-track';const fill=document.createElement('div');fill.className='bar-fill';fill.style.width=`${Math.max(0,Math.min(100,factor.score))}%`;track.appendChild(fill);wrapper.append(label,track);container.appendChild(wrapper);});
     }
     function renderMemory(profile,data={}) {
       const episodic=$('#episodic-memory');episodic.replaceChildren();
@@ -676,6 +724,7 @@ PAGE = r"""<!doctype html>
       renderProviderResilience(data.resilience);
       if(!data.profile||typeof data.profile.display_name!=='string')throw new Error('Spotify returned an incomplete listening profile. Please retry or reconnect.');
       const profile=data.profile; const pick=data.recommendation; recommendationSlate=data.recommendations||[pick].filter(Boolean);
+      rememberRecentListening(profile);
       recommendationSlate.forEach(item=>item?.id&&item?.decision_id&&decisionByTrackId.set(item.id,item.decision_id));
       if(recordRound)rememberDnaRound(recommendationSlate);
       const newestPlanIndex=dnaRounds.length-1;
@@ -683,7 +732,7 @@ PAGE = r"""<!doctype html>
       temporalMoodProfile=data.temporal_mood||null; renderTemporalMood();
       renderBoostControls(data.effective_weights||{});renderMomentImpact(data.moment_impact);const cachedPlan=data.resilience?.mode==='last_known_good';$('#context-statement').hidden=cachedPlan;if(!cachedPlan)setText('#context-statement',data.context_statement||'Music DNA and the current listening moment are shaping the next track.');setText('#dna-plan-statement',`${data.moment_impact?.message||''} ${data.context_statement||'Music DNA and the current listening moment shaped this final playback order.'}`.trim());
       setText('#greeting', `${greetingForHour(new Date().getHours())}, ${profile.display_name}.`);
-      if (pick) { liveRecommendationReady=true; const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · EchoSense recommendation from your Music DNA`); setText('#match',`${pick.match_score}% EchoSense score`);$('#match').title='EchoSense Recommendation Score: the final normalized result after Music DNA affinity, live context, learned preference, diversity, and boosts are applied.';$('#match').setAttribute('aria-label',`${pick.match_score}% EchoSense Recommendation Score. ${$('#match').title}`);setText('#reason',pick.reason);setText('#why-pill',`✨ ${explained.why_now?.summary||pick.reason||'Selected as an EchoSense recommendation'}`);renderMomentImpact(data.moment_impact,explained);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';const genres=pick.evidence?.matched_genres||[];setText('#hero-genre',genres[0]||'Music DNA');$('#hero-genre').hidden=false; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your Music DNA. Choose Driving, Working, Exercising, Relaxing, or Social for recommendations tailored to that moment and your taste.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''} ${genres.length?`Context evidence: ${genres.join(', ')}.`:'EchoSense used moment-specific catalog evidence and your ranked listening history.'}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
+      if (pick) { liveRecommendationReady=true; const explained=recommendationSlate.find(item=>item.id===pick.id)||pick;setText('#pick-heading',pick.title); setText('#artist',`${pick.artist} · EchoSense pick`); setText('#match',`${pick.match_score}% EchoSense score`);$('#match').title='EchoSense Recommendation Score: final score after Taste match, Moment fit, Learning, Freshness, and your priority settings are combined.';$('#match').setAttribute('aria-label',`${pick.match_score}% EchoSense Recommendation Score. ${$('#match').title}`);setText('#reason',pick.reason);renderHeroWhy(explained);renderMomentImpact(data.moment_impact,explained);renderHeroFactors(explained);const cover=pick.image_url||explained.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';$('#hero-genre').hidden=true; const anyMomentGuidance='Any moment is selected, so EchoSense is playing broadly suitable songs from your taste. Choose Driving, Working, Exercising, Relaxing, or Social for a more specific moment fit.';setText('#evidence',$('#moment').value==='general'?anyMomentGuidance:`${pick.evidence?.noticed||''}`); currentRecommendationId=pick.decision_id; currentTrackId=pick.id; currentPlayOutcomeId=`out_${crypto.randomUUID?.()||Date.now()}`; currentQueueCommandId=`queue_${crypto.randomUUID?.()||Date.now()}`; reportedSignals.clear(); syncPickLabel(); await refreshSavedState(pick.id); }
       setText('#insight',data.insight); const dna=$('#dna'); dna.replaceChildren(); const genres=profile.genres||[];
       dna.appendChild(dnaLine('Mostly',genres[0]?.name||'Still learning')); dna.appendChild(dnaLine('Also drawn to',genres[1]?.name||'More signals needed')); dna.appendChild(dnaLine('Popularity profile',profile.average_popularity>=70?'Mainstream':profile.average_popularity>=40?'Balanced':'Deep cuts'));
       renderTimeline(data.timeline.length?data.timeline:['Connected','Listening','Learning']); renderMemory(profile,data); renderDnaQueue();
@@ -867,8 +916,9 @@ PAGE = r"""<!doctype html>
       const score=item.match_score??item.why_now?.overall_score;
       setText('#match',Number.isFinite(score)?`${score}% EchoSense score`:'EchoSense selected');
       setText('#reason',item.reason||item.why_now?.summary||'Selected from your final EchoSense Playback Plan.');
-      setText('#why-pill',`✨ ${item.why_now?.summary||item.reason||'This track is the active EchoSense recommendation.'}`);
+      renderHeroWhy(item);
       const cover=item.image_url||'';$('#hero-cover').src=cover;$('#hero-cover').style.visibility=cover?'visible':'hidden';
+      $('#hero-genre').hidden=true;
       renderHeroFactors(item);
       syncPickLabel();
       if(match.roundIndex!==null)dnaPageIndex=match.roundIndex;
@@ -1151,20 +1201,13 @@ PAGE = r"""<!doctype html>
       if(Number.isFinite(taste))points.push(`Taste ${taste}%`);
       if(Number.isFinite(moment))points.push(`Moment ${moment}%`);
       if(Number.isFinite(learning)&&learning!==0)points.push(`Learning ${learning>0?'+':''}${learning}%`);
-      if(Number.isFinite(freshness))points.push(freshness>=100?'Fresh':'Less fresh');
+      if(Number.isFinite(freshness))points.push(freshnessLabel(item,freshness));
       if(!points.length)points.push(recommendationExplanation(item));
       return points.slice(0,4);
     }
-    function factorLabel(name) {
-      if(name==='Music DNA affinity')return 'Taste match';
-      if(name==='Live context fit')return 'Moment fit';
-      if(name==='Learned preference')return 'Learning';
-      if(name==='Diversity guard')return 'Freshness';
-      return name;
-    }
     function factorValueText(name,score) {
       if(!Number.isFinite(score))return 'No data';
-      if(name==='Diversity guard')return score>=100?'Fresh':'Limited';
+      if(name==='Diversity guard')return freshnessLabel({},score);
       if(name==='Learned preference')return `${score>0?'+':''}${score}%`;
       return `${score}%`;
     }
@@ -1187,7 +1230,7 @@ PAGE = r"""<!doctype html>
         const magnitude=factor.name==='Learned preference'?Math.abs(score):score;
         fill.style.setProperty('--meter',`${Math.max(0,Math.min(100,magnitude))}%`);
         track.appendChild(fill);
-        const value=document.createElement('strong');value.className='meter-value';value.textContent=factorValueText(factor.name,score);
+        const value=document.createElement('strong');value.className='meter-value';value.textContent=factor.name==='Diversity guard'?freshnessLabel(item,score):factorValueText(factor.name,score);
         row.append(heading,track,value);stack.appendChild(row);
       });
       return stack;
